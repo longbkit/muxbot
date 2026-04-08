@@ -13,7 +13,7 @@ export function buildPairingReply(params: {
     `Pairing code: ${params.code}`,
     "",
     "Ask the bot owner to approve with:",
-    `bun run src/main.ts pairing approve ${params.channel} <code>`,
+    `muxbot pairing approve ${params.channel} <code>`,
   ].join("\n");
 }
 

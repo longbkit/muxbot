@@ -138,7 +138,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
         isForum: true,
       }),
     ).toContain(
-      "`bun run src/main.ts channels add telegram-group -1003455688247 --topic 3`",
+      "`muxbot channels add telegram-group -1003455688247 --topic 3`",
     );
   });
 

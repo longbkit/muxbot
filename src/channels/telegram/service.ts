@@ -128,8 +128,8 @@ export function renderTelegramUnroutedRouteMessage(params: {
 
   lines.push(
     params.topicId != null
-      ? `\`bun run src/main.ts channels add telegram-group ${params.chatId} --topic ${params.topicId}\``
-      : `\`bun run src/main.ts channels add telegram-group ${params.chatId}\``,
+      ? `\`muxbot channels add telegram-group ${params.chatId} --topic ${params.topicId}\``
+      : `\`muxbot channels add telegram-group ${params.chatId}\``,
   );
 
   if (params.mode === "start" || params.mode === "help" || params.mode === "status") {

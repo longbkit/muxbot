@@ -88,8 +88,8 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(replyCalls).toBe(1);
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Privilege commands are not allowed");
-    expect(posted[0]).toContain("bun run src/main.ts channels privilege enable slack-channel C123");
-    expect(posted[0]).toContain("bun run src/main.ts channels privilege allow-user slack-channel C123 U123");
+    expect(posted[0]).toContain("muxbot channels privilege enable slack-channel C123");
+    expect(posted[0]).toContain("muxbot channels privilege allow-user slack-channel C123 U123");
   });
 
   test("blocks bash commands when sensitive commands are disabled", async () => {
@@ -129,8 +129,8 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(bashCalls).toBe(0);
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Privilege commands are not allowed");
-    expect(posted[0]).toContain("bun run src/main.ts channels privilege enable slack-channel C123");
-    expect(posted[0]).toContain("bun run src/main.ts channels privilege allow-user slack-channel C123 U123");
+    expect(posted[0]).toContain("muxbot channels privilege enable slack-channel C123");
+    expect(posted[0]).toContain("muxbot channels privilege allow-user slack-channel C123 U123");
   });
 
   test("allows transcript requests when privilege commands are enabled", async () => {
@@ -395,7 +395,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("muxbot status");
     expect(posted[0]).toContain("Operator commands:");
-    expect(posted[0]).toContain("bun run src/main.ts channels privilege enable slack-channel C123");
-    expect(posted[0]).toContain("bun run src/main.ts channels privilege allow-user slack-channel C123 U123");
+    expect(posted[0]).toContain("muxbot channels privilege enable slack-channel C123");
+    expect(posted[0]).toContain("muxbot channels privilege allow-user slack-channel C123 U123");
   });
 });

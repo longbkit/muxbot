@@ -85,7 +85,7 @@ bun run dev
 Print the resolved default config path:
 
 ```bash
-bun run src/main.ts status
+muxbot status
 ```
 
 Important distinction:
