@@ -83,6 +83,9 @@ const TELEGRAM_MINIMAL_COMMANDS: TelegramRegisteredCommand[] = [
 const TELEGRAM_FULL_COMMANDS: TelegramRegisteredCommand[] = [
   ...TELEGRAM_MINIMAL_COMMANDS,
   { command: "transcript", description: "Show current transcript" },
+  { command: "attach", description: "Attach to the active run" },
+  { command: "detach", description: "Stop live updates for this thread" },
+  { command: "watch", description: "Watch the active run on an interval" },
   { command: "stop", description: "Interrupt current run" },
   { command: "followup", description: "Show or change follow-up mode" },
   { command: "bash", description: "Run bash in the agent workspace" },

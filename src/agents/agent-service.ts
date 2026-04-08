@@ -3,6 +3,14 @@ import {
   type FollowUpMode,
   type StoredFollowUpState,
 } from "./follow-up-policy.ts";
+import {
+  formatConfiguredRuntimeLimit,
+  isTerminalRunStatus,
+  type PromptExecutionStatus,
+  type RunObserver,
+  type RunUpdate,
+  type StoredSessionRuntime,
+} from "./run-observation.ts";
 import { createSessionId, extractSessionId } from "./session-identity.ts";
 import { SessionStore } from "./session-store.ts";
 import {
@@ -16,6 +24,7 @@ import { applyTemplate, ensureDir } from "../shared/paths.ts";
 import { sleep } from "../shared/process.ts";
 import { deriveInteractionText, normalizePaneText } from "../shared/transcript.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
+import { monitorTmuxRun } from "../runners/tmux/run-monitor.ts";
 import { AgentJobQueue } from "./job-queue.ts";
 
 export type AgentSessionTarget = {
@@ -25,23 +34,22 @@ export type AgentSessionTarget = {
   parentSessionKey?: string;
 };
 
-type StreamUpdate = {
-  status: "running" | "completed" | "timeout";
-  agentId: string;
+export type SessionRuntimeInfo = {
+  state: "idle" | "running" | "detached";
+  startedAt?: number;
+  detachedAt?: number;
   sessionKey: string;
-  sessionName: string;
-  workspacePath: string;
-  snapshot: string;
-  fullSnapshot: string;
-  initialSnapshot: string;
+  agentId: string;
 };
+
+type StreamUpdate = RunUpdate;
 
 type StreamCallbacks = {
   onUpdate: (update: StreamUpdate) => Promise<void> | void;
 };
 
 type AgentExecutionResult = {
-  status: "completed" | "timeout";
+  status: Exclude<PromptExecutionStatus, "running">;
   agentId: string;
   sessionKey: string;
   sessionName: string;
@@ -49,6 +57,7 @@ type AgentExecutionResult = {
   snapshot: string;
   fullSnapshot: string;
   initialSnapshot: string;
+  note?: string;
 };
 
 type ShellCommandResult = {
@@ -66,6 +75,32 @@ const BASH_WINDOW_NAME = "bash";
 const BASH_WINDOW_STARTUP_DELAY_MS = 150;
 const TMUX_MISSING_SESSION_PATTERN = /can't find session:/i;
 const TMUX_DUPLICATE_SESSION_PATTERN = /duplicate session:/i;
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+  settled: boolean;
+};
+
+type ActiveRun = {
+  resolved: ReturnType<AgentService["resolveTarget"]>;
+  observers: Map<string, RunObserver>;
+  initialResult: Deferred<AgentExecutionResult>;
+  latestUpdate: RunUpdate;
+  prompt: string;
+};
+
+export class ActiveRunInProgressError extends Error {
+  constructor(
+    readonly update: RunUpdate,
+  ) {
+    super(
+      update.note ??
+        "This session already has an active run. Use `/attach`, `/watch every <duration>`, or `/stop` before sending a new prompt.",
+    );
+  }
+}
 
 function shellQuote(value: string) {
   if (/^[a-zA-Z0-9_./:@=-]+$/.test(value)) {
@@ -122,10 +157,39 @@ function stripShellCommandEcho(output: string, command: string, sentinel?: strin
   return lines.join("\n").trim();
 }
 
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const deferred: Deferred<T> = {
+    promise: new Promise<T>((nextResolve, nextReject) => {
+      resolve = nextResolve;
+      reject = nextReject;
+    }),
+    resolve: (value) => {
+      if (deferred.settled) {
+        return;
+      }
+      deferred.settled = true;
+      resolve(value);
+    },
+    reject: (error) => {
+      if (deferred.settled) {
+        return;
+      }
+      deferred.settled = true;
+      reject(error);
+    },
+    settled: false,
+  };
+
+  return deferred;
+}
+
 export class AgentService {
   private readonly tmux: TmuxClient;
   private readonly queue = new AgentJobQueue();
   private readonly sessionStore: SessionStore;
+  private readonly activeRuns = new Map<string, ActiveRun>();
   private cleanupTimer?: ReturnType<typeof setInterval>;
   private cleanupInFlight = false;
 
@@ -168,6 +232,7 @@ export class AgentService {
   }
 
   async start() {
+    await this.reconcileActiveRuns();
     const cleanup = this.loadedConfig.raw.control.sessionCleanup;
     if (!cleanup.enabled) {
       return;
@@ -188,6 +253,55 @@ export class AgentService {
 
   async cleanupStaleSessions() {
     await this.runSessionCleanup();
+  }
+
+  private async reconcileActiveRuns() {
+    const entries = await this.sessionStore.list();
+
+    for (const entry of entries) {
+      if (!entry.runtime || entry.runtime.state === "idle") {
+        continue;
+      }
+
+      const resolved = this.resolveTarget({
+        agentId: entry.agentId,
+        sessionKey: entry.sessionKey,
+      });
+
+      if (!(await this.tmux.hasSession(resolved.sessionName))) {
+        await this.setSessionRuntime(resolved, {
+          state: "idle",
+        });
+        continue;
+      }
+
+      const fullSnapshot = normalizePaneText(
+        await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
+      );
+      const initialResult = createDeferred<AgentExecutionResult>();
+      const update = this.createRunUpdate({
+        resolved,
+        status: entry.runtime.state === "detached" ? "detached" : "running",
+        snapshot: deriveInteractionText("", fullSnapshot),
+        fullSnapshot,
+        initialSnapshot: "",
+        note: entry.runtime.state === "detached" ? this.buildDetachedNote(resolved) : undefined,
+      });
+      const run: ActiveRun = {
+        resolved,
+        observers: new Map(),
+        initialResult,
+        latestUpdate: update,
+        prompt: "",
+      };
+      this.activeRuns.set(resolved.sessionKey, run);
+      this.startRunMonitor(run, {
+        prompt: undefined,
+        initialSnapshot: "",
+        startedAt: entry.runtime.startedAt ?? Date.now(),
+        detachedAlready: entry.runtime.state === "detached",
+      });
+    }
   }
 
   private resolveTarget(target: AgentSessionTarget) {
@@ -236,6 +350,10 @@ export class AgentService {
       stream: {
         ...defaults.stream,
         ...(override?.stream ?? {}),
+        maxRuntimeLabel: formatConfiguredRuntimeLimit({
+          maxRuntimeSec: override?.stream?.maxRuntimeSec ?? defaults.stream.maxRuntimeSec,
+          maxRuntimeMin: override?.stream?.maxRuntimeMin ?? defaults.stream.maxRuntimeMin,
+        }),
         maxRuntimeMs: resolveMaxRuntimeMs({
           maxRuntimeSec: override?.stream?.maxRuntimeSec ?? defaults.stream.maxRuntimeSec,
           maxRuntimeMin: override?.stream?.maxRuntimeMin ?? defaults.stream.maxRuntimeMin,
@@ -254,10 +372,12 @@ export class AgentService {
       sessionId?: string;
       followUp?: StoredFollowUpState;
       runnerCommand?: string;
+      runtime?: StoredSessionRuntime;
     } | null) => {
       sessionId?: string;
       followUp?: StoredFollowUpState;
       runnerCommand?: string;
+      runtime?: StoredSessionRuntime;
     },
   ) {
     return this.sessionStore.update(resolved.sessionKey, (existing) => {
@@ -269,6 +389,7 @@ export class AgentService {
         workspacePath: resolved.workspacePath,
         runnerCommand: next.runnerCommand ?? existing?.runnerCommand ?? resolved.runner.command,
         followUp: next.followUp,
+        runtime: next.runtime ?? existing?.runtime,
         updatedAt: Date.now(),
       };
     });
@@ -276,12 +397,17 @@ export class AgentService {
 
   private async touchSessionEntry(
     resolved: ReturnType<AgentService["resolveTarget"]>,
-    params: { sessionId?: string | null; runnerCommand?: string } = {},
+    params: {
+      sessionId?: string | null;
+      runnerCommand?: string;
+      runtime?: StoredSessionRuntime;
+    } = {},
   ) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: params.sessionId?.trim() || existing?.sessionId,
       followUp: existing?.followUp,
       runnerCommand: params.runnerCommand ?? existing?.runnerCommand ?? resolved.runner.command,
+      runtime: params.runtime ?? existing?.runtime,
     }));
   }
 
@@ -293,6 +419,21 @@ export class AgentService {
       sessionId: undefined,
       followUp: existing?.followUp,
       runnerCommand: params.runnerCommand ?? existing?.runnerCommand ?? resolved.runner.command,
+      runtime: {
+        state: "idle",
+      },
+    }));
+  }
+
+  private async setSessionRuntime(
+    resolved: ReturnType<AgentService["resolveTarget"]>,
+    runtime: StoredSessionRuntime,
+  ) {
+    return this.upsertSessionEntry(resolved, (existing) => ({
+      sessionId: existing?.sessionId,
+      followUp: existing?.followUp,
+      runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
+      runtime,
     }));
   }
 
@@ -368,6 +509,10 @@ export class AgentService {
         }
 
         if (now - entry.updatedAt < staleAfterMinutes * 60_000) {
+          continue;
+        }
+
+        if (entry.runtime?.state === "running" || entry.runtime?.state === "detached") {
           continue;
         }
 
@@ -584,7 +729,11 @@ export class AgentService {
     const resolved = this.resolveTarget(target);
     const existed = await this.tmux.hasSession(resolved.sessionName);
     if (existed) {
-      await this.touchSessionEntry(resolved);
+      await this.touchSessionEntry(resolved, {
+        runtime: {
+          state: "idle",
+        },
+      });
       try {
         await this.tmux.sendKey(resolved.sessionName, "Escape");
         await sleep(150);
@@ -605,6 +754,30 @@ export class AgentService {
   async getConversationFollowUpState(target: AgentSessionTarget): Promise<StoredFollowUpState> {
     const entry = await this.sessionStore.get(target.sessionKey);
     return entry?.followUp ?? {};
+  }
+
+  async getSessionRuntime(target: AgentSessionTarget): Promise<SessionRuntimeInfo> {
+    const entry = await this.sessionStore.get(target.sessionKey);
+    return {
+      state: entry?.runtime?.state ?? "idle",
+      startedAt: entry?.runtime?.startedAt,
+      detachedAt: entry?.runtime?.detachedAt,
+      sessionKey: target.sessionKey,
+      agentId: target.agentId,
+    };
+  }
+
+  async listActiveSessionRuntimes() {
+    const entries = await this.sessionStore.list();
+    return entries
+      .filter((entry) => entry.runtime?.state === "running" || entry.runtime?.state === "detached")
+      .map((entry) => ({
+        state: entry.runtime?.state ?? "idle",
+        startedAt: entry.runtime?.startedAt,
+        detachedAt: entry.runtime?.detachedAt,
+        sessionKey: entry.sessionKey,
+        agentId: entry.agentId,
+      })) satisfies SessionRuntimeInfo[];
   }
 
   async setConversationFollowUpMode(target: AgentSessionTarget, mode: FollowUpMode) {
@@ -657,6 +830,7 @@ export class AgentService {
         lastBotReplyAt: Date.now(),
       },
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
+      runtime: existing?.runtime,
     }));
   }
 
@@ -763,12 +937,264 @@ export class AgentService {
     return this.resolveTarget(target).workspacePath;
   }
 
+  private buildDetachedNote(resolved: ReturnType<AgentService["resolveTarget"]>) {
+    return `This session has been running for over ${resolved.stream.maxRuntimeLabel}. muxbot will keep monitoring it and will post the final result here when it completes. Use \`/attach\` to resume live updates, \`/watch every 30s\` for interval updates, or \`/stop\` to interrupt it.`;
+  }
+
+  private createRunUpdate(params: {
+    resolved: ReturnType<AgentService["resolveTarget"]>;
+    status: PromptExecutionStatus;
+    snapshot: string;
+    fullSnapshot: string;
+    initialSnapshot: string;
+    note?: string;
+  }): RunUpdate {
+    return {
+      status: params.status,
+      agentId: params.resolved.agentId,
+      sessionKey: params.resolved.sessionKey,
+      sessionName: params.resolved.sessionName,
+      workspacePath: params.resolved.workspacePath,
+      snapshot: params.snapshot,
+      fullSnapshot: params.fullSnapshot,
+      initialSnapshot: params.initialSnapshot,
+      note: params.note,
+    };
+  }
+
+  private async notifyRunObservers(run: ActiveRun, update: RunUpdate) {
+    run.latestUpdate = update;
+    const now = Date.now();
+
+    for (const observer of run.observers.values()) {
+      if (observer.expiresAt && now >= observer.expiresAt && observer.mode !== "passive-final") {
+        observer.mode = "passive-final";
+      }
+
+      let shouldSend = false;
+      if (isTerminalRunStatus(update.status)) {
+        shouldSend = true;
+      } else if (observer.mode === "live") {
+        shouldSend = true;
+      } else if (observer.mode === "poll") {
+        shouldSend =
+          typeof observer.lastSentAt !== "number" ||
+          now - observer.lastSentAt >= (observer.intervalMs ?? 0);
+      }
+
+      if (!shouldSend) {
+        continue;
+      }
+
+      observer.lastSentAt = now;
+      await observer.onUpdate(update);
+    }
+  }
+
+  private async finishActiveRun(
+    run: ActiveRun,
+    update: AgentExecutionResult,
+  ) {
+    await this.setSessionRuntime(run.resolved, {
+      state: "idle",
+    });
+    await this.notifyRunObservers(run, update);
+    run.initialResult.resolve(update);
+    this.activeRuns.delete(run.resolved.sessionKey);
+  }
+
+  private async failActiveRun(run: ActiveRun, error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const update = this.createRunUpdate({
+      resolved: run.resolved,
+      status: "error",
+      snapshot: message,
+      fullSnapshot: run.latestUpdate.fullSnapshot,
+      initialSnapshot: run.latestUpdate.initialSnapshot,
+      note: "Run failed.",
+    });
+    await this.setSessionRuntime(run.resolved, {
+      state: "idle",
+    });
+    await this.notifyRunObservers(run, update);
+    if (!run.initialResult.settled) {
+      run.initialResult.reject(error);
+    }
+    this.activeRuns.delete(run.resolved.sessionKey);
+  }
+
+  async observeRun(
+    target: AgentSessionTarget,
+    observer: Omit<RunObserver, "lastSentAt">,
+  ) {
+    const existingRun = this.activeRuns.get(target.sessionKey);
+    if (existingRun) {
+      existingRun.observers.set(observer.id, {
+        ...observer,
+      });
+      return {
+        active: !isTerminalRunStatus(existingRun.latestUpdate.status),
+        update: existingRun.latestUpdate,
+      };
+    }
+
+    const transcript = await this.captureTranscript(target);
+    return {
+      active: false,
+      update: {
+        status: "completed" as const,
+        agentId: transcript.agentId,
+        sessionKey: transcript.sessionKey,
+        sessionName: transcript.sessionName,
+        workspacePath: transcript.workspacePath,
+        snapshot: transcript.snapshot,
+        fullSnapshot: transcript.snapshot,
+        initialSnapshot: "",
+      },
+    };
+  }
+
+  async detachRunObserver(target: AgentSessionTarget, observerId: string) {
+    const run = this.activeRuns.get(target.sessionKey);
+    if (!run) {
+      return {
+        detached: false,
+      };
+    }
+
+    const observer = run.observers.get(observerId);
+    if (!observer) {
+      return {
+        detached: false,
+      };
+    }
+
+    observer.mode = "passive-final";
+    return {
+      detached: true,
+    };
+  }
+
+  private startRunMonitor(
+    run: ActiveRun,
+    params: {
+      prompt?: string;
+      initialSnapshot: string;
+      startedAt: number;
+      detachedAlready: boolean;
+    },
+  ) {
+    void (async () => {
+      try {
+        await monitorTmuxRun({
+          tmux: this.tmux,
+          sessionName: run.resolved.sessionName,
+          prompt: params.prompt,
+          promptSubmitDelayMs: run.resolved.runner.promptSubmitDelayMs,
+          captureLines: run.resolved.stream.captureLines,
+          updateIntervalMs: run.resolved.stream.updateIntervalMs,
+          idleTimeoutMs: run.resolved.stream.idleTimeoutMs,
+          noOutputTimeoutMs: run.resolved.stream.noOutputTimeoutMs,
+          maxRuntimeMs: run.resolved.stream.maxRuntimeMs,
+          startedAt: params.startedAt,
+          initialSnapshot: params.initialSnapshot,
+          detachedAlready: params.detachedAlready,
+          onRunning: async (update) => {
+            await this.notifyRunObservers(
+              run,
+              this.createRunUpdate({
+                resolved: run.resolved,
+                status: "running",
+                snapshot: update.snapshot,
+                fullSnapshot: update.fullSnapshot,
+                initialSnapshot: update.initialSnapshot,
+              }),
+            );
+          },
+          onDetached: async (update) => {
+            const detachedUpdate = this.createRunUpdate({
+              resolved: run.resolved,
+              status: "detached",
+              snapshot: update.snapshot,
+              fullSnapshot: update.fullSnapshot,
+              initialSnapshot: update.initialSnapshot,
+              note: this.buildDetachedNote(run.resolved),
+            });
+            await this.setSessionRuntime(run.resolved, {
+              state: "detached",
+              startedAt: params.startedAt,
+              detachedAt: Date.now(),
+            });
+            run.latestUpdate = detachedUpdate;
+            run.initialResult.resolve(detachedUpdate);
+          },
+          onCompleted: async (update) => {
+            await this.finishActiveRun(
+              run,
+              this.createRunUpdate({
+                resolved: run.resolved,
+                status: "completed",
+                snapshot: update.snapshot,
+                fullSnapshot: update.fullSnapshot,
+                initialSnapshot: update.initialSnapshot,
+              }),
+            );
+          },
+          onTimeout: async (update) => {
+            await this.finishActiveRun(
+              run,
+              this.createRunUpdate({
+                resolved: run.resolved,
+                status: "timeout",
+                snapshot: update.snapshot,
+                fullSnapshot: update.fullSnapshot,
+                initialSnapshot: update.initialSnapshot,
+              }),
+            );
+          },
+        });
+      } catch (error) {
+        await this.failActiveRun(run, this.mapSessionError(
+          error,
+          run.resolved.sessionName,
+          "while the prompt was running",
+        ));
+      }
+    })();
+  }
+
   private async executePrompt(
     target: AgentSessionTarget,
     prompt: string,
-    callbacks: StreamCallbacks,
+    observer: Omit<RunObserver, "lastSentAt">,
     options: { allowFreshRetryBeforePrompt?: boolean } = {},
   ): Promise<AgentExecutionResult> {
+    const existingActiveRun = this.activeRuns.get(target.sessionKey);
+    if (existingActiveRun) {
+      throw new ActiveRunInProgressError(existingActiveRun.latestUpdate);
+    }
+
+    const existingEntry = await this.sessionStore.get(target.sessionKey);
+    if (
+      existingEntry?.runtime?.state &&
+      existingEntry.runtime.state !== "idle"
+    ) {
+      const resolvedExisting = this.resolveTarget(target);
+      throw new ActiveRunInProgressError(
+        this.createRunUpdate({
+          resolved: resolvedExisting,
+          status: existingEntry.runtime.state === "detached" ? "detached" : "running",
+          snapshot: "",
+          fullSnapshot: "",
+          initialSnapshot: "",
+          note:
+            existingEntry.runtime.state === "detached"
+              ? this.buildDetachedNote(resolvedExisting)
+              : "This session already has an active run. Use `/attach`, `/watch every 30s`, or `/stop` before sending a new prompt.",
+        }),
+      );
+    }
+
     let resolved = await this.ensureSessionReady(target, {
       allowFreshRetry: options.allowFreshRetryBeforePrompt,
     });
@@ -816,99 +1242,52 @@ export class AgentService {
         throw this.mapSessionError(error, resolved.sessionName, "before prompt submission");
       }
     }
-    let previousSnapshot = initialSnapshot;
-    let lastChangeAt = Date.now();
-    let sawChange = false;
-    let lastVisibleSnapshot = "";
     const startedAt = Date.now();
+    const initialResult = createDeferred<AgentExecutionResult>();
+    const activeRun: ActiveRun = {
+      resolved,
+      observers: new Map([
+        [observer.id, { ...observer }],
+      ]),
+      initialResult,
+      latestUpdate: this.createRunUpdate({
+        resolved,
+        status: "running",
+        snapshot: "",
+        fullSnapshot: initialSnapshot,
+        initialSnapshot,
+      }),
+      prompt,
+    };
+    this.activeRuns.set(resolved.sessionKey, activeRun);
 
-    try {
-      await this.tmux.sendLiteral(resolved.sessionName, prompt);
-      await sleep(resolved.runner.promptSubmitDelayMs);
-      await this.tmux.sendKey(resolved.sessionName, "Enter");
-    } catch (error) {
-      throw this.mapSessionError(error, resolved.sessionName, "before prompt submission");
-    }
+    await this.setSessionRuntime(resolved, {
+      state: "running",
+      startedAt,
+    });
+    this.startRunMonitor(activeRun, {
+      prompt,
+      initialSnapshot,
+      startedAt,
+      detachedAlready: false,
+    });
 
-    while (true) {
-      await sleep(resolved.stream.updateIntervalMs);
-      let snapshot = "";
-      try {
-        snapshot = normalizePaneText(
-          await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
-        );
-      } catch (error) {
-        throw this.mapSessionError(error, resolved.sessionName, "while the prompt was running");
-      }
-      const now = Date.now();
-
-      if (snapshot !== previousSnapshot) {
-        lastChangeAt = now;
-        previousSnapshot = snapshot;
-        const interactionSnapshot = deriveInteractionText(initialSnapshot, snapshot);
-        if (interactionSnapshot && interactionSnapshot !== lastVisibleSnapshot) {
-          sawChange = true;
-          lastVisibleSnapshot = interactionSnapshot;
-          await callbacks.onUpdate({
-            status: "running",
-            agentId: resolved.agentId,
-            sessionKey: resolved.sessionKey,
-            sessionName: resolved.sessionName,
-            workspacePath: resolved.workspacePath,
-            snapshot: interactionSnapshot,
-            fullSnapshot: snapshot,
-            initialSnapshot,
-          });
-        }
-      }
-
-      if (sawChange && now - lastChangeAt >= resolved.stream.idleTimeoutMs) {
-        const interactionSnapshot = deriveInteractionText(initialSnapshot, previousSnapshot);
-        return {
-          status: "completed",
-          agentId: resolved.agentId,
-          sessionKey: resolved.sessionKey,
-          sessionName: resolved.sessionName,
-          workspacePath: resolved.workspacePath,
-          snapshot: interactionSnapshot,
-          fullSnapshot: previousSnapshot,
-          initialSnapshot,
-        };
-      }
-
-      if (!sawChange && now - startedAt >= resolved.stream.noOutputTimeoutMs) {
-        const interactionSnapshot = deriveInteractionText(initialSnapshot, previousSnapshot);
-        return {
-          status: "timeout",
-          agentId: resolved.agentId,
-          sessionKey: resolved.sessionKey,
-          sessionName: resolved.sessionName,
-          workspacePath: resolved.workspacePath,
-          snapshot: interactionSnapshot,
-          fullSnapshot: previousSnapshot,
-          initialSnapshot,
-        };
-      }
-
-      if (now - startedAt >= resolved.stream.maxRuntimeMs) {
-        const interactionSnapshot = deriveInteractionText(initialSnapshot, previousSnapshot);
-        return {
-          status: "timeout",
-          agentId: resolved.agentId,
-          sessionKey: resolved.sessionKey,
-          sessionName: resolved.sessionName,
-          workspacePath: resolved.workspacePath,
-          snapshot: interactionSnapshot,
-          fullSnapshot: previousSnapshot,
-          initialSnapshot,
-        };
-      }
-    }
+    return initialResult.promise;
   }
 
-  enqueuePrompt(target: AgentSessionTarget, prompt: string, callbacks: StreamCallbacks) {
+  enqueuePrompt(
+    target: AgentSessionTarget,
+    prompt: string,
+    callbacks: StreamCallbacks & {
+      observerId?: string;
+    },
+  ) {
     return this.queue.enqueue(target.sessionKey, async () =>
-      this.executePrompt(target, prompt, callbacks),
+      this.executePrompt(target, prompt, {
+        id: callbacks.observerId ?? `prompt:${target.sessionKey}`,
+        mode: "live",
+        onUpdate: callbacks.onUpdate,
+      }),
     );
   }
 

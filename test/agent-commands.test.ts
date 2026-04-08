@@ -49,6 +49,39 @@ describe("parseAgentCommand", () => {
     });
   });
 
+  test("parses attach as a reserved control slash command", () => {
+    const parsed = parseAgentCommand("/attach");
+
+    expect(parsed).toEqual({
+      type: "control",
+      name: "attach",
+    });
+  });
+
+  test("parses detach as a reserved control slash command", () => {
+    const parsed = parseAgentCommand("/detach");
+
+    expect(parsed).toEqual({
+      type: "control",
+      name: "detach",
+    });
+  });
+
+  test("parses watch commands with interval and optional duration", () => {
+    expect(parseAgentCommand("/watch every 30s")).toEqual({
+      type: "control",
+      name: "watch",
+      intervalMs: 30_000,
+    });
+
+    expect(parseAgentCommand("/watch every 30s for 10m")).toEqual({
+      type: "control",
+      name: "watch",
+      intervalMs: 30_000,
+      durationMs: 600_000,
+    });
+  });
+
   test("parses bash shortcut prefixes", () => {
     const parsed = parseAgentCommand("!pwd");
 

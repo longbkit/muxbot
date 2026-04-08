@@ -77,6 +77,16 @@ This is not the default interaction mode.
 
 It exists so users or operators can inspect full tmux-backed state when needed without turning normal interaction into a terminal dump.
 
+### Run Observer Command
+
+An explicit channel command pattern that changes how the current thread follows an already-running session.
+
+Examples:
+
+- attach live updates for an active run
+- detach a thread from live updates while still receiving final settlement later
+- watch the latest state on an interval until the run completes
+
 ### Runner Chrome
 
 Repeated or structural output that helps a terminal operator but is often not the answer a user wants to read.
@@ -112,6 +122,12 @@ The system should behave in this order:
 2. runner emits normalized snapshot and streaming updates
 3. channel applies default chat-first rendering or an explicit transcript request path
 4. channel renders the interaction to the target surface using that channel's transport capability
+
+For already-running sessions, the same pipeline should also support observer changes without restarting the run:
+
+1. runner or Agent-OS keeps monitoring the active session
+2. channel command changes observer mode for the current thread
+3. channel receives live, passive-final, or interval updates from the same normalized run state
 
 The same normalized runner output may be rendered differently by different channels and by different command patterns on the same channel.
 
@@ -172,6 +188,19 @@ Rules:
 - transcript requests may return the current whole session view, including terminal chrome
 - transcript requests must not change the default interaction model for later normal prompts
 - transcript requests should work for tmux-backed agents and plain tmux-hosted shells
+
+## Explicit Run Observer Commands
+
+Observer commands are also opt-in, but unlike transcript requests they stay inside the normal chat-first rendering model.
+
+Rules:
+
+- observer commands do not expose raw tmux transcript by default
+- observer commands change how the current thread follows an already-running session
+- channels may support live attach, passive detach, and interval watch behavior on the same active run
+- current observer identity is thread-scoped per routed conversation surface, so a later observer command in the same thread replaces the previous observer mode for that thread
+- `detach` is a passive-final mode, not a full unsubscribe: it stops live updates for that thread but still allows final settlement there when the run completes
+- detaching a thread from live updates must not silently stop runner monitoring or final settlement
 
 ## tmux-Specific Implications
 

@@ -485,6 +485,18 @@ Finagling
         maxChars: 200,
       }),
     ).toBe("Thinking...\nFound the issue.");
+
+    expect(
+      renderSlackInteraction({
+        status: "detached",
+        content: "Still working through the repository.",
+        maxChars: 200,
+        note:
+          "This session has been running for over 15 minutes. muxbot left it running as-is. Use `/transcript` anytime to check it.",
+      }),
+    ).toBe(
+      "Still working through the repository.\n\n_This session has been running for over 15 minutes. muxbot left it running as-is. Use `/transcript` anytime to check it._",
+    );
   });
 
   test("extracts the final answer and drops leading progress blocks on completion", () => {

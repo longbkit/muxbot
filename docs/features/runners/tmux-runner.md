@@ -233,7 +233,8 @@ Current implementation:
 - when a session is stale, muxbot kills the tmux session only
 - the stored `sessionKey -> sessionId` continuity entry remains
 - the next inbound message can recreate tmux and resume the prior AI CLI session when the runner supports resume
-- stale detection is based on muxbot session activity timestamps, not tmux CPU usage
+- stale detection is based on muxbot session activity timestamps for ordinary idle sessions
+- when a turn exceeds the configured `maxRuntimeMin` or `maxRuntimeSec`, muxbot detaches observation, leaves the tmux session running, and marks that session as exempt from stale cleanup until a later interactive turn or stop action clears that exemption
 - sessions that are currently busy in the muxbot queue are skipped by cleanup
 
 Current disable rule:

@@ -1,4 +1,5 @@
 import type { FollowUpMode } from "./follow-up-policy.ts";
+import { parseCommandDurationMs } from "./run-observation.ts";
 
 export type CommandPrefixes = {
   slash: string[];
@@ -11,6 +12,9 @@ export type AgentControlSlashCommandName =
   | "help"
   | "whoami"
   | "transcript"
+  | "attach"
+  | "detach"
+  | "watch"
   | "stop"
   | "followup";
 export type AgentFollowUpSlashAction = "status" | "auto" | "mention-only" | "pause" | "resume";
@@ -35,6 +39,20 @@ export type AgentControlSlashCommand =
   | {
       type: "control";
       name: "transcript";
+    }
+  | {
+      type: "control";
+      name: "attach";
+    }
+  | {
+      type: "control";
+      name: "detach";
+    }
+  | {
+      type: "control";
+      name: "watch";
+      intervalMs: number;
+      durationMs?: number;
     }
   | {
       type: "control";
@@ -129,6 +147,37 @@ export function parseAgentCommand(
     return {
       type: "control",
       name: "transcript",
+    };
+  }
+
+  if (lowered === "attach") {
+    return {
+      type: "control",
+      name: "attach",
+    };
+  }
+
+  if (lowered === "detach") {
+    return {
+      type: "control",
+      name: "detach",
+    };
+  }
+
+  if (lowered === "watch") {
+    const parsed = parseWatchCommand(withoutSlash.slice(command.length).trim());
+    if (parsed) {
+      return {
+        type: "control",
+        name: "watch",
+        intervalMs: parsed.intervalMs,
+        durationMs: parsed.durationMs,
+      };
+    }
+
+    return {
+      type: "control",
+      name: "help",
     };
   }
 
@@ -235,6 +284,9 @@ export function renderAgentControlSlashHelp() {
     "- `/help`: show available control slash commands",
     "- `/whoami`: show the current platform, route, and sender identity details",
     "- `/transcript`: show the current conversation session transcript when the route enables sensitive commands",
+    "- `/attach`: attach this thread to the active run and resume live updates when it is still processing",
+    "- `/detach`: stop live updates for this thread while still allowing final settlement here",
+    "- `/watch every 30s [for 10m]`: post the latest state on an interval until the run settles or the watch window ends",
     "- `/stop`: send Escape to interrupt the current conversation session",
     "- `/followup status`: show the current conversation follow-up policy",
     "- `/followup auto`: allow natural follow-up after the bot has replied in-thread",
@@ -246,4 +298,27 @@ export function renderAgentControlSlashHelp() {
     "",
     "Other slash commands are forwarded to the agent unchanged.",
   ].join("\n");
+}
+
+function parseWatchCommand(raw: string) {
+  const match = raw.match(/^every\s+(\S+)(?:\s+for\s+(\S+))?$/i);
+  if (!match) {
+    return null;
+  }
+
+  const intervalMs = parseCommandDurationMs(match[1] ?? "");
+  if (!intervalMs) {
+    return null;
+  }
+
+  const durationToken = match[2];
+  const durationMs = durationToken ? parseCommandDurationMs(durationToken) : undefined;
+  if (durationToken && !durationMs) {
+    return null;
+  }
+
+  return {
+    intervalMs,
+    durationMs,
+  };
 }

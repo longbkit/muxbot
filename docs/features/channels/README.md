@@ -38,6 +38,7 @@ Channels is where those surfaces live.
 - default chat-first rendering per channel
 - user-visible transcript shaping from normalized runner output, including top and bottom chrome stripping where needed
 - explicit transcript request command patterns for whole-session visibility when users ask for it
+- observer-style run control commands such as attach, detach, and interval watch on active long-running sessions
 - channel-ingestion concurrency so one long-running conversation does not block unrelated conversations on the same channel account
 
 ## Non-Goals
@@ -88,6 +89,10 @@ Keep the Slack MVP truthful on `SLACK_TEST_CHANNEL`.
 - OpenClaw’s Slack-only sparse-config fallback to `groupPolicy: "open"` is documented as research nuance, not copied as a `muxbot` default
 - Slack should acknowledge accepted inbound messages immediately with a configurable reaction, Slack assistant thread status, and a live in-thread processing reply
 - default Slack feedback should keep `ackReaction: ":heavy_check_mark:"`, `typingReaction: ""`, and `processingStatus.enabled: true`
+- active long-running sessions should support `/attach`, `/detach`, and `/watch every <duration>` so users can control how this thread follows the run without switching to raw transcript by default
+- current observer scope is per thread for a routed conversation, so running `/attach` or `/watch` again in the same thread replaces the earlier observer mode for that thread
+- current `/detach` behavior is passive-final rather than silent unsubscribe: live updates stop, but final settlement still returns to the same thread when the run completes
+- `/status` on a routed thread should expose the current session run state so users can see active detached work without switching to transcript-first inspection
 - expand the same channel model to the API surface next
 - Telegram now ships as a topic-aware channel surface, using OpenClaw-style group and topic config inheritance instead of reusing Slack follow-up mechanics for topic identity
 - Telegram transport should respect Telegram Bot API retry-after hints and pace live message edits so streaming does not fail on 429 rate limits

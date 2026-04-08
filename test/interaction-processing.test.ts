@@ -371,11 +371,18 @@ describe("processChannelInteraction sensitive command gating", () => {
 
   test("renders status with operator privilege commands for routed conversations", async () => {
     const posted: string[] = [];
+    const startedAt = 1_700_000_000_000;
+    const detachedAt = 1_700_000_060_000;
 
     await processChannelInteraction({
       agentService: {
         getConversationFollowUpState: async () => ({
           lastBotReplyAt: Date.now(),
+        }),
+        getSessionRuntime: async () => ({
+          state: "detached",
+          startedAt,
+          detachedAt,
         }),
         recordConversationReply: async () => undefined,
       } as any,
@@ -394,8 +401,167 @@ describe("processChannelInteraction sensitive command gating", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("muxbot status");
+    expect(posted[0]).toContain("run.state: `detached`");
+    expect(posted[0]).toContain(`run.startedAt: \`${new Date(startedAt).toISOString()}\``);
+    expect(posted[0]).toContain(`run.detachedAt: \`${new Date(detachedAt).toISOString()}\``);
+    expect(posted[0]).toContain("/attach`, `/detach`, `/watch every 30s`");
     expect(posted[0]).toContain("Operator commands:");
     expect(posted[0]).toContain("muxbot channels privilege enable slack-channel C123");
     expect(posted[0]).toContain("muxbot channels privilege allow-user slack-channel C123 U123");
+  });
+});
+
+describe("processChannelInteraction detached long-running settlement", () => {
+  test("renders detached guidance instead of a timeout when max runtime is exceeded", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: () => ({
+          positionAhead: 0,
+          result: Promise.resolve({
+            status: "detached",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            snapshot: "Still working through the repository.",
+            fullSnapshot: "Still working through the repository.",
+            initialSnapshot: "",
+            note:
+              "This session has been running for over 15 minutes. muxbot left it running as-is. Use `/transcript` anytime to check it.",
+          }),
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "keep going",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(posted[0]).toContain("Working...");
+    expect(reconciled.at(-1)).toContain("Still working through the repository.");
+    expect(reconciled.at(-1)).toContain("Use `/transcript` anytime to check it.");
+    expect(reconciled.at(-1)).not.toContain("Timed out waiting");
+  });
+});
+
+describe("processChannelInteraction run observer commands", () => {
+  test("attach resumes the latest active run state", async () => {
+    const posted: string[] = [];
+    let observedMode = "";
+
+    await processChannelInteraction({
+      agentService: {
+        observeRun: async (_target: AgentSessionTarget, observer: any) => {
+          observedMode = observer.mode;
+          return {
+            active: true,
+            update: {
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "Still working through the repository.",
+              fullSnapshot: "Still working through the repository.",
+              initialSnapshot: "",
+            },
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/attach",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(observedMode).toBe("live");
+    expect(posted[0]).toContain("Still working through the repository.");
+  });
+
+  test("detach stops live updates for the current thread", async () => {
+    const posted: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        detachRunObserver: async () => ({
+          detached: true,
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/detach",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(posted[0]).toContain("Detached this thread from live updates");
+  });
+
+  test("watch registers a polling observer", async () => {
+    let observedMode = "";
+    let observedInterval = 0;
+
+    await processChannelInteraction({
+      agentService: {
+        observeRun: async (_target: AgentSessionTarget, observer: any) => {
+          observedMode = observer.mode;
+          observedInterval = observer.intervalMs;
+          return {
+            active: true,
+            update: {
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "Polling state.",
+              fullSnapshot: "Polling state.",
+              initialSnapshot: "",
+            },
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/watch every 30s for 10m",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => [text],
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(observedMode).toBe("poll");
+    expect(observedInterval).toBe(30_000);
   });
 });

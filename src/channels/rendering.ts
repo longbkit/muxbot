@@ -14,7 +14,7 @@ export type ChannelRenderedMessageState = {
 
 export function buildRenderedMessageState(params: {
   platform: "slack" | "telegram";
-  status: "queued" | "running" | "completed" | "timeout" | "error";
+  status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   snapshot: string;
   queuePosition?: number;
   maxChars: number;
@@ -24,7 +24,7 @@ export function buildRenderedMessageState(params: {
 }): ChannelRenderedMessageState {
   const body =
     params.snapshot.trim() ||
-    (params.status === "completed" || params.status === "timeout"
+    (params.status === "completed" || params.status === "timeout" || params.status === "detached"
       ? (params.previousState?.body ?? "")
       : "");
 
@@ -44,7 +44,7 @@ export function buildRenderedMessageState(params: {
 
 export function renderPlatformInteraction(params: {
   platform: "slack" | "telegram";
-  status: "queued" | "running" | "completed" | "timeout" | "error";
+  status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   content: string;
   maxChars: number;
   queuePosition?: number;

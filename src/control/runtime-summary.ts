@@ -21,6 +21,7 @@ import {
   renderOperatorHelpLines,
   renderPairingSetupHelpLines,
   renderRepoHelpLines,
+  renderTmuxDebugHelpLines,
 } from "./startup-bootstrap.ts";
 
 type AgentOperatorSummary = {
@@ -53,6 +54,13 @@ type RuntimeOperatorSummary = {
   loadedConfig: LoadedConfig;
   agentSummaries: AgentOperatorSummary[];
   channelSummaries: ChannelOperatorSummary[];
+  activeRuns: Array<{
+    agentId: string;
+    sessionKey: string;
+    state: "running" | "detached";
+    startedAt?: number;
+    detachedAt?: number;
+  }>;
   configuredAgents: number;
   bootstrapPendingAgents: number;
   bootstrappedAgents: number;
@@ -110,6 +118,7 @@ export async function getRuntimeOperatorSummary(params: {
   activityPath?: string;
 }) {
   const loadedConfig = await loadOperatorSummaryConfig(params.configPath);
+  const agentService = new AgentService(loadedConfig);
   const activityStore = new ActivityStore(params.activityPath ?? DEFAULT_ACTIVITY_STORE_PATH);
   const activities = await activityStore.read();
   const runningTmuxSessions = params.runtimeRunning ? await getRunningTmuxSessions(loadedConfig) : 0;
@@ -179,6 +188,7 @@ export async function getRuntimeOperatorSummary(params: {
     loadedConfig,
     agentSummaries,
     channelSummaries,
+    activeRuns: await agentService.listActiveSessionRuntimes(),
     configuredAgents: agentSummaries.length,
     bootstrapPendingAgents: agentSummaries.filter((item) =>
       item.bootstrapState === "missing" || item.bootstrapState === "not-bootstrapped"
@@ -187,6 +197,26 @@ export async function getRuntimeOperatorSummary(params: {
       .length,
     runningTmuxSessions,
   } satisfies RuntimeOperatorSummary;
+}
+
+function renderActiveRunSummaryLines(summary: RuntimeOperatorSummary) {
+  if (summary.activeRuns.length === 0) {
+    return [
+      "",
+      "Active runs:",
+      "  none",
+    ];
+  }
+
+  return [
+    "",
+    "Active runs:",
+    ...summary.activeRuns.map((run) => {
+      const startedAt = run.startedAt ? new Date(run.startedAt).toISOString() : "unknown";
+      const detachedAt = run.detachedAt ? ` detachedAt=${new Date(run.detachedAt).toISOString()}` : "";
+      return `  - agent=${run.agentId} state=${run.state} startedAt=${startedAt}${detachedAt} sessionKey=${run.sessionKey}`;
+    }),
+  ];
 }
 
 async function loadOperatorSummaryConfig(configPath?: string) {
@@ -311,6 +341,7 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
         conditionalOnly: true,
       }),
     );
+    lines.push(...renderTmuxDebugHelpLines("  "));
     lines.push(...renderRepoHelpLines("  - "));
     appendChannelSetupNotes(lines, summary, "  ");
     return lines.join("\n");
@@ -334,6 +365,7 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
       conditionalOnly: true,
     }),
   );
+  lines.push(...renderTmuxDebugHelpLines());
   lines.push(...renderRepoHelpLines("  - "));
 
   appendChannelSetupNotes(lines, summary);
@@ -395,6 +427,7 @@ export function renderStatusSummary(summary: RuntimeOperatorSummary) {
     `stats agents=${summary.configuredAgents} bootstrapped=${summary.bootstrappedAgents} pendingBootstrap=${summary.bootstrapPendingAgents} tmuxSessions=${summary.runningTmuxSessions}`,
     ...renderAgentSummaryLines(summary),
     ...renderChannelSummaryLines(summary),
+    ...renderActiveRunSummaryLines(summary),
   ];
 
   appendChannelSetupNotes(lines, summary);

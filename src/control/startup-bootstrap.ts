@@ -338,6 +338,14 @@ export function renderPairingSetupHelpLines(
   return lines;
 }
 
+export function renderTmuxDebugHelpLines(prefix = "") {
+  return [
+    `${prefix}tmux debug:`,
+    `${prefix}  - list sessions: \`tmux -S ~/.muxbot/state/muxbot.sock list-sessions\``,
+    `${prefix}  - attach to a session: \`tmux -S ~/.muxbot/state/muxbot.sock attach -t <session-name>\``,
+  ];
+}
+
 export function renderChannelSetupHelpLines(
   prefix = "",
   options: { includePrivilegeHelp?: boolean } = {},
@@ -350,6 +358,7 @@ export function renderChannelSetupHelpLines(
       slackDirectMessagesPolicy: "pairing",
       telegramDirectMessagesPolicy: "pairing",
     }),
+    ...renderTmuxDebugHelpLines(prefix),
     ...(options.includePrivilegeHelp === false ? [] : renderGenericPrivilegeCommandHelpLines(prefix)),
     ...renderRepoHelpLines(prefix),
   ];

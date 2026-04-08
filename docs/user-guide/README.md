@@ -291,15 +291,52 @@ Current meaning:
 - `noOutputTimeoutMs: 20000`
   - if a turn produces no visible output for 20 seconds from the start, muxbot returns a timeout
 - `maxRuntimeMin: 15`
-  - hard cap of 15 minutes for one turn by default
+  - default observation window of 15 minutes for one turn
+  - if the session is still active after that window, muxbot stops waiting, leaves the session running, and tells you to use `/transcript` to inspect it later
 - `maxRuntimeSec`
-  - optional second-based override when you need tighter tests or shorter limits
+  - optional second-based observation window when you need tighter tests or shorter limits
 
 Important distinction:
 
 - these settings affect streaming settlement and turn completion
 - they do not decide whether the tmux session stays alive after the turn
 - stale tmux cleanup is controlled separately by `session.staleAfterMinutes` and `control.sessionCleanup.*`
+- a detached long-running session is exempt from stale cleanup until a later interactive turn or stop action clears that detached state
+
+## Long-Running Session Commands
+
+When a run keeps going beyond the initial observation window, `muxbot` keeps monitoring it and can keep this thread attached in different ways.
+
+Current commands:
+
+- `/attach`
+  - attach this thread to the active run
+  - if the run is still processing, live updates resume here
+  - if the run is already settled, you get one latest settled state
+- `/detach`
+  - stop live updates for this thread
+  - the underlying run keeps going
+  - final settlement is still posted here when the run completes
+- `/watch every 30s`
+  - post the latest state here every 30 seconds until the run completes
+- `/watch every 30s for 10m`
+  - same as above, but stop interval watch after the configured window
+
+Current prompt-admission rule:
+
+- if a session already has an active run, a new prompt is rejected until that run settles or is interrupted
+- use `/attach`, `/watch`, or `/stop` instead of sending a second prompt into the same still-running session
+
+Current observer-scope rule:
+
+- observer mode is currently scoped per thread for a routed conversation
+- running `/attach` or `/watch ...` again in the same thread replaces the earlier observer mode for that same thread
+
+Current status visibility:
+
+- `/status` now shows whether the routed session is `idle`, `running`, or `detached`
+- when available, `/status` also shows `run.startedAt` and `run.detachedAt`
+- `muxbot status` now lists active runs too, so detached autonomous sessions are visible without using `/transcript` or re-attaching a thread
 
 ## muxbot tmux Server
 

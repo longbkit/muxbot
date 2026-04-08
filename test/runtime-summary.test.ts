@@ -115,6 +115,62 @@ describe("runtime summaries", () => {
     expect(startText).toContain("Slack DMs use `pairing`.");
     expect(startText).toContain("Say `hi` to the Slack bot to get a pairing code.");
     expect(startText).toContain("muxbot pairing approve slack <code>");
+    expect(startText).toContain("tmux -S ~/.muxbot/state/muxbot.sock list-sessions");
+    expect(startText).toContain("tmux -S ~/.muxbot/state/muxbot.sock attach -t <session-name>");
+  });
+
+  test("renders active runs in operator status output", async () => {
+    process.env.SLACK_APP_TOKEN = "app";
+    process.env.SLACK_BOT_TOKEN = "bot";
+    tempDir = mkdtempSync(join(tmpdir(), "muxbot-runtime-summary-"));
+    const configPath = join(tempDir, "muxbot.json");
+    const config = muxbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate({
+      slackEnabled: true,
+      telegramEnabled: false,
+    })));
+    config.agents.list = [
+      {
+        id: "work",
+        cliTool: "codex",
+      },
+    ];
+    await writeEditableConfig(configPath, config);
+
+    writeFileSync(
+      join(tempDir, "sessions.json"),
+      JSON.stringify(
+        {
+          "agent:work:slack:channel:C123:thread:1.2": {
+            agentId: "work",
+            sessionKey: "agent:work:slack:channel:C123:thread:1.2",
+            workspacePath: join(tempDir, "work"),
+            runnerCommand: "codex",
+            runtime: {
+              state: "detached",
+              startedAt: 1_700_000_000_000,
+              detachedAt: 1_700_000_060_000,
+            },
+            updatedAt: 1_700_000_060_000,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    config.session.storePath = join(tempDir, "sessions.json");
+    await writeEditableConfig(configPath, config);
+
+    const summary = await getRuntimeOperatorSummary({
+      configPath,
+      runtimeRunning: false,
+      activityPath: join(tempDir, "activity.json"),
+    });
+    const text = renderStatusSummary(summary);
+
+    expect(text).toContain("Active runs:");
+    expect(text).toContain("agent=work");
+    expect(text).toContain("state=detached");
+    expect(text).toContain("sessionKey=agent:work:slack:channel:C123:thread:1.2");
   });
 
   test("distinguishes missing, not-bootstrapped, and bootstrapped bootstrap states", async () => {
@@ -171,6 +227,8 @@ describe("runtime summaries", () => {
     expect(startText).toContain("next: chat with the bot or open the workspace");
     expect(startText).toContain("follow: BOOTSTRAP.md and the team-assistant personality files");
     expect(startText).toContain("Next steps after bootstrap:");
+    expect(startText).toContain("tmux -S ~/.muxbot/state/muxbot.sock list-sessions");
+    expect(startText).toContain("tmux -S ~/.muxbot/state/muxbot.sock attach -t <session-name>");
   });
 
   test("falls back to raw config when token env vars are missing in the operator shell", async () => {

@@ -176,6 +176,7 @@ Current sensitive-command rule should stay explicit:
   - configured slash-style transcript shortcuts such as `::transcript` or `\transcript`
   - `/bash <command>`
   - configured bash shortcuts such as `!<command>`
+- observer commands such as `/attach`, `/detach`, and `/watch every <duration>` use the normal channel route and do not require `privilegeCommands.enabled`
 - route-level enablement is supported under:
   - `channels.slack.channels.<id>.privilegeCommands`
   - `channels.slack.groups.<id>.privilegeCommands`
@@ -396,15 +397,17 @@ Current meaning:
 - `noOutputTimeoutMs`
   - if the turn produces no visible output at all for this many milliseconds from start, muxbot returns a timeout result
 - `maxRuntimeMin`
-  - default minute-based hard upper bound for one turn, even if output keeps changing
+  - default minute-based observation window for one turn
+  - when that window is exceeded, muxbot stops waiting for settlement, leaves the session running, and tells the user to inspect later with `/transcript`
 - `maxRuntimeSec`
-  - optional second-based hard upper bound when you need a shorter value for tests or special routes
+  - optional second-based observation window when you need a shorter value for tests or special routes
 
 Important distinction:
 
 - these are per-turn execution timers
 - they do not control stale tmux cleanup
 - stale tmux cleanup is controlled separately by `session.staleAfterMinutes` and `control.sessionCleanup.*`
+- a session that was detached after exceeding `maxRuntimeMin` or `maxRuntimeSec` is intentionally exempt from stale cleanup until it is observed again by a later interactive turn or stop action
 
 ## Resume Debugging
 

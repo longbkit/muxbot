@@ -28,9 +28,9 @@ Execution detail belongs in `docs/tasks/`.
 
 | State | Area | Feature | Main Doc | Tasks Folder | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Active | surface | channels | [channels](channels/README.md) | [channels tasks](../tasks/features/channels) | 2026-04-04 | Slack is the first active channel, and API-compatible access is treated as another channel rather than a separate product. |
+| Active | surface | channels | [channels](channels/README.md) | [channels tasks](../tasks/features/channels) | 2026-04-08 | Channels now add observer-style attach, detach, and watch controls on top of chat-first rendering for long-running agent sessions. |
 | Active | core | agent-os | [agent-os](agent-os/README.md) | [agent-os tasks](../tasks/features/agent-os) | 2026-04-04 | Agent-OS owns agents, sessions, workspaces, memory, tools, skills, queueing, and subagents without depending on tmux-specific mechanics. |
-| Active | core | runners | [runners](runners/README.md) | [runner tasks](../tasks/features/runners) | 2026-04-04 | Runners standardize backend input, output, snapshots, and streaming across tmux today and ACP or SDK integrations later. |
+| Active | core | runners | [runners](runners/README.md) | [runner tasks](../tasks/features/runners) | 2026-04-08 | Runners now need to keep monitoring long-running sessions after request-level detachment so channels can re-attach and still receive final settlement. |
 | Planned | ops | control | [control](control/README.md) | [control tasks](../tasks/features/control) | 2026-04-04 | Operator inspect, attach, restart, stop, and health flows belong to control rather than user-facing channels. |
 | Active | platform | configuration | [configuration](configuration/README.md) | [configuration tasks](../tasks/features/configuration) | 2026-04-04 | Configuration is the local control plane for channels, agent-os, runners, and policy. |
 

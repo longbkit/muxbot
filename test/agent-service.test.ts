@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentService } from "../src/agents/agent-service.ts";
+import { ActiveRunInProgressError, AgentService } from "../src/agents/agent-service.ts";
 import { loadConfig } from "../src/config/load-config.ts";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
 
@@ -13,6 +13,8 @@ type FakeSession = {
   pendingInput: string;
   sessionId: string;
   snapshot: string;
+  longRunning: boolean;
+  longRunningStep: number;
 };
 
 class FakeTmuxClient {
@@ -52,6 +54,8 @@ class FakeTmuxClient {
         pendingInput: "",
         sessionId,
         snapshot: `READY ${sessionId}`,
+        longRunning: false,
+        longRunningStep: 0,
       });
       throw new Error(`duplicate session: ${params.sessionName}`);
     }
@@ -66,6 +70,8 @@ class FakeTmuxClient {
       pendingInput: "",
       sessionId,
       snapshot: `READY ${sessionId}`,
+      longRunning: false,
+      longRunningStep: 0,
     });
   }
 
@@ -87,6 +93,10 @@ class FakeTmuxClient {
       return;
     } else if (session.pendingInput === "ping") {
       session.snapshot = `${session.snapshot}\nPONG ${session.sessionId}`;
+    } else if (session.pendingInput === "stream-forever") {
+      session.longRunning = true;
+      session.longRunningStep = 0;
+      session.snapshot = `${session.snapshot}\nSTEP 0 ${session.sessionId}`;
     } else if (session.pendingInput) {
       session.snapshot = `${session.snapshot}\nECHO ${session.pendingInput}`;
     }
@@ -99,6 +109,10 @@ class FakeTmuxClient {
       this.disappearingOnCaptureSessionIds.delete(session.sessionId);
       this.sessions.delete(sessionName);
       throw new Error(`can't find session: ${sessionName}`);
+    }
+    if (session.longRunning) {
+      session.longRunningStep += 1;
+      session.snapshot = `${session.snapshot}\nSTEP ${session.longRunningStep} ${session.sessionId}`;
     }
     return session.snapshot;
   }
@@ -145,7 +159,7 @@ function readSessionId(storePath: string, sessionKey: string) {
 function readSessionEntry(storePath: string, sessionKey: string) {
   const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<
     string,
-    { sessionId?: string; updatedAt: number }
+    { sessionId?: string; runtime?: { state: string }; updatedAt: number }
   >;
   return store[sessionKey] ?? null;
 }
@@ -160,6 +174,14 @@ function buildConfig(params: {
   staleAfterMinutes?: number;
   cleanupEnabled?: boolean;
   cleanupIntervalMinutes?: number;
+  streamOverrides?: Partial<{
+    captureLines: number;
+    updateIntervalMs: number;
+    idleTimeoutMs: number;
+    noOutputTimeoutMs: number;
+    maxRuntimeSec: number;
+    maxMessageChars: number;
+  }>;
 }) {
   return {
     tmux: {
@@ -189,6 +211,7 @@ function buildConfig(params: {
           noOutputTimeoutMs: 100,
           maxRuntimeSec: 1,
           maxMessageChars: 2000,
+          ...(params.streamOverrides ?? {}),
         },
         session: {
           createIfMissing: true,
@@ -710,6 +733,254 @@ describe("AgentService session identity", () => {
       expect(typeof firstSessionId).toBe("string");
       expect(secondRun.snapshot).toContain(`PONG ${firstSessionId ?? ""}`);
       expect(fakeTmux.sessionCommands[1]).toContain(`resume ${firstSessionId ?? ""}`);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("detaches long-running prompts instead of timing them out and protects them from stale cleanup", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "muxbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "muxbot.sock");
+      const configPath = join(tempDir, "muxbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            staleAfterMinutes: 1,
+            streamOverrides: {
+              updateIntervalMs: 5,
+              idleTimeoutMs: 5000,
+              noOutputTimeoutMs: 5000,
+              maxRuntimeSec: 1,
+            },
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c5:thread:900.1000",
+      };
+
+      const execution = await service.enqueuePrompt(target, "stream-forever", {
+        onUpdate: () => undefined,
+      }).result;
+
+      expect(execution.status).toBe("detached");
+      expect(execution.snapshot).toContain("STEP");
+      expect(execution.note).toContain("over 1 second");
+      expect(execution.note).toContain("/attach");
+      expect(execution.note).toContain("/watch every 30s");
+      expect(await fakeTmux.hasSession(execution.sessionName)).toBe(true);
+
+      const staleEntry = readSessionEntry(storePath, target.sessionKey);
+      expect(staleEntry?.runtime?.state).toBe("detached");
+      await Bun.write(
+        storePath,
+        JSON.stringify(
+          {
+            [target.sessionKey]: {
+              ...staleEntry,
+              updatedAt: Date.now() - 2 * 60_000,
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      await service.cleanupStaleSessions();
+      expect(await fakeTmux.hasSession(execution.sessionName)).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a new prompt while a detached active run is still being monitored", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "muxbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "muxbot.sock");
+      const configPath = join(tempDir, "muxbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              updateIntervalMs: 5,
+              idleTimeoutMs: 5000,
+              noOutputTimeoutMs: 5000,
+              maxRuntimeSec: 1,
+            },
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c6:thread:901.1001",
+      };
+
+      const first = await service.enqueuePrompt(target, "stream-forever", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(first.status).toBe("detached");
+
+      const second = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result.catch((error) => error);
+
+      expect(second).toBeInstanceOf(ActiveRunInProgressError);
+      expect((second as Error).message).toContain("/attach");
+      expect((second as Error).message).toContain("/watch every 30s");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("reconciles persisted detached runtime state on service start", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "muxbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "muxbot.sock");
+      const configPath = join(tempDir, "muxbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              updateIntervalMs: 5,
+              idleTimeoutMs: 5000,
+              noOutputTimeoutMs: 5000,
+              maxRuntimeSec: 1,
+            },
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const firstService = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c7:thread:902.1002",
+      };
+
+      const first = await firstService.enqueuePrompt(target, "stream-forever", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(first.status).toBe("detached");
+
+      const recoveredService = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      await recoveredService.start();
+
+      const observed = await recoveredService.observeRun(target, {
+        id: "recovered-thread",
+        mode: "live",
+        onUpdate: () => undefined,
+      });
+      expect(observed.active).toBe(true);
+      expect(observed.update.status).toBe("detached");
+
+      const second = await recoveredService.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result.catch((error) => error);
+      expect(second).toBeInstanceOf(ActiveRunInProgressError);
+      await recoveredService.stop();
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

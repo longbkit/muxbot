@@ -81,4 +81,5 @@ That means the tmux runner must expose a normalized view of session progress tha
 - [Runners Feature](../../../features/runners/README.md)
 - [tmux Runner](../../../features/runners/tmux-runner.md)
 - [Transcript Presentation And Streaming](../../../architecture/transcript-presentation-and-streaming.md)
+- [Observer-Based Session Attach, Detach, And Watch](../../2026-04-08-observer-based-session-attach-detach-and-watch.md)
 - [Runners Tests](../../../tests/features/runners/README.md)

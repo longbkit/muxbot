@@ -919,7 +919,7 @@ export function selectSlackSnapshotBody(params: {
   snapshot: string;
   initialSnapshot?: string;
   previousBody?: string;
-  status: "queued" | "running" | "completed" | "timeout" | "error";
+  status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
 }) {
   const current = normalizePaneText(params.snapshot);
   const previousBody = cleanInteractionSnapshot(params.previousBody ?? "");
@@ -933,7 +933,12 @@ export function selectSlackSnapshotBody(params: {
     return interactionBody;
   }
 
-  if (params.status === "completed" || params.status === "timeout" || params.status === "error") {
+  if (
+    params.status === "completed" ||
+    params.status === "timeout" ||
+    params.status === "detached" ||
+    params.status === "error"
+  ) {
     return previousBody;
   }
 
@@ -941,7 +946,7 @@ export function selectSlackSnapshotBody(params: {
 }
 
 export function renderSlackInteraction(params: {
-  status: "queued" | "running" | "completed" | "timeout" | "error";
+  status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   content: string;
   maxChars: number;
   queuePosition?: number;
@@ -955,7 +960,10 @@ export function renderSlackInteraction(params: {
       ? stripSingleLineAssistantEnvelope(extractFinalAnswer(trimmedContent))
       : trimmedContent;
   const body = completedBody
-    ? params.status === "completed" || params.status === "timeout" || params.status === "error"
+    ? params.status === "completed" ||
+      params.status === "timeout" ||
+      params.status === "detached" ||
+      params.status === "error"
       ? truncateHead(completedBody, params.maxChars)
       : truncateTail(completedBody, params.maxChars)
     : "";
@@ -980,6 +988,10 @@ export function renderSlackInteraction(params: {
     return body ? `${body}\n\n_Timed out waiting for more output._` : "_Timed out waiting for visible output._";
   }
 
+  if (params.status === "detached") {
+    return body ? `${body}\n\n_${params.note ?? "This session is still running. Use `/transcript` anytime to check it."}_` : `_${params.note ?? "This session is still running. Use `/transcript` anytime to check it."}_`;
+  }
+
   if (params.status === "error") {
     return body ? `${body}\n\n_Error._` : "_Error._";
   }
@@ -988,7 +1000,7 @@ export function renderSlackInteraction(params: {
 }
 
 export function renderTelegramInteraction(params: {
-  status: "queued" | "running" | "completed" | "timeout" | "error";
+  status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   content: string;
   maxChars: number;
   queuePosition?: number;
@@ -1002,7 +1014,10 @@ export function renderTelegramInteraction(params: {
       ? stripSingleLineAssistantEnvelope(extractFinalAnswer(trimmedContent))
       : trimmedContent;
   const body = completedBody
-    ? params.status === "completed" || params.status === "timeout" || params.status === "error"
+    ? params.status === "completed" ||
+      params.status === "timeout" ||
+      params.status === "detached" ||
+      params.status === "error"
       ? truncateHead(completedBody, params.maxChars)
       : truncateTail(completedBody, params.maxChars)
     : "";
@@ -1027,6 +1042,11 @@ export function renderTelegramInteraction(params: {
     return body ? `${body}\n\nTimed out waiting for more output.` : "Timed out waiting for visible output.";
   }
 
+  if (params.status === "detached") {
+    const note = params.note ?? "This session is still running. Use /transcript anytime to check it.";
+    return body ? `${body}\n\n${note}` : note;
+  }
+
   if (params.status === "error") {
     return body ? `${body}\n\nError.` : "Error.";
   }
@@ -1038,7 +1058,7 @@ export function renderSlackTranscript(params: {
   agentId: string;
   sessionName: string;
   workspacePath: string;
-  status: "queued" | "running" | "completed" | "timeout" | "error";
+  status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   snapshot: string;
   queuePosition?: number;
   maxChars: number;

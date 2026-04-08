@@ -71,3 +71,6 @@ Current lifecycle rule:
 
 - runners may be sunset as stale tmux sessions
 - stale cleanup must not imply logical conversation reset
+- if a turn exceeds the configured `maxRuntimeMin` or `maxRuntimeSec`, the runner detaches observation instead of treating the turn as failed
+- that detached settlement must leave the tmux session running while monitoring continues until real completion
+- channels must be able to attach new observers to that still-running session and receive truthful final settlement later

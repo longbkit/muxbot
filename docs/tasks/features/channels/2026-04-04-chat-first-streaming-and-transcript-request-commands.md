@@ -95,6 +95,7 @@ Definition:
 - [Channels Feature](../../../features/channels/README.md)
 - [tmux Runner](../../../features/runners/tmux-runner.md)
 - [Transcript Presentation And Streaming](../../../architecture/transcript-presentation-and-streaming.md)
+- [Observer-Based Session Attach, Detach, And Watch](../../2026-04-08-observer-based-session-attach-detach-and-watch.md)
 - [Channels Tests](../../../tests/features/channels/README.md)
 - [Runner Tests](../../../tests/features/runners/README.md)
 - [Configuration Feature](../../../features/configuration/README.md)

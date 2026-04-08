@@ -1,4 +1,5 @@
 import type { StoredFollowUpState } from "./follow-up-policy.ts";
+import type { StoredSessionRuntime } from "./run-observation.ts";
 import { dirname } from "node:path";
 import { fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
 import { ensureDir } from "../shared/paths.ts";
@@ -10,6 +11,7 @@ export type StoredSessionEntry = {
   workspacePath: string;
   runnerCommand: string;
   followUp?: StoredFollowUpState;
+  runtime?: StoredSessionRuntime;
   updatedAt: number;
 };
 
@@ -70,6 +72,7 @@ export class SessionStore {
       workspacePath: params.workspacePath,
       runnerCommand: params.runnerCommand,
       followUp: existing?.followUp,
+      runtime: existing?.runtime,
       updatedAt: Date.now(),
     });
   }

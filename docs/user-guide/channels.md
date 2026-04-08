@@ -39,7 +39,8 @@ Important distinction:
 Operational notes:
 
 - `/whoami` is the fastest way to confirm the resolved platform, session key, sender id, and route-level privilege-command policy for the current conversation
-- `/status` shows the current route follow-up state plus operator hints for enabling privilege commands on that exact route
+- `/status` shows the current route follow-up state, current run state, and operator hints for enabling privilege commands on that exact route
+- `/status` is also the fastest way to see whether this routed thread is idle, actively running, or detached after a long autonomous turn
 - `/start` is useful both for routed conversations and for Telegram groups or topics that are not routed yet
 
 ## Operator Commands

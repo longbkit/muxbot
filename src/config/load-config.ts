@@ -17,6 +17,7 @@ export type ResolvedAgentConfig = {
   workspacePath: string;
   runner: MuxbotConfig["agents"]["defaults"]["runner"];
   stream: Omit<MuxbotConfig["agents"]["defaults"]["stream"], "maxRuntimeSec" | "maxRuntimeMin"> & {
+    maxRuntimeLabel: string;
     maxRuntimeMs: number;
   };
   session: MuxbotConfig["agents"]["defaults"]["session"];

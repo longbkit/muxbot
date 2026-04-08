@@ -1,4 +1,8 @@
-import { AgentService, type AgentSessionTarget } from "../agents/agent-service.ts";
+import {
+  ActiveRunInProgressError,
+  AgentService,
+  type AgentSessionTarget,
+} from "../agents/agent-service.ts";
 import {
   parseAgentCommand,
   renderAgentControlSlashHelp,
@@ -23,6 +27,7 @@ import {
   type PrivilegeCommandsConfig,
 } from "./privilege-commands.ts";
 import { renderPrivilegeCommandHelpLines } from "./privilege-help.ts";
+import type { RunObserverMode, RunUpdate } from "../agents/run-observation.ts";
 
 export type ChannelInteractionRoute = {
   agentId: string;
@@ -107,6 +112,11 @@ function renderRouteStatusMessage(params: {
     overrideMode?: "auto" | "mention-only" | "paused";
     lastBotReplyAt?: number;
   };
+  runtimeState: {
+    state: "idle" | "running" | "detached";
+    startedAt?: number;
+    detachedAt?: number;
+  };
 }) {
   const lines = [
     "muxbot status",
@@ -136,11 +146,20 @@ function renderRouteStatusMessage(params: {
   lines.push(
     `followUp.mode: \`${params.followUpState.overrideMode ?? params.route.followUp.mode}\``,
     `followUp.windowMinutes: \`${formatFollowUpTtlMinutes(params.route.followUp.participationTtlMs)}\``,
+    `run.state: \`${params.runtimeState.state}\``,
     `privilegeCommands.enabled: \`${params.route.privilegeCommands.enabled}\``,
     `privilegeCommands.allowUsers: \`${
       params.route.privilegeCommands.allowUsers.join(", ") || "(all users on route)"
     }\``,
   );
+
+  if (params.runtimeState.startedAt) {
+    lines.push(`run.startedAt: \`${new Date(params.runtimeState.startedAt).toISOString()}\``);
+  }
+
+  if (params.runtimeState.detachedAt) {
+    lines.push(`run.detachedAt: \`${new Date(params.runtimeState.detachedAt).toISOString()}\``);
+  }
 
   lines.push(
     "",
@@ -148,12 +167,25 @@ function renderRouteStatusMessage(params: {
     "- `/help`",
     "- `/whoami`",
     "- `/status`",
+    "- `/attach`, `/detach`, `/watch every 30s`",
     "- `/followup status`",
     "- `/transcript` and `/bash` require privilege commands",
   );
 
   lines.push("", ...renderPrivilegeCommandHelpLines(params.identity));
   return lines.join("\n");
+}
+
+function buildChannelObserverId(identity: ChannelInteractionIdentity) {
+  return [
+    identity.platform,
+    identity.conversationKind,
+    identity.senderId ?? "",
+    identity.channelId ?? "",
+    identity.chatId ?? "",
+    identity.threadTs ?? "",
+    identity.topicId ?? "",
+  ].join(":");
 }
 
 export async function processChannelInteraction<TChunk>(params: {
@@ -169,6 +201,69 @@ export async function processChannelInteraction<TChunk>(params: {
 }) {
   let responseChunks: TChunk[] = [];
   let renderedState: ChannelRenderedMessageState | undefined;
+  const observerId = buildChannelObserverId(params.identity);
+  let replyRecorded = false;
+  let renderChain = Promise.resolve();
+
+  async function recordReplyIfNeeded() {
+    if (replyRecorded) {
+      return;
+    }
+
+    await params.agentService.recordConversationReply(params.sessionTarget);
+    replyRecorded = true;
+  }
+
+  async function renderResponseText(nextText: string) {
+    if (!responseChunks.length) {
+      responseChunks = await params.postText(nextText);
+      if (responseChunks.length > 0) {
+        await recordReplyIfNeeded();
+      }
+      return;
+    }
+
+    responseChunks = await params.reconcileText(responseChunks, nextText);
+  }
+
+  async function applyRunUpdate(update: RunUpdate) {
+    await (renderChain = renderChain.then(async () => {
+      const nextState = buildRenderedMessageState({
+        platform: params.identity.platform,
+        status: update.status,
+        snapshot: update.snapshot,
+        maxChars: Number.POSITIVE_INFINITY,
+        note: update.note,
+        previousState: renderedState,
+        responsePolicy: params.route.response,
+      });
+      if (renderedState?.text === nextState.text) {
+        return;
+      }
+
+      await renderResponseText(nextState.text);
+      renderedState = nextState;
+    }));
+  }
+
+  function buildRunObserver(paramsForObserver: {
+    mode: RunObserverMode;
+    intervalMs?: number;
+    durationMs?: number;
+  }) {
+    return {
+      id: observerId,
+      mode: paramsForObserver.mode,
+      intervalMs: paramsForObserver.intervalMs,
+      expiresAt: paramsForObserver.durationMs
+        ? Date.now() + paramsForObserver.durationMs
+        : undefined,
+      onUpdate: async (update: RunUpdate) => {
+        await applyRunUpdate(update);
+      },
+    };
+  }
+
   const slashCommand = parseAgentCommand(params.text, {
     commandPrefixes: params.route.commandPrefixes,
   });
@@ -192,12 +287,14 @@ export async function processChannelInteraction<TChunk>(params: {
     if (slashCommand.name === "start" || slashCommand.name === "status") {
       const followUpState =
         await params.agentService.getConversationFollowUpState(params.sessionTarget);
+      const runtimeState = await params.agentService.getSessionRuntime(params.sessionTarget);
       await params.postText(
         renderRouteStatusMessage({
           identity: params.identity,
           route: params.route,
           sessionTarget: params.sessionTarget,
           followUpState,
+          runtimeState,
         }),
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
@@ -235,6 +332,44 @@ export async function processChannelInteraction<TChunk>(params: {
           note: "transcript command",
         }),
       );
+      return;
+    }
+
+    if (slashCommand.name === "attach") {
+      const observation = await params.agentService.observeRun(
+        params.sessionTarget,
+        buildRunObserver({
+          mode: "live",
+        }),
+      );
+      await applyRunUpdate(observation.update);
+      return;
+    }
+
+    if (slashCommand.name === "detach") {
+      const detached = await params.agentService.detachRunObserver(
+        params.sessionTarget,
+        observerId,
+      );
+      await params.postText(
+        detached.detached
+          ? "Detached this thread from live updates. muxbot will still post the final settlement here when the run completes."
+          : "This thread was not attached to an active run.",
+      );
+      await params.agentService.recordConversationReply(params.sessionTarget);
+      return;
+    }
+
+    if (slashCommand.name === "watch") {
+      const observation = await params.agentService.observeRun(
+        params.sessionTarget,
+        buildRunObserver({
+          mode: "poll",
+          intervalMs: slashCommand.intervalMs,
+          durationMs: slashCommand.durationMs,
+        }),
+      );
+      await applyRunUpdate(observation.update);
       return;
     }
 
@@ -305,37 +440,14 @@ export async function processChannelInteraction<TChunk>(params: {
     return;
   }
 
-  let replyRecorded = false;
-  let renderChain = Promise.resolve();
-
-  const recordReplyIfNeeded = async () => {
-    if (replyRecorded) {
-      return;
-    }
-
-    await params.agentService.recordConversationReply(params.sessionTarget);
-    replyRecorded = true;
-  };
-
-  const renderResponseText = async (nextText: string) => {
-    if (!responseChunks.length) {
-      responseChunks = await params.postText(nextText);
-      if (responseChunks.length > 0) {
-        await recordReplyIfNeeded();
-      }
-      return;
-    }
-
-    responseChunks = await params.reconcileText(responseChunks, nextText);
-  };
-
   try {
     const { positionAhead, result } = params.agentService.enqueuePrompt(
       params.sessionTarget,
       params.text,
       {
+        observerId,
         onUpdate: async (update) => {
-          if (params.route.streaming === "off") {
+          if (params.route.streaming === "off" && update.status === "running") {
             return;
           }
 
@@ -346,6 +458,7 @@ export async function processChannelInteraction<TChunk>(params: {
               snapshot: update.snapshot,
               queuePosition: positionAhead,
               maxChars: Number.POSITIVE_INFINITY,
+              note: update.note,
               previousState: renderedState,
               responsePolicy: params.route.response,
             });
@@ -391,6 +504,7 @@ export async function processChannelInteraction<TChunk>(params: {
       status: finalResult.status,
       snapshot: finalResult.snapshot,
       maxChars: Number.POSITIVE_INFINITY,
+      note: finalResult.note,
       previousState: renderedState,
       responsePolicy: params.route.response,
     });
@@ -402,6 +516,7 @@ export async function processChannelInteraction<TChunk>(params: {
           status: finalResult.status,
           content: nextState.body,
           maxChars: Number.POSITIVE_INFINITY,
+          note: finalResult.note,
           responsePolicy: "final",
         }),
       );
@@ -413,6 +528,17 @@ export async function processChannelInteraction<TChunk>(params: {
     await renderResponseText(nextState.text);
     renderedState = nextState;
   } catch (error) {
+    if (error instanceof ActiveRunInProgressError) {
+      const activeText = error.update.note ?? String(error);
+      if (params.route.streaming !== "off" && responseChunks.length > 0) {
+        await params.reconcileText(responseChunks, activeText);
+      } else {
+        await params.postText(activeText);
+      }
+      await params.agentService.recordConversationReply(params.sessionTarget);
+      return;
+    }
+
     const errorText = renderPlatformInteraction({
       platform: params.identity.platform,
       status: "error",
