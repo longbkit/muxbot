@@ -60,6 +60,12 @@ Channels is where those surfaces live.
 - [Slack Thread Follow-Up Behavior](../../research/channels/2026-04-05-slack-thread-follow-up-behavior.md)
 - [OpenClaw Telegram Topics And Slack-Parity Plan](../../research/channels/2026-04-05-openclaw-telegram-topics-and-parity-plan.md)
 - [OpenClaw Pairing Implementation](../../research/channels/2026-04-06-openclaw-pairing-implementation.md)
+- [OpenClaw CLI Command Surfaces And Slack Telegram Send Syntax](../../research/channels/2026-04-09-openclaw-cli-command-surfaces-and-slack-telegram-send-syntax.md)
+
+## Related Feature Docs
+
+- [Message Actions And Channel Accounts](message-actions-and-channel-accounts.md)
+- [Agent Progress Reply Wrapper And Prompt](agent-progress-reply-wrapper-and-prompt.md)
 
 ## Dependencies
 

@@ -82,6 +82,18 @@ function createLoadedConfig(): LoadedConfig {
           mode: "socket",
           appToken: "app-token",
           botToken: "bot-token",
+          defaultAccount: "default",
+          accounts: {
+            default: {
+              appToken: "app-token",
+              botToken: "bot-token",
+            },
+          },
+          agentPrompt: {
+            enabled: true,
+            maxProgressMessages: 3,
+            requireFinalResponse: true,
+          },
           ackReaction: ":heavy_check_mark:",
           typingReaction: "",
           processingStatus: {
@@ -104,6 +116,7 @@ function createLoadedConfig(): LoadedConfig {
           },
           streaming: "all",
           response: "final",
+          responseMode: "message-tool",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -121,6 +134,17 @@ function createLoadedConfig(): LoadedConfig {
           enabled: true,
           mode: "polling",
           botToken: "telegram-token",
+          defaultAccount: "default",
+          accounts: {
+            default: {
+              botToken: "telegram-token",
+            },
+          },
+          agentPrompt: {
+            enabled: true,
+            maxProgressMessages: 3,
+            requireFinalResponse: true,
+          },
           allowBots: false,
           groupPolicy: "allowlist",
           defaultAgentId: "default",
@@ -134,6 +158,7 @@ function createLoadedConfig(): LoadedConfig {
           },
           streaming: "all",
           response: "final",
+          responseMode: "message-tool",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,

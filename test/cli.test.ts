@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseCliArgs, renderCliHelp } from "../src/cli.ts";
+import { getMuxbotVersion } from "../src/version.ts";
 
 describe("parseCliArgs", () => {
   test("parses stop --hard", () => {
@@ -21,6 +22,18 @@ describe("parseCliArgs", () => {
     });
   });
 
+  test("parses version command and flags", () => {
+    expect(parseCliArgs(["bun", "src/main.ts", "version"])).toEqual({
+      name: "version",
+    });
+    expect(parseCliArgs(["bun", "src/main.ts", "--version"])).toEqual({
+      name: "version",
+    });
+    expect(parseCliArgs(["bun", "src/main.ts", "-v"])).toEqual({
+      name: "version",
+    });
+  });
+
   test("parses logs with explicit line count", () => {
     expect(parseCliArgs(["bun", "src/main.ts", "logs", "--lines", "50"])).toEqual({
       name: "logs",
@@ -32,6 +45,15 @@ describe("parseCliArgs", () => {
     expect(parseCliArgs(["bun", "src/main.ts", "channels", "enable", "slack"])).toEqual({
       name: "channels",
       args: ["enable", "slack"],
+    });
+  });
+
+  test("parses message subcommands", () => {
+    expect(
+      parseCliArgs(["bun", "src/main.ts", "message", "send", "--channel", "slack"]),
+    ).toEqual({
+      name: "message",
+      args: ["send", "--channel", "slack"],
     });
   });
 
@@ -107,6 +129,7 @@ describe("renderCliHelp", () => {
   test("includes lifecycle commands and npm usage", () => {
     const help = renderCliHelp();
 
+    expect(help).toContain(`muxbot v${getMuxbotVersion()}`);
     expect(help).toContain("muxbot start");
     expect(help).toContain("personal-assistant");
     expect(help).toContain("team-assistant");
@@ -120,8 +143,10 @@ describe("renderCliHelp", () => {
     expect(help).toContain("muxbot restart");
     expect(help).toContain("muxbot stop [--hard]");
     expect(help).toContain("muxbot status");
+    expect(help).toContain("muxbot version");
     expect(help).toContain("muxbot logs [--lines N]");
     expect(help).toContain("muxbot channels <subcommand>");
+    expect(help).toContain("muxbot message <subcommand>");
     expect(help).toContain("muxbot agents <subcommand>");
     expect(help).toContain("muxbot init [--cli <codex|claude>] [--bootstrap <personal-assistant|team-assistant>]");
     expect(help).not.toContain("print-config-path");

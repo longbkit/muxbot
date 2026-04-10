@@ -16,8 +16,10 @@ export type AgentControlSlashCommandName =
   | "detach"
   | "watch"
   | "stop"
-  | "followup";
+  | "followup"
+  | "responsemode";
 export type AgentFollowUpSlashAction = "status" | "auto" | "mention-only" | "pause" | "resume";
+export type AgentResponseModeSlashAction = "status" | "capture-pane" | "message-tool";
 
 export type AgentControlSlashCommand =
   | {
@@ -63,6 +65,12 @@ export type AgentControlSlashCommand =
       name: "followup";
       action: AgentFollowUpSlashAction;
       mode?: FollowUpMode;
+    }
+  | {
+      type: "control";
+      name: "responsemode";
+      action: AgentResponseModeSlashAction;
+      responseMode?: "capture-pane" | "message-tool";
     };
 
 export type AgentSlashCommand =
@@ -240,6 +248,32 @@ export function parseAgentCommand(
     };
   }
 
+  if (lowered === "responsemode") {
+    const action = withoutSlash.slice(command.length).trim().toLowerCase();
+    if (!action || action === "status") {
+      return {
+        type: "control",
+        name: "responsemode",
+        action: "status",
+      };
+    }
+
+    if (action === "capture-pane" || action === "message-tool") {
+      return {
+        type: "control",
+        name: "responsemode",
+        action,
+        responseMode: action,
+      };
+    }
+
+    return {
+      type: "control",
+      name: "responsemode",
+      action: "status",
+    };
+  }
+
   if (lowered === "bash") {
     return {
       type: "bash",
@@ -293,6 +327,9 @@ export function renderAgentControlSlashHelp() {
     "- `/followup mention-only`: require explicit mention for each later turn",
     "- `/followup pause`: stop passive follow-up until the next explicit mention",
     "- `/followup resume`: clear the runtime override and restore config defaults",
+    "- `/responsemode status`: show the configured response mode for this surface",
+    "- `/responsemode capture-pane`: settle replies from captured pane output for this surface",
+    "- `/responsemode message-tool`: expect the agent to reply through `muxbot message send` for this surface",
     "- `/bash` followed by a shell command: requires `privilegeCommands.enabled: true` on the current route",
     "- shortcut prefixes such as `!` run bash when the route allows privilege commands",
     "",

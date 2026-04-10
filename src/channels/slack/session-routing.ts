@@ -18,6 +18,7 @@ export type SlackConversationKind = "dm" | "group" | "channel";
 export function resolveSlackConversationTarget(params: {
   loadedConfig: LoadedConfig;
   agentId: string;
+  accountId?: string | null;
   channelId: string;
   userId?: string | null;
   messageTs?: string | null;
@@ -38,7 +39,7 @@ export function resolveSlackConversationTarget(params: {
         agentId: params.agentId,
         mainKey: sessionConfig.mainKey,
         channel: "slack",
-        accountId: "default",
+        accountId: params.accountId ?? "default",
         peerKind: "dm",
         peerId: params.userId ?? params.channelId,
         dmScope: sessionConfig.dmScope,
@@ -55,7 +56,7 @@ export function resolveSlackConversationTarget(params: {
         agentId: params.agentId,
         mainKey: sessionConfig.mainKey,
         channel: "slack",
-        accountId: "default",
+        accountId: params.accountId ?? "default",
         peerKind: "group",
         peerId: params.channelId,
       }),
@@ -67,7 +68,7 @@ export function resolveSlackConversationTarget(params: {
     agentId: params.agentId,
     mainKey: sessionConfig.mainKey,
     channel: "slack",
-    accountId: "default",
+    accountId: params.accountId ?? "default",
     peerKind: "channel",
     peerId: params.channelId,
   });

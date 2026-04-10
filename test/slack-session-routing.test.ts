@@ -82,6 +82,18 @@ function createLoadedConfig(): LoadedConfig {
           mode: "socket",
           appToken: "app-token",
           botToken: "bot-token",
+          defaultAccount: "default",
+          accounts: {
+            default: {
+              appToken: "app-token",
+              botToken: "bot-token",
+            },
+          },
+          agentPrompt: {
+            enabled: true,
+            maxProgressMessages: 3,
+            requireFinalResponse: true,
+          },
           ackReaction: ":heavy_check_mark:",
           typingReaction: "",
           processingStatus: {
@@ -104,6 +116,7 @@ function createLoadedConfig(): LoadedConfig {
           },
           streaming: "all",
           response: "final",
+          responseMode: "message-tool",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -121,6 +134,17 @@ function createLoadedConfig(): LoadedConfig {
           enabled: false,
           mode: "polling",
           botToken: "telegram-token",
+          defaultAccount: "default",
+          accounts: {
+            default: {
+              botToken: "telegram-token",
+            },
+          },
+          agentPrompt: {
+            enabled: true,
+            maxProgressMessages: 3,
+            requireFinalResponse: true,
+          },
           allowBots: false,
           groupPolicy: "allowlist",
           defaultAgentId: "default",
@@ -134,6 +158,7 @@ function createLoadedConfig(): LoadedConfig {
           },
           streaming: "all",
           response: "final",
+          responseMode: "message-tool",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -273,6 +298,24 @@ describe("Slack conversation target routing", () => {
     });
 
     expect(channelRoute.route?.agentId).toBe("bound-agent");
+  });
+
+  test("uses agent responseMode when the route does not override it", () => {
+    const loadedConfig = createLoadedConfig();
+    loadedConfig.raw.channels.slack.channelPolicy = "open";
+    loadedConfig.raw.agents.list = [
+      {
+        id: "default",
+        responseMode: "capture-pane",
+      },
+    ];
+
+    const channelRoute = resolveSlackConversationRoute(loadedConfig, {
+      channel_type: "channel",
+      channel: "C123",
+    });
+
+    expect(channelRoute.route?.responseMode).toBe("capture-pane");
   });
 
   test("uses account-specific slack binding when the bound account id is provided", () => {

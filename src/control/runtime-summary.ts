@@ -30,6 +30,7 @@ type AgentOperatorSummary = {
   cliTool: string;
   workspacePath: string;
   startupOptions: string[];
+  responseMode?: "capture-pane" | "message-tool";
   bootstrapMode?: string;
   bootstrapState: BootstrapWorkspaceState;
   bindings: string[];
@@ -41,6 +42,9 @@ type ChannelOperatorSummary = {
   enabled: boolean;
   connection: RuntimeChannelConnection;
   defaultAgentId: string;
+  streaming: "off" | "latest" | "all";
+  response: "all" | "final";
+  responseMode: "capture-pane" | "message-tool";
   configuredSurfaceCount: number;
   directMessagesEnabled: boolean;
   directMessagesPolicy: string;
@@ -143,6 +147,7 @@ export async function getRuntimeOperatorSummary(params: {
       cliTool: tool.cliTool,
       workspacePath: resolved.workspacePath,
       startupOptions: tool.startupOptions,
+      responseMode: entry.responseMode,
       bootstrapMode: entry.bootstrap?.mode,
       bootstrapState,
       bindings: loadedConfig.raw.bindings
@@ -152,23 +157,37 @@ export async function getRuntimeOperatorSummary(params: {
     } satisfies AgentOperatorSummary;
   });
 
+  const slackConnection = deriveChannelConnection({
+    enabled: loadedConfig.raw.channels.slack.enabled,
+    runtimeRunning: params.runtimeRunning,
+    recordedConnection: runtimeHealth.channels.slack?.connection,
+  });
+  const telegramConnection = deriveChannelConnection({
+    enabled: loadedConfig.raw.channels.telegram.enabled,
+    runtimeRunning: params.runtimeRunning,
+    recordedConnection: runtimeHealth.channels.telegram?.connection,
+  });
+
   const channelSummaries = [
     {
       channel: "slack" as const,
       enabled: loadedConfig.raw.channels.slack.enabled,
-      connection: deriveChannelConnection({
-        enabled: loadedConfig.raw.channels.slack.enabled,
-        runtimeRunning: params.runtimeRunning,
-        recordedConnection: runtimeHealth.channels.slack?.connection,
-      }),
+      connection: slackConnection,
       defaultAgentId: loadedConfig.raw.channels.slack.defaultAgentId,
+      streaming: loadedConfig.raw.channels.slack.streaming,
+      response: loadedConfig.raw.channels.slack.response,
+      responseMode: loadedConfig.raw.channels.slack.responseMode,
       configuredSurfaceCount: countSlackSurfaces(loadedConfig),
       directMessagesEnabled: loadedConfig.raw.channels.slack.directMessages.enabled,
       directMessagesPolicy: loadedConfig.raw.channels.slack.directMessages.policy,
       groupPolicy: loadedConfig.raw.channels.slack.groupPolicy,
       lastActivityAt: activities.channels.slack?.updatedAt,
       lastActivityAgentId: activities.channels.slack?.agentId,
-      healthSummary: runtimeHealth.channels.slack?.summary,
+      healthSummary: deriveHealthSummary({
+        channel: "slack",
+        connection: slackConnection,
+        recordedSummary: runtimeHealth.channels.slack?.summary,
+      }),
       healthDetail: runtimeHealth.channels.slack?.detail,
       healthActions: runtimeHealth.channels.slack?.actions ?? [],
       healthUpdatedAt: runtimeHealth.channels.slack?.updatedAt,
@@ -176,19 +195,22 @@ export async function getRuntimeOperatorSummary(params: {
     {
       channel: "telegram" as const,
       enabled: loadedConfig.raw.channels.telegram.enabled,
-      connection: deriveChannelConnection({
-        enabled: loadedConfig.raw.channels.telegram.enabled,
-        runtimeRunning: params.runtimeRunning,
-        recordedConnection: runtimeHealth.channels.telegram?.connection,
-      }),
+      connection: telegramConnection,
       defaultAgentId: loadedConfig.raw.channels.telegram.defaultAgentId,
+      streaming: loadedConfig.raw.channels.telegram.streaming,
+      response: loadedConfig.raw.channels.telegram.response,
+      responseMode: loadedConfig.raw.channels.telegram.responseMode,
       configuredSurfaceCount: countTelegramSurfaces(loadedConfig),
       directMessagesEnabled: loadedConfig.raw.channels.telegram.directMessages.enabled,
       directMessagesPolicy: loadedConfig.raw.channels.telegram.directMessages.policy,
       groupPolicy: loadedConfig.raw.channels.telegram.groupPolicy,
       lastActivityAt: activities.channels.telegram?.updatedAt,
       lastActivityAgentId: activities.channels.telegram?.agentId,
-      healthSummary: runtimeHealth.channels.telegram?.summary,
+      healthSummary: deriveHealthSummary({
+        channel: "telegram",
+        connection: telegramConnection,
+        recordedSummary: runtimeHealth.channels.telegram?.summary,
+      }),
       healthDetail: runtimeHealth.channels.telegram?.detail,
       healthActions: runtimeHealth.channels.telegram?.actions ?? [],
       healthUpdatedAt: runtimeHealth.channels.telegram?.updatedAt,
@@ -225,6 +247,30 @@ function deriveChannelConnection(params: {
     return "stopped" as const;
   }
   return params.recordedConnection ?? "active";
+}
+
+function deriveHealthSummary(params: {
+  channel: "slack" | "telegram";
+  connection: RuntimeChannelConnection;
+  recordedSummary?: string;
+}) {
+  if (params.recordedSummary) {
+    return params.recordedSummary;
+  }
+
+  const label = params.channel === "slack" ? "Slack" : "Telegram";
+  switch (params.connection) {
+    case "disabled":
+      return `${label} channel is disabled in config.`;
+    case "stopped":
+      return `${label} channel is stopped.`;
+    case "starting":
+      return `${label} channel is starting.`;
+    case "active":
+      return `${label} channel is active.`;
+    case "failed":
+      return `${label} channel failed to start.`;
+  }
 }
 
 function renderActiveRunSummaryLines(summary: RuntimeOperatorSummary) {
@@ -279,9 +325,10 @@ function renderAgentSummaryLines(summary: RuntimeOperatorSummary) {
           ? "bootstrap=not-configured"
           : `bootstrap=${agent.bootstrapMode}:${agent.bootstrapState}`;
       const bindings = agent.bindings.length ? ` bindings=${agent.bindings.join(",")}` : "";
+      const responseMode = ` responseMode=${agent.responseMode ?? "inherit"}`;
       return `  - ${agent.id} tool=${agent.cliTool} ${bootstrap}${bindings} last=${formatTime(
         agent.lastActivityAt,
-      )}`;
+      )}${responseMode}`;
     }),
   ];
 }
@@ -296,18 +343,19 @@ function renderChannelSummaryLines(summary: RuntimeOperatorSummary) {
         : " last=never";
       const dm = ` dm=${channel.directMessagesEnabled ? channel.directMessagesPolicy : "disabled"}`;
       const group = channel.groupPolicy ? ` groups=${channel.groupPolicy}` : "";
+      const render = ` streaming=${channel.streaming} response=${channel.response} responseMode=${channel.responseMode}`;
       const routeHint =
         channel.configuredSurfaceCount === 0
           ? " routes=none"
           : ` routes=${channel.configuredSurfaceCount}`;
-      return `  - ${channel.channel} enabled=${channel.enabled ? "yes" : "no"} connection=${channel.connection} defaultAgent=${channel.defaultAgentId}${dm}${group}${routeHint}${last}`;
+      return `  - ${channel.channel} enabled=${channel.enabled ? "yes" : "no"} connection=${channel.connection} defaultAgent=${channel.defaultAgentId}${render}${dm}${group}${routeHint}${last}`;
     }),
   ];
 }
 
 function renderChannelDiagnosticLines(summary: RuntimeOperatorSummary) {
   const channelsNeedingDiagnostics = summary.channelSummaries.filter((channel) =>
-    channel.connection === "failed" || channel.healthActions.length > 0
+    Boolean(channel.healthSummary) || channel.healthActions.length > 0 || Boolean(channel.healthDetail)
   );
   if (channelsNeedingDiagnostics.length === 0) {
     return [];
@@ -315,7 +363,7 @@ function renderChannelDiagnosticLines(summary: RuntimeOperatorSummary) {
 
   return [
     "",
-    "Channel diagnostics:",
+    "Channel health:",
     ...channelsNeedingDiagnostics.flatMap((channel) => {
       const lines = [
         `  - ${channel.channel}: ${channel.healthSummary ?? "channel diagnostics available"}`,

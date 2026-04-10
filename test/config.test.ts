@@ -101,6 +101,11 @@ describe("loadConfig", () => {
                 "Preparing response...",
               ],
             },
+            agentPrompt: {
+              enabled: true,
+              maxProgressMessages: 3,
+              requireFinalResponse: true,
+            },
             replyToMode: "thread",
             channelPolicy: "allowlist",
             groupPolicy: "allowlist",
@@ -115,6 +120,7 @@ describe("loadConfig", () => {
             },
             streaming: "all",
             response: "final",
+            responseMode: "message-tool",
             followUp: {
               mode: "auto",
               participationTtlSec: 13,
@@ -171,6 +177,7 @@ describe("loadConfig", () => {
       slash: ["::", "\\"],
       bash: ["!"],
     });
+    expect(loaded.raw.channels.slack.responseMode).toBe("message-tool");
     expect(loaded.raw.channels.slack.streaming).toBe("all");
     expect(loaded.raw.channels.slack.response).toBe("final");
     expect(loaded.raw.channels.slack.followUp.mode).toBe("auto");

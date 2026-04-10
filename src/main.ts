@@ -3,6 +3,7 @@ import { parseCliArgs, renderCliHelp } from "./cli.ts";
 import { runPairingCli } from "./channels/pairing/cli.ts";
 import { addAgentToEditableConfig, runAgentsCli } from "./control/agents-cli.ts";
 import { runChannelsCli } from "./control/channels-cli.ts";
+import { runMessageCli } from "./control/message-cli.ts";
 import { RuntimeSupervisor } from "./control/runtime-supervisor.ts";
 import {
   ensureConfigFile,
@@ -48,6 +49,7 @@ import {
   renderRuntimeErrorLines,
 } from "./control/operator-errors.ts";
 import { commandExists } from "./shared/process.ts";
+import { getMuxbotVersion } from "./version.ts";
 
 type PreparedBootstrapState = {
   channelAvailability: ReturnType<typeof getDefaultChannelAvailability>;
@@ -392,6 +394,7 @@ async function restart() {
 
 async function status() {
   const runtimeStatus = await getRuntimeStatus();
+  console.log(`version: ${getMuxbotVersion()}`);
   console.log(`running: ${runtimeStatus.running ? "yes" : "no"}`);
   if (runtimeStatus.pid) {
     console.log(`pid: ${runtimeStatus.pid}`);
@@ -458,6 +461,11 @@ async function main() {
     return;
   }
 
+  if (command.name === "version") {
+    console.log(getMuxbotVersion());
+    return;
+  }
+
   if (command.name === "init") {
     await initConfig(command);
     return;
@@ -495,6 +503,11 @@ async function main() {
 
   if (command.name === "channels") {
     await runChannelsCli(command.args);
+    return;
+  }
+
+  if (command.name === "message") {
+    await runMessageCli(command.args);
     return;
   }
 

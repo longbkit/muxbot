@@ -117,6 +117,26 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             slackEnabled,
             options.slackBotTokenRef,
           ),
+          defaultAccount: "default",
+          accounts: {
+            default: {
+              appToken: renderEnvReference(
+                "SLACK_APP_TOKEN",
+                slackEnabled,
+                options.slackAppTokenRef,
+              ),
+              botToken: renderEnvReference(
+                "SLACK_BOT_TOKEN",
+                slackEnabled,
+                options.slackBotTokenRef,
+              ),
+            },
+          },
+          agentPrompt: {
+            enabled: true,
+            maxProgressMessages: 3,
+            requireFinalResponse: true,
+          },
           ackReaction: ":heavy_check_mark:",
           typingReaction: "",
           processingStatus: {
@@ -139,6 +159,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
           },
           streaming: "all",
           response: "final",
+          responseMode: "message-tool",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -165,6 +186,21 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             telegramEnabled,
             options.telegramBotTokenRef,
           ),
+          defaultAccount: "default",
+          accounts: {
+            default: {
+              botToken: renderEnvReference(
+                "TELEGRAM_BOT_TOKEN",
+                telegramEnabled,
+                options.telegramBotTokenRef,
+              ),
+            },
+          },
+          agentPrompt: {
+            enabled: true,
+            maxProgressMessages: 3,
+            requireFinalResponse: true,
+          },
           allowBots: false,
           groupPolicy: "allowlist",
           defaultAgentId: "default",
@@ -178,6 +214,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
           },
           streaming: "all",
           response: "final",
+          responseMode: "message-tool",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,

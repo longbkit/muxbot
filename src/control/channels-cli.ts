@@ -3,6 +3,11 @@ import {
   renderGenericPrivilegeCommandHelpLines,
   renderPrivilegeCommandHelpLines,
 } from "../channels/privilege-help.ts";
+import {
+  getConfiguredResponseMode,
+  setConfiguredResponseMode,
+  type ResponseMode,
+} from "../channels/response-mode-config.ts";
 import { runChannelPrivilegeCli } from "./channel-privilege-cli.ts";
 import { renderChannelSetupHelpLines } from "./startup-bootstrap.ts";
 
@@ -30,6 +35,8 @@ export function renderChannelsHelp() {
     "  muxbot channels add slack-group <groupId> [--agent <id>] [--require-mention true|false]",
     "  muxbot channels remove slack-group <groupId>",
     "  muxbot channels privilege <enable|disable|allow-user|remove-user> <target> ...",
+    "  muxbot channels response-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]",
+    "  muxbot channels response-mode set <capture-pane|message-tool> --channel <slack|telegram> [--target <target>] [--topic <topicId>]",
     "  muxbot channels set-token <slack-app|slack-bot|telegram-bot> <value>",
     "  muxbot channels clear-token <slack-app|slack-bot|telegram-bot>",
     "",
@@ -42,7 +49,20 @@ export function renderChannelsHelp() {
     "  - Telegram forum topics need channels.telegram.groups.<chatId>.topics.<topicId>",
     "  - Adding a route puts that surface on the allowlist; other channels, groups, or topics still need to be added explicitly",
     "  - Tune route settings such as requireMention, privilegeCommands, and followUp in muxbot.json when a surface should behave differently",
+    "  - Response delivery can be tuned with responseMode: `capture-pane` or `message-tool`",
+    "  - Slack response-mode targets use `channel:<id>`, `group:<id>`, or `dm:<id>`",
+    "  - Telegram response-mode targets use a numeric chat id; negative ids are groups, positive ids are direct messages",
+    "  - Telegram topics add `--topic <topicId>` on top of the group chat id",
     "  - Use pairing or allowlist DM policy when you do not want open direct-message access",
+    "",
+    "Response mode examples:",
+    "  - muxbot channels response-mode status --channel slack",
+    "  - muxbot channels response-mode set message-tool --channel slack --target channel:C123",
+    "  - muxbot channels response-mode set capture-pane --channel slack --target group:G123",
+    "  - muxbot channels response-mode set message-tool --channel slack --target dm:D123",
+    "  - muxbot channels response-mode set message-tool --channel telegram --target -1001234567890",
+    "  - muxbot channels response-mode set capture-pane --channel telegram --target -1001234567890 --topic 42",
+    "  - muxbot channels response-mode set message-tool --channel telegram --target 123456789",
     "",
     "Discovery tips:",
     "  - Telegram: use `/whoami` in the target group or topic to get chatId and topicId",
@@ -80,6 +100,48 @@ function parseTokenTarget(raw: string | undefined): TokenTarget {
   throw new Error(
     "Usage: muxbot channels <set-token|clear-token> <slack-app|slack-bot|telegram-bot> [value]",
   );
+}
+
+function parseResponseMode(raw: string | undefined): ResponseMode {
+  if (raw === "capture-pane" || raw === "message-tool") {
+    return raw;
+  }
+  throw new Error(renderChannelsHelp());
+}
+
+function parseResponseModeChannel(raw: string | undefined) {
+  if (raw === "slack" || raw === "telegram") {
+    return raw;
+  }
+  throw new Error("response-mode requires --channel slack or --channel telegram");
+}
+
+function parseResponseModeTarget(channel: "slack" | "telegram", raw: string | undefined) {
+  if (!raw) {
+    return undefined;
+  }
+
+  const target = raw.trim();
+  if (!target) {
+    throw new Error("--target requires a value");
+  }
+
+  if (channel === "slack") {
+    const [kind, targetId] = target.split(":", 2);
+    if (
+      (kind === "channel" || kind === "group" || kind === "dm") &&
+      targetId?.trim()
+    ) {
+      return `${kind}:${targetId.trim()}`;
+    }
+    throw new Error("Slack --target must use channel:<id>, group:<id>, or dm:<id>");
+  }
+
+  if (!/^-?\d+$/.test(target)) {
+    throw new Error("Telegram --target must be a numeric chat id");
+  }
+
+  return target;
 }
 
 function parseOptionValue(args: string[], name: string) {
@@ -289,10 +351,26 @@ async function setToken(target: TokenTarget, value: string) {
 
   if (target === "slack-app") {
     config.channels.slack.appToken = value;
+    const defaultAccountId = config.channels.slack.defaultAccount || "default";
+    const existing = config.channels.slack.accounts[defaultAccountId];
+    config.channels.slack.accounts[defaultAccountId] = {
+      appToken: value,
+      botToken: existing?.botToken ?? config.channels.slack.botToken,
+    };
   } else if (target === "slack-bot") {
     config.channels.slack.botToken = value;
+    const defaultAccountId = config.channels.slack.defaultAccount || "default";
+    const existing = config.channels.slack.accounts[defaultAccountId];
+    config.channels.slack.accounts[defaultAccountId] = {
+      appToken: existing?.appToken ?? config.channels.slack.appToken,
+      botToken: value,
+    };
   } else {
     config.channels.telegram.botToken = value;
+    const defaultAccountId = config.channels.telegram.defaultAccount || "default";
+    config.channels.telegram.accounts[defaultAccountId] = {
+      botToken: value,
+    };
   }
 
   await writeEditableConfig(configPath, config);
@@ -305,15 +383,76 @@ async function clearToken(target: TokenTarget) {
 
   if (target === "slack-app") {
     config.channels.slack.appToken = "";
+    const defaultAccountId = config.channels.slack.defaultAccount || "default";
+    const existing = config.channels.slack.accounts[defaultAccountId];
+    if (existing) {
+      config.channels.slack.accounts[defaultAccountId] = {
+        appToken: "",
+        botToken: existing.botToken,
+      };
+    }
   } else if (target === "slack-bot") {
     config.channels.slack.botToken = "";
+    const defaultAccountId = config.channels.slack.defaultAccount || "default";
+    const existing = config.channels.slack.accounts[defaultAccountId];
+    if (existing) {
+      config.channels.slack.accounts[defaultAccountId] = {
+        appToken: existing.appToken,
+        botToken: "",
+      };
+    }
   } else {
     config.channels.telegram.botToken = "";
+    const defaultAccountId = config.channels.telegram.defaultAccount || "default";
+    if (config.channels.telegram.accounts[defaultAccountId]) {
+      config.channels.telegram.accounts[defaultAccountId] = {
+        botToken: "",
+      };
+    }
   }
 
   await writeEditableConfig(configPath, config);
   console.log(`cleared ${target} token reference`);
   console.log(`config: ${configPath}`);
+}
+
+async function runResponseModeCli(args: string[]) {
+  const action = args[0];
+  if (action !== "status" && action !== "set") {
+    throw new Error(renderChannelsHelp());
+  }
+
+  const responseMode = action === "set" ? parseResponseMode(args[1]) : undefined;
+  const optionArgs = action === "set" ? args.slice(2) : args.slice(1);
+  const channel = parseResponseModeChannel(parseOptionValue(optionArgs, "--channel"));
+  const target = parseResponseModeTarget(channel, parseOptionValue(optionArgs, "--target"));
+  const topic = parseOptionValue(optionArgs, "--topic");
+
+  if (channel === "slack" && topic) {
+    throw new Error("Slack response-mode commands do not support --topic");
+  }
+
+  if (action === "status") {
+    const status = await getConfiguredResponseMode({
+      channel,
+      target,
+      topic,
+    });
+    console.log(`responseMode target: ${status.label}`);
+    console.log(`responseMode: ${status.responseMode ?? "(inherit)"}`);
+    console.log(`config: ${status.configPath}`);
+    return;
+  }
+
+  const updated = await setConfiguredResponseMode({
+    channel,
+    target,
+    topic,
+    responseMode: responseMode!,
+  });
+  console.log(`updated responseMode for ${updated.label}`);
+  console.log(`responseMode: ${updated.responseMode}`);
+  console.log(`config: ${updated.configPath}`);
 }
 
 function renderPostChangeGuidance(action: ChannelAction, channel: ChannelId) {
@@ -445,6 +584,11 @@ export async function runChannelsCli(args: string[]) {
 
   if (command === "privilege") {
     await runChannelPrivilegeCli(args.slice(1));
+    return;
+  }
+
+  if (command === "response-mode") {
+    await runResponseModeCli(args.slice(1));
     return;
   }
 

@@ -11,6 +11,7 @@ import { type MuxbotConfig } from "../config/schema.ts";
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
 import { applyBootstrapTemplate, getBootstrapWorkspaceState } from "../agents/bootstrap.ts";
 import { formatBinding } from "../config/bindings.ts";
+import type { ResponseMode } from "../channels/response-mode-config.ts";
 
 function getEditableConfigPath() {
   return process.env.MUXBOT_CONFIG_PATH;
@@ -60,6 +61,13 @@ function parseSingleOption(args: string[], name: string) {
 
 function hasFlag(args: string[], name: string) {
   return args.includes(name);
+}
+
+function parseResponseMode(raw: string | undefined): ResponseMode {
+  if (raw === "capture-pane" || raw === "message-tool") {
+    return raw;
+  }
+  throw new Error("Usage: agents response-mode <status|set|clear> ...");
 }
 
 function removeConsumedArgs(args: string[], consumedNames: string[]) {
@@ -192,6 +200,7 @@ async function listAgents(args: string[]) {
   const summaries = config.agents.list.map((agent) => ({
     id: agent.id,
     cliTool: agent.cliTool ?? agent.runner?.command ?? config.agents.defaults.runner.command,
+    responseMode: agent.responseMode,
     workspace:
       agent.workspace ??
       config.agents.defaults.workspace.replaceAll("{agentId}", agent.id),
@@ -229,6 +238,7 @@ async function listAgents(args: string[]) {
       `- ${summary.id}`,
       `tool=${summary.cliTool}`,
       `workspace=${summary.workspace}`,
+      `responseMode=${summary.responseMode ?? "inherit"}`,
     ];
     if (summary.bootstrapMode) {
       parts.push(`bootstrap=${summary.bootstrapMode}:${summary.bootstrapState}`);
@@ -422,6 +432,44 @@ async function unbindAgent(args: string[]) {
   console.log(removeAll ? `Removed all bindings for ${agentId}.` : `Removed ${bindingValue} from ${agentId}.`);
 }
 
+async function runAgentResponseModeCli(args: string[]) {
+  const action = args[0];
+  if (action !== "status" && action !== "set" && action !== "clear") {
+    throw new Error("Usage: agents response-mode <status|set|clear> --agent <id> [capture-pane|message-tool]");
+  }
+
+  const agentId = parseSingleOption(args, "--agent");
+  if (!agentId) {
+    throw new Error("Usage: agents response-mode <status|set|clear> --agent <id> [capture-pane|message-tool]");
+  }
+
+  const { config, configPath } = await readEditableConfig(getEditableConfigPath());
+  const agent = ensureAgentExists(config, agentId);
+
+  if (action === "status") {
+    console.log(`agent: ${agent.id}`);
+    console.log(`responseMode: ${agent.responseMode ?? "(inherit)"}`);
+    console.log(`config: ${configPath}`);
+    return;
+  }
+
+  if (action === "clear") {
+    delete agent.responseMode;
+    await writeEditableConfig(configPath, config);
+    console.log(`cleared responseMode for ${agent.id}`);
+    console.log(`responseMode: (inherit)`);
+    console.log(`config: ${configPath}`);
+    return;
+  }
+
+  const responseMode = parseResponseMode(args[1]);
+  agent.responseMode = responseMode;
+  await writeEditableConfig(configPath, config);
+  console.log(`updated responseMode for ${agent.id}`);
+  console.log(`responseMode: ${responseMode}`);
+  console.log(`config: ${configPath}`);
+}
+
 export async function runAgentsCli(args: string[]) {
   const subcommand = args[0];
   const rest = args.slice(1);
@@ -443,6 +491,11 @@ export async function runAgentsCli(args: string[]) {
 
   if (subcommand === "bootstrap") {
     await bootstrapAgent(rest);
+    return;
+  }
+
+  if (subcommand === "response-mode") {
+    await runAgentResponseModeCli(rest);
     return;
   }
 

@@ -2,7 +2,11 @@
 
 ## Purpose
 
-Use this page when you need the default Slack or Telegram account tokens that let `muxbot start` bootstrap and run.
+Use this page when you need to configure Slack or Telegram accounts for:
+
+- runtime startup
+- `muxbot message ...` operator actions
+- binding-level account selection with `channel[:accountId]`
 
 Current startup rule:
 
@@ -16,6 +20,76 @@ Current startup rule:
 - the CLI also accepts placeholder form such as `'${CUSTOM_SLACK_APP_TOKEN}'`
 - `muxbot start` prints the token env names it checks and whether each one is `set` or `missing`
 - when no default channel token is available, `muxbot` does not create runtime state or start the background service
+
+## Config Shape
+
+Slack and Telegram now support provider-owned account maps.
+
+Current target shape:
+
+```json
+{
+  "channels": {
+    "slack": {
+      "appToken": "${SLACK_APP_TOKEN}",
+      "botToken": "${SLACK_BOT_TOKEN}",
+      "defaultAccount": "default",
+      "accounts": {
+        "default": {
+          "appToken": "${SLACK_APP_TOKEN}",
+          "botToken": "${SLACK_BOT_TOKEN}"
+        },
+        "ops": {
+          "appToken": "${SLACK_OPS_APP_TOKEN}",
+          "botToken": "${SLACK_OPS_BOT_TOKEN}"
+        }
+      }
+    },
+    "telegram": {
+      "botToken": "${TELEGRAM_BOT_TOKEN}",
+      "defaultAccount": "default",
+      "accounts": {
+        "default": {
+          "botToken": "${TELEGRAM_BOT_TOKEN}"
+        },
+        "alerts": {
+          "botToken": "${TELEGRAM_ALERTS_BOT_TOKEN}"
+        }
+      }
+    }
+  }
+}
+```
+
+Rules:
+
+- `channels.<provider>.accounts.<accountId>` defines one provider account
+- `channels.<provider>.defaultAccount` is used when routing or CLI input omits `--account`
+- route tables such as `channels.slack.channels`, `channels.slack.groups`, and `channels.telegram.groups` remain provider-owned
+- bindings can target the provider default with `slack` or `telegram`
+- bindings can target a specific account with `slack:ops` or `telegram:alerts`
+- `muxbot message ...` can target a specific account with `--account <accountId>`
+- root token fields still exist and are used for startup defaults and compatibility with existing setup helpers
+
+## Binding Examples
+
+Examples:
+
+```json
+{
+  "bindings": [
+    { "match": "slack", "agentId": "default" },
+    { "match": "slack:ops", "agentId": "ops-agent" },
+    { "match": "telegram:alerts", "agentId": "alerts-agent" }
+  ]
+}
+```
+
+Interpretation:
+
+- `slack` means the Slack provider using `channels.slack.defaultAccount`
+- `slack:ops` means the Slack provider using `channels.slack.accounts.ops`
+- `telegram:alerts` means the Telegram provider using `channels.telegram.accounts.alerts`
 
 ## Slack Tokens
 
@@ -112,7 +186,7 @@ When `~/.muxbot/muxbot.json` does not exist yet:
 When `~/.muxbot/muxbot.json` already exists:
 
 - `start` does not change channel enablement in the existing config
-- `start` validates the env vars referenced by the enabled channel token fields before it launches the background runtime
+- `start` validates the env vars referenced by the enabled channel token fields for the provider default account before it launches the background runtime
 - if an enabled channel points at a missing env var, `start` prints the exact missing env name and exits cleanly
 - if default tokens are present but `channels.slack.enabled` or `channels.telegram.enabled` is still `false`, `start` prints a warning and continues using the existing config as written
 

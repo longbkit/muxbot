@@ -168,7 +168,8 @@ For product or runtime work, use the available tools end-to-end when relevant:
 - run build verification when relevant
 - check logs when behavior is unclear
 - for Slack live validation, always use the channel id from `SLACK_TEST_CHANNEL`; do not switch to ad hoc channels or DMs unless the user explicitly asks for that
-- for the shared bot Claude Code CLI route in this repo, `SLACK_TEST_CHANNEL` must point to `C0AQW4DUSDC`
+- for the shared bot Claude Code CLI route in this repo, `SLACK_TEST_CHANNEL` must point to `C07U0LDK6ER`
+- the only Slack DM surface allowed for live validation is `SLACK_TEST_DM_CHANNEL`
 - for Telegram live validation, always use the configured Telegram test surface only:
 - `TELEGRAM_BOT_USERNAME`
 - `TELEGRAM_CONTROL_BOT_USERNAME`

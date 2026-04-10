@@ -385,6 +385,8 @@ describe("AgentService session identity", () => {
       expect(readSessionId(storePath, target.sessionKey)).toBe(
         RUNNER_GENERATED_ID,
       );
+      expect(fakeTmux.sessionCommands[0]).toContain("export PATH=");
+      expect(fakeTmux.sessionCommands[0]).toContain("export MUXBOT_BIN=");
       expect(fakeTmux.sessionCommands[0]).toContain("fake-cli -C");
       expect(fakeTmux.sessionCommands[0]).not.toContain("resume");
 

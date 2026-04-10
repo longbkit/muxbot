@@ -228,4 +228,67 @@ describe("channels cli", () => {
       allowUsers: ["123456"],
     });
   });
+
+  test("updates top-level channel responseMode", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "muxbot-channels-cli-"));
+    previousConfigPath = process.env.MUXBOT_CONFIG_PATH;
+    process.env.MUXBOT_CONFIG_PATH = join(tempDir, "muxbot.json");
+    console.log = (() => {}) as typeof console.log;
+
+    await runChannelsCli(["response-mode", "set", "capture-pane", "--channel", "slack"]);
+
+    const rawConfig = JSON.parse(
+      readFileSync(process.env.MUXBOT_CONFIG_PATH!, "utf8"),
+    ) as {
+      channels: {
+        slack: {
+          responseMode: string;
+        };
+      };
+    };
+
+    expect(rawConfig.channels.slack.responseMode).toBe("capture-pane");
+  });
+
+  test("updates telegram topic responseMode", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "muxbot-channels-cli-"));
+    previousConfigPath = process.env.MUXBOT_CONFIG_PATH;
+    process.env.MUXBOT_CONFIG_PATH = join(tempDir, "muxbot.json");
+    console.log = (() => {}) as typeof console.log;
+
+    await runChannelsCli([
+      "add",
+      "telegram-group",
+      "-1001234567890",
+      "--topic",
+      "42",
+      "--agent",
+      "default",
+    ]);
+
+    await runChannelsCli([
+      "response-mode",
+      "set",
+      "capture-pane",
+      "--channel",
+      "telegram",
+      "--target",
+      "-1001234567890",
+      "--topic",
+      "42",
+    ]);
+
+    const rawConfig = JSON.parse(
+      readFileSync(process.env.MUXBOT_CONFIG_PATH!, "utf8"),
+    ) as {
+      channels: {
+        telegram: {
+          groups: Record<string, { topics?: Record<string, { responseMode?: string }> }>;
+        };
+      };
+    };
+
+    expect(rawConfig.channels.telegram.groups["-1001234567890"]?.topics?.["42"]?.responseMode)
+      .toBe("capture-pane");
+  });
 });

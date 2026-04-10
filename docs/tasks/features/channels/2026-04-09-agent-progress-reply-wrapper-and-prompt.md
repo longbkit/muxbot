@@ -1,0 +1,67 @@
+# Agent Progress Reply Wrapper And Prompt
+
+## Summary
+
+Give agent sessions a stable local `muxbot` command and a channel-owned prompt envelope so Codex or Claude can send progress updates and final replies back to the current Slack or Telegram conversation while running in another workspace.
+
+## Status
+
+In Progress
+
+## Why
+
+Current agent sessions run inside agent workspaces, not in the `muxbot` repo root.
+
+That makes repo-local commands such as `bun run src/main.ts message send ...` poor developer experience for live chatbot testing, especially when `muxbot` is already running in dev mode and the agent needs to post progress updates back to the same chat thread.
+
+## Scope
+
+- create a stable local `~/.muxbot/bin/muxbot` wrapper automatically
+- make runner-launched agent sessions able to call that wrapper reliably
+- inject a short channel prompt envelope with the exact reply command for the current surface
+- add `responseMode` so normal pane-settlement replies can be suppressed when the agent is expected to answer through `muxbot message send`
+- support operator control of `responseMode` at agent level and surface level
+- keep control commands and privilege commands unchanged
+- document the dev flow so another developer can test it quickly on a different machine
+
+## Research
+
+- [OpenClaw CLI Command Surfaces And Slack Telegram Send Syntax](../../../research/channels/2026-04-09-openclaw-cli-command-surfaces-and-slack-telegram-send-syntax.md)
+
+## Subtasks
+
+- [x] add feature doc and backlog entry
+- [x] add stable local wrapper generation
+- [x] export wrapper availability into runner launches
+- [x] add channel prompt-envelope config and prompt builder
+- [x] inject prompt envelope only into agent-bound prompts
+- [x] add `responseMode` so channel auto-settlement can be disabled without disabling runner observation
+- [x] rename the shipped surface to `responseMode` across config, status, CLI, slash help, and docs
+- [x] add agent-level `responseMode` overrides with surface > agent > provider precedence
+- [x] add `muxbot channels response-mode status|set ...` with message-style `--channel` and `--target` addressing
+- [x] add `muxbot agents response-mode status|set|clear ...`
+- [x] document the local test flow in the user guide
+- [x] add unit tests for wrapper creation, prompt building, and runner launch behavior
+- [x] test the local wrapper path against the configured Slack test channel
+
+## Validation Notes
+
+- automated coverage now verifies:
+  - wrapper creation and rewrite behavior
+  - runner launch command export of wrapper-related env and PATH
+  - Slack and Telegram agent prompt envelope rendering
+  - agent-bound prompt injection path inside `processChannelInteraction`
+  - responseMode delivery suppresses normal channel settlement but still falls back on runtime error
+  - agent-level and surface-level responseMode precedence
+  - response-mode operator CLI updates for Slack and Telegram targets
+- live Slack validation now verifies the generated local wrapper at `~/.muxbot/bin/muxbot` can:
+  - send to `SLACK_TEST_CHANNEL`
+  - delete the created test message cleanly
+- this task did not force a full human-inbound to agent-outbound progress-update loop because agent behavior depends on live model decisions, not just muxbot transport correctness
+
+## Exit Criteria
+
+- a developer can run `bun start`, send a real Slack or Telegram message, and have the agent use the local wrapper to post progress updates back to that same conversation
+- the prompt envelope contains the exact reply command for the current surface
+- the stable wrapper exists without requiring a global package install
+- tests cover wrapper creation, prompt injection, and runner launch behavior

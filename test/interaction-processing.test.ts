@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   processChannelInteraction,
   type ChannelInteractionIdentity,
   type ChannelInteractionRoute,
 } from "../src/channels/interaction-processing.ts";
 import type { AgentSessionTarget } from "../src/agents/agent-service.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 function createRoute(
   overrides: Partial<ChannelInteractionRoute> = {},
@@ -21,6 +25,7 @@ function createRoute(
     },
     streaming: "all",
     response: "final",
+    responseMode: "capture-pane",
     followUp: {
       mode: "auto",
       participationTtlMs: 24 * 60 * 60 * 1000,
@@ -401,6 +406,7 @@ describe("processChannelInteraction sensitive command gating", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("muxbot status");
+    expect(posted[0]).toContain("responseMode: `capture-pane`");
     expect(posted[0]).toContain("run.state: `detached`");
     expect(posted[0]).toContain(`run.startedAt: \`${new Date(startedAt).toISOString()}\``);
     expect(posted[0]).toContain(`run.detachedAt: \`${new Date(detachedAt).toISOString()}\``);
@@ -408,6 +414,115 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("Operator commands:");
     expect(posted[0]).toContain("muxbot channels privilege enable slack-channel C123");
     expect(posted[0]).toContain("muxbot channels privilege allow-user slack-channel C123 U123");
+  });
+
+  test("shows persisted response mode for the current route", async () => {
+    const posted: string[] = [];
+    const originalConfigPath = process.env.MUXBOT_CONFIG_PATH;
+    const configDir = mkdtempSync(join(tmpdir(), "muxbot-interaction-config-"));
+    const configPath = join(configDir, "muxbot.json");
+
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          ...JSON.parse(renderDefaultConfigTemplate()),
+          channels: {
+            ...JSON.parse(renderDefaultConfigTemplate()).channels,
+            slack: {
+              ...JSON.parse(renderDefaultConfigTemplate()).channels.slack,
+              channels: {
+                C123: {
+                  requireMention: true,
+                  responseMode: "message-tool",
+                },
+              },
+            },
+          },
+        }, null, 2),
+      );
+      process.env.MUXBOT_CONFIG_PATH = configPath;
+
+      await processChannelInteraction({
+        agentService: {
+          recordConversationReply: async () => undefined,
+        } as any,
+        sessionTarget: createTarget(),
+        identity: createIdentity(),
+        senderId: "U123",
+        text: "/responsemode status",
+        route: createRoute({
+          responseMode: "message-tool",
+        }),
+        maxChars: 4000,
+        postText: async (text) => {
+          posted.push(text);
+          return [text];
+        },
+        reconcileText: async (_chunks, text) => [text],
+      });
+    } finally {
+      process.env.MUXBOT_CONFIG_PATH = originalConfigPath;
+      rmSync(configDir, { recursive: true, force: true });
+    }
+
+    expect(posted[0]).toContain("muxbot response mode");
+    expect(posted[0]).toContain("activeRoute.responseMode: `message-tool`");
+    expect(posted[0]).toContain("config.responseMode: `message-tool`");
+  });
+
+  test("updates persisted response mode for the current route", async () => {
+    const posted: string[] = [];
+    const originalConfigPath = process.env.MUXBOT_CONFIG_PATH;
+    const configDir = mkdtempSync(join(tmpdir(), "muxbot-interaction-config-"));
+    const configPath = join(configDir, "muxbot.json");
+
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          ...JSON.parse(renderDefaultConfigTemplate()),
+          channels: {
+            ...JSON.parse(renderDefaultConfigTemplate()).channels,
+            slack: {
+              ...JSON.parse(renderDefaultConfigTemplate()).channels.slack,
+              channels: {
+                C123: {
+                  requireMention: true,
+                  responseMode: "message-tool",
+                },
+              },
+            },
+          },
+        }, null, 2),
+      );
+      process.env.MUXBOT_CONFIG_PATH = configPath;
+
+      await processChannelInteraction({
+        agentService: {
+          recordConversationReply: async () => undefined,
+        } as any,
+        sessionTarget: createTarget(),
+        identity: createIdentity(),
+        senderId: "U123",
+        text: "/responsemode capture-pane",
+        route: createRoute({
+          responseMode: "message-tool",
+        }),
+        maxChars: 4000,
+        postText: async (text) => {
+          posted.push(text);
+          return [text];
+        },
+        reconcileText: async (_chunks, text) => [text],
+      });
+    } finally {
+      process.env.MUXBOT_CONFIG_PATH = originalConfigPath;
+      rmSync(configDir, { recursive: true, force: true });
+    }
+
+    expect(posted[0]).toContain("Updated response mode");
+    expect(posted[0]).toContain("config.responseMode: `capture-pane`");
   });
 });
 
@@ -455,6 +570,123 @@ describe("processChannelInteraction detached long-running settlement", () => {
     expect(reconciled.at(-1)).toContain("Still working through the repository.");
     expect(reconciled.at(-1)).toContain("Use `/transcript` anytime to check it.");
     expect(reconciled.at(-1)).not.toContain("Timed out waiting");
+  });
+});
+
+describe("processChannelInteraction agent prompt text", () => {
+  test("uses agentPromptText for the agent-bound prompt while keeping slash parsing on raw text", async () => {
+    let observedPrompt = "";
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = prompt;
+          return {
+            positionAhead: 0,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "done",
+              fullSnapshot: "done",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      agentPromptText: "<system>\nuse wrapper\n</system>\n\n<user>\ninvestigate this\n</user>",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => [text],
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(observedPrompt).toContain("use wrapper");
+    expect(observedPrompt).toContain("<user>");
+  });
+
+  test("suppresses normal channel delivery when message-tool mode is enabled", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: () => ({
+          positionAhead: 0,
+          result: Promise.resolve({
+            status: "completed",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            snapshot: "final pane output",
+            fullSnapshot: "final pane output",
+            initialSnapshot: "",
+          }),
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      agentPromptText: "<system>\nuse wrapper\n</system>\n\n<user>\ninvestigate this\n</user>",
+      route: createRoute({
+        responseMode: "message-tool",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(posted).toEqual([]);
+    expect(reconciled).toEqual([]);
+  });
+
+  test("still posts a fallback error when message-tool mode fails before the agent can reply", async () => {
+    const posted: string[] = [];
+
+    await expect(
+      processChannelInteraction({
+        agentService: {
+          enqueuePrompt: () => ({
+            positionAhead: 0,
+            result: Promise.reject(new Error("runner crashed")),
+          }),
+          recordConversationReply: async () => undefined,
+        } as any,
+        sessionTarget: createTarget(),
+        identity: createIdentity(),
+        senderId: "U123",
+        text: "investigate this",
+        agentPromptText: "<system>\nuse wrapper\n</system>\n\n<user>\ninvestigate this\n</user>",
+        route: createRoute({
+          responseMode: "message-tool",
+        }),
+        maxChars: 4000,
+        postText: async (text) => {
+          posted.push(text);
+          return [text];
+        },
+        reconcileText: async (_chunks, text) => [text],
+      }),
+    ).rejects.toThrow("runner crashed");
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("runner crashed");
   });
 });
 

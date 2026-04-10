@@ -15,6 +15,11 @@ import {
   ensureTmuxShellPane,
   runTmuxShellCommand,
 } from "../runners/tmux/shell-command.ts";
+import {
+  ensureMuxbotWrapper,
+  getMuxbotWrapperDir,
+  getMuxbotWrapperPath,
+} from "../control/muxbot-wrapper.ts";
 
 export type ShellCommandResult = {
   agentId: string;
@@ -44,6 +49,16 @@ function shellQuote(value: string) {
 
 function buildCommandString(command: string, args: string[]) {
   return [command, ...args].map(shellQuote).join(" ");
+}
+
+function buildRunnerLaunchCommand(command: string, args: string[]) {
+  const wrapperDir = getMuxbotWrapperDir();
+  const wrapperPath = getMuxbotWrapperPath();
+  const exports = [
+    `export PATH=${shellQuote(wrapperDir)}:"$PATH"`,
+    `export MUXBOT_BIN=${shellQuote(wrapperPath)}`,
+  ];
+  return `${exports.join("; ")}; exec ${buildCommandString(command, args)}`;
 }
 
 function isTmuxDuplicateSessionError(error: unknown) {
@@ -206,6 +221,7 @@ export class RunnerSessionService {
     target: AgentSessionTarget,
     options: { allowFreshRetry?: boolean } = {},
   ): Promise<ResolvedAgentTarget> {
+    await ensureMuxbotWrapper();
     const resolved = this.resolveTarget(target);
     await ensureDir(resolved.workspacePath);
     await ensureDir(dirname(this.loadedConfig.raw.tmux.socketPath));
@@ -232,7 +248,7 @@ export class RunnerSessionService {
       sessionId: startupSessionId || undefined,
       resume: resumingExistingSession,
     });
-    const command = buildCommandString(runnerLaunch.command, runnerLaunch.args);
+    const command = buildRunnerLaunchCommand(runnerLaunch.command, runnerLaunch.args);
 
     try {
       await this.tmux.newSession({

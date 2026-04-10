@@ -5,6 +5,10 @@ import {
   extractEnvReferenceName,
   hasEnvReferenceValue,
 } from "../shared/env-references.ts";
+import {
+  resolveSlackAccountConfig,
+  resolveTelegramAccountConfig,
+} from "../config/channel-accounts.ts";
 import type {
   AgentBootstrapMode,
   AgentCliToolId,
@@ -163,33 +167,27 @@ export function renderBootstrapTokenUsageLines(
 export function renderConfiguredChannelTokenIssueLines(
   config: {
     channels: {
-      slack: {
-        enabled: boolean;
-        appToken: string;
-        botToken: string;
-      };
-      telegram: {
-        enabled: boolean;
-        botToken: string;
-      };
+      slack: any;
+      telegram: any;
     };
   },
   env: NodeJS.ProcessEnv = process.env,
 ) {
   const lines: string[] = [];
   const hardErrorLines: string[] = [];
-  const slackAppEnv = extractEnvReferenceName(config.channels.slack.appToken);
-  const slackBotEnv = extractEnvReferenceName(config.channels.slack.botToken);
-  const telegramBotEnv = extractEnvReferenceName(config.channels.telegram.botToken);
 
   if (config.channels.slack.enabled) {
-    if (!config.channels.slack.appToken.trim()) {
+    const slackAccount = resolveSlackAccountConfig(config.channels.slack);
+    const slackAppEnv = extractEnvReferenceName(slackAccount.config.appToken);
+    const slackBotEnv = extractEnvReferenceName(slackAccount.config.botToken);
+
+    if (!slackAccount.config.appToken.trim()) {
       hardErrorLines.push("Configured Slack app token is empty.");
     } else if (slackAppEnv && !env[slackAppEnv]?.trim()) {
       lines.push(`Configured Slack app token env var is missing: ${slackAppEnv}`);
     }
 
-    if (!config.channels.slack.botToken.trim()) {
+    if (!slackAccount.config.botToken.trim()) {
       hardErrorLines.push("Configured Slack bot token is empty.");
     } else if (slackBotEnv && !env[slackBotEnv]?.trim()) {
       lines.push(`Configured Slack bot token env var is missing: ${slackBotEnv}`);
@@ -197,7 +195,10 @@ export function renderConfiguredChannelTokenIssueLines(
   }
 
   if (config.channels.telegram.enabled) {
-    if (!config.channels.telegram.botToken.trim()) {
+    const telegramAccount = resolveTelegramAccountConfig(config.channels.telegram);
+    const telegramBotEnv = extractEnvReferenceName(telegramAccount.config.botToken);
+
+    if (!telegramAccount.config.botToken.trim()) {
       hardErrorLines.push("Configured Telegram bot token is empty.");
     } else if (telegramBotEnv && !env[telegramBotEnv]?.trim()) {
       lines.push(`Configured Telegram bot token env var is missing: ${telegramBotEnv}`);
@@ -235,15 +236,8 @@ export function renderConfiguredChannelTokenIssueLines(
 export function renderConfiguredChannelTokenStatusLines(
   config: {
     channels: {
-      slack: {
-        enabled: boolean;
-        appToken: string;
-        botToken: string;
-      };
-      telegram: {
-        enabled: boolean;
-        botToken: string;
-      };
+      slack: any;
+      telegram: any;
     };
   },
   env: NodeJS.ProcessEnv = process.env,
@@ -251,8 +245,9 @@ export function renderConfiguredChannelTokenStatusLines(
   const lines: string[] = [];
 
   if (config.channels.slack.enabled) {
-    const slackApp = describeConfiguredTokenSource(config.channels.slack.appToken, env);
-    const slackBot = describeConfiguredTokenSource(config.channels.slack.botToken, env);
+    const slackAccount = resolveSlackAccountConfig(config.channels.slack);
+    const slackApp = describeConfiguredTokenSource(slackAccount.config.appToken, env);
+    const slackBot = describeConfiguredTokenSource(slackAccount.config.botToken, env);
     lines.push(...renderConfiguredTokenSourceLines({
       channel: "Slack",
       sources: [
@@ -264,7 +259,8 @@ export function renderConfiguredChannelTokenStatusLines(
   }
 
   if (config.channels.telegram.enabled) {
-    const telegramBot = describeConfiguredTokenSource(config.channels.telegram.botToken, env);
+    const telegramAccount = resolveTelegramAccountConfig(config.channels.telegram);
+    const telegramBot = describeConfiguredTokenSource(telegramAccount.config.botToken, env);
     lines.push(...renderConfiguredTokenSourceLines({
       channel: "Telegram",
       sources: [{ label: "bot", source: telegramBot }],

@@ -186,6 +186,58 @@ describe("agents cli", () => {
     expect(output.join("\n")).toContain("telegram -> work");
   });
 
+  test("sets, shows, and clears agent responseMode", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "muxbot-agents-cli-"));
+    previousConfigPath = process.env.MUXBOT_CONFIG_PATH;
+    process.env.MUXBOT_CONFIG_PATH = join(tempDir, "muxbot.json");
+    const output: string[] = [];
+    console.log = ((value: string) => {
+      output.push(value);
+    }) as typeof console.log;
+
+    await runAgentsCli(["add", "work", "--cli", "claude"]);
+    output.length = 0;
+
+    await runAgentsCli(["response-mode", "set", "capture-pane", "--agent", "work"]);
+
+    let rawConfig = JSON.parse(
+      readFileSync(process.env.MUXBOT_CONFIG_PATH!, "utf8"),
+    ) as {
+      agents: {
+        list: Array<{ id: string; responseMode?: string }>;
+      };
+    };
+
+    expect(rawConfig.agents.list[0]?.responseMode).toBe("capture-pane");
+    expect(output.join("\n")).toContain("updated responseMode for work");
+
+    output.length = 0;
+    await runAgentsCli(["response-mode", "status", "--agent", "work"]);
+    expect(output.join("\n")).toContain("responseMode: capture-pane");
+
+    output.length = 0;
+    await runAgentsCli(["response-mode", "clear", "--agent", "work"]);
+    rawConfig = JSON.parse(readFileSync(process.env.MUXBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.agents.list[0]?.responseMode).toBeUndefined();
+    expect(output.join("\n")).toContain("cleared responseMode for work");
+  });
+
+  test("lists agent responseMode state", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "muxbot-agents-cli-"));
+    previousConfigPath = process.env.MUXBOT_CONFIG_PATH;
+    process.env.MUXBOT_CONFIG_PATH = join(tempDir, "muxbot.json");
+    const output: string[] = [];
+    console.log = ((value: string) => {
+      output.push(value);
+    }) as typeof console.log;
+
+    await runAgentsCli(["add", "work", "--cli", "claude"]);
+    output.length = 0;
+    await runAgentsCli(["list"]);
+
+    expect(output.join("\n")).toContain("responseMode=inherit");
+  });
+
   test("bootstrap refuses overwrite without force and can overwrite with force", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "muxbot-agents-cli-"));
     previousConfigPath = process.env.MUXBOT_CONFIG_PATH;

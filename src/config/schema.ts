@@ -142,6 +142,7 @@ const agentBootstrapSchema = z.object({
 
 const agentOverrideSchema = z.object({
   workspace: z.string().optional(),
+  responseMode: z.enum(["capture-pane", "message-tool"]).optional(),
   runner: runnerOverrideSchema.optional(),
   stream: streamSchema.partial().optional(),
   session: sessionSchema.partial().optional(),
@@ -222,6 +223,14 @@ const commandPrefixesOverrideSchema = z.object({
   bash: z.array(z.string().min(1)).optional(),
 });
 
+const channelAgentPromptSchema = z.object({
+  enabled: z.boolean().default(true),
+  maxProgressMessages: z.number().int().min(0).default(3),
+  requireFinalResponse: z.boolean().default(true),
+});
+
+const channelResponseModeSchema = z.enum(["capture-pane", "message-tool"]);
+
 const slackRouteSchema = z.object({
   requireMention: z.boolean().default(true),
   allowBots: z.boolean().default(false),
@@ -230,6 +239,7 @@ const slackRouteSchema = z.object({
   commandPrefixes: commandPrefixesOverrideSchema.optional(),
   streaming: slackStreamingSchema.optional(),
   response: slackResponseSchema.optional(),
+  responseMode: channelResponseModeSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
 });
 
@@ -241,6 +251,7 @@ const telegramTopicRouteSchema = z.object({
   commandPrefixes: commandPrefixesOverrideSchema.optional(),
   streaming: slackStreamingSchema.optional(),
   response: slackResponseSchema.optional(),
+  responseMode: channelResponseModeSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
 });
 
@@ -252,6 +263,7 @@ const telegramGroupRouteSchema = z.object({
   commandPrefixes: commandPrefixesOverrideSchema.optional(),
   streaming: slackStreamingSchema.optional(),
   response: slackResponseSchema.optional(),
+  responseMode: channelResponseModeSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
   topics: z.record(z.string(), telegramTopicRouteSchema).default({}),
 });
@@ -267,6 +279,7 @@ const telegramDirectMessagesSchema = z.object({
   commandPrefixes: commandPrefixesOverrideSchema.optional(),
   streaming: slackStreamingSchema.optional(),
   response: slackResponseSchema.optional(),
+  responseMode: channelResponseModeSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
 });
 
@@ -275,10 +288,21 @@ const telegramPollingSchema = z.object({
   retryDelayMs: z.number().int().positive().default(1000),
 });
 
+const telegramAccountSchema = z.object({
+  botToken: z.string().default(""),
+});
+
 const telegramSchema = z.object({
   enabled: z.boolean().default(false),
   mode: z.literal("polling").default("polling"),
-  botToken: z.string().min(1),
+  botToken: z.string().default(""),
+  defaultAccount: z.string().min(1).default("default"),
+  accounts: z.record(z.string(), telegramAccountSchema).default({}),
+  agentPrompt: channelAgentPromptSchema.default({
+    enabled: true,
+    maxProgressMessages: 3,
+    requireFinalResponse: true,
+  }),
   allowBots: z.boolean().default(false),
   groupPolicy: slackConversationPolicySchema.default("allowlist"),
   defaultAgentId: z.string().default("default"),
@@ -292,6 +316,7 @@ const telegramSchema = z.object({
   }),
   streaming: slackStreamingSchema.default("all"),
   response: slackResponseSchema.default("final"),
+  responseMode: channelResponseModeSchema.default("message-tool"),
   followUp: slackFollowUpSchema.default({
     mode: "auto",
     participationTtlMin: 5,
@@ -320,14 +345,25 @@ const directMessagesSchema = z.object({
   commandPrefixes: commandPrefixesOverrideSchema.optional(),
   streaming: slackStreamingSchema.optional(),
   response: slackResponseSchema.optional(),
+  responseMode: channelResponseModeSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
 });
 
 const slackSchema = z.object({
   enabled: z.boolean().default(false),
   mode: z.literal("socket").default("socket"),
-  appToken: z.string().min(1),
-  botToken: z.string().min(1),
+  appToken: z.string().default(""),
+  botToken: z.string().default(""),
+  defaultAccount: z.string().min(1).default("default"),
+  accounts: z.record(z.string(), z.object({
+    appToken: z.string().default(""),
+    botToken: z.string().default(""),
+  })).default({}),
+  agentPrompt: channelAgentPromptSchema.default({
+    enabled: true,
+    maxProgressMessages: 3,
+    requireFinalResponse: true,
+  }),
   ackReaction: z.string().default(":heavy_check_mark:"),
   typingReaction: z.string().default(""),
   processingStatus: slackProcessingStatusSchema.default({
@@ -350,6 +386,7 @@ const slackSchema = z.object({
   }),
   streaming: slackStreamingSchema.default("all"),
   response: slackResponseSchema.default("final"),
+  responseMode: channelResponseModeSchema.default("message-tool"),
   followUp: slackFollowUpSchema.default({
     mode: "auto",
     participationTtlMin: 5,
@@ -438,6 +475,12 @@ export const muxbotConfigSchema = z.object({
       enabled: false,
       mode: "polling",
       botToken: "${TELEGRAM_BOT_TOKEN}",
+      defaultAccount: "default",
+      accounts: {
+        default: {
+          botToken: "${TELEGRAM_BOT_TOKEN}",
+        },
+      },
       allowBots: false,
       groupPolicy: "allowlist",
       defaultAgentId: "default",
@@ -447,6 +490,7 @@ export const muxbotConfigSchema = z.object({
       },
       streaming: "all",
       response: "final",
+      responseMode: "message-tool",
       followUp: {
         mode: "auto",
         participationTtlMin: 5,

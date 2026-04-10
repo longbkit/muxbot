@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { kill } from "node:process";
 import { loadConfig } from "../config/load-config.ts";
 import { renderDefaultConfigTemplate } from "../config/template.ts";
+import { ensureMuxbotWrapper } from "./muxbot-wrapper.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
 import { readTextFile, readTextFileSlice, writeTextFile } from "../shared/fs.ts";
 import {
@@ -98,6 +99,7 @@ export async function ensureConfigFile(
   configPath?: string,
   options: ConfigBootstrapOptions = {},
 ) {
+  await ensureMuxbotWrapper();
   const expandedConfigPath = resolveConfigPath(configPath);
   await ensureDir(dirname(expandedConfigPath));
 

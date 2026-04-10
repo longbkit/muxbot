@@ -3,9 +3,11 @@ import type {
   AgentCliToolId,
 } from "./config/agent-tool-presets.ts";
 import { REPO_HELP_HINT, USER_GUIDE_DOC_PATH } from "./control/startup-bootstrap.ts";
+import { getMuxbotVersion } from "./version.ts";
 
 export type ParsedCliCommand =
   | { name: "help" }
+  | { name: "version" }
   | {
       name: "start";
       cliTool?: AgentCliToolId;
@@ -19,6 +21,7 @@ export type ParsedCliCommand =
   | { name: "status" }
   | { name: "logs"; lines: number }
   | { name: "channels"; args: string[] }
+  | { name: "message"; args: string[] }
   | { name: "agents"; args: string[] }
   | { name: "pairing"; args: string[] }
   | {
@@ -37,6 +40,10 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
 
   if (!command || command === "help" || command === "--help" || command === "-h") {
     return { name: "help" };
+  }
+
+  if (command === "version" || command === "--version" || command === "-v") {
+    return { name: "version" };
   }
 
   if (command === "start") {
@@ -76,6 +83,13 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
     };
   }
 
+  if (command === "message") {
+    return {
+      name: "message",
+      args: args.slice(1),
+    };
+  }
+
   if (command === "agents") {
     return {
       name: "agents",
@@ -107,7 +121,7 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
 
 export function renderCliHelp() {
   return [
-    "muxbot",
+    `muxbot v${getMuxbotVersion()}`,
     "",
     "Fastest start:",
     "  1. Export default token env vars in your shell.",
@@ -137,8 +151,10 @@ export function renderCliHelp() {
     "  muxbot restart",
     "  muxbot stop [--hard]",
     "  muxbot status",
+    "  muxbot version",
     "  muxbot logs [--lines N]",
     "  muxbot channels <subcommand>",
+    "  muxbot message <subcommand>",
     "  muxbot agents <subcommand>",
     "  muxbot pairing <subcommand>",
     "  muxbot init [--cli <codex|claude>] [--bootstrap <personal-assistant|team-assistant>]",
@@ -152,6 +168,7 @@ export function renderCliHelp() {
     "  stop               Stop the running muxbot process.",
     "  stop --hard        Stop muxbot and kill all tmux sessions on the configured muxbot socket.",
     "  status             Show runtime process, config, log, and tmux socket status.",
+    "  version            Show the installed muxbot version.",
     "  logs               Print the most recent muxbot log lines.",
     "  channels           Manage channel enablement, routes, and token references in config.",
     "                     enable|disable <slack|telegram>",
@@ -163,9 +180,11 @@ export function renderCliHelp() {
     "                     remove slack-group <groupId>",
     "                     set-token <slack-app|slack-bot|telegram-bot> <value>",
     "                     clear-token <slack-app|slack-bot|telegram-bot>",
+    "  message            Run provider message actions such as send, react, read, edit, delete, and pins.",
     "  agents             Manage configured agents and top-level bindings.",
     "  pairing            Run the pairing control CLI.",
     "  init               Seed ~/.muxbot/muxbot.json and optionally create the first agent without starting muxbot.",
+    "  --version, -v      Show the installed muxbot version.",
     "  --help             Show this help text.",
     "",
     "Package usage:",

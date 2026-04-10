@@ -264,6 +264,31 @@ Live proof on April 5, 2026:
 - no misleading partial or final Slack reply is produced for that missed follow-up
 - the explicit mention still works because `app_mention` continues to reach the service
 
+## Test Case 2I: Message-Tool Reply Still Enables No-Mention Slack Follow-Up
+
+### Preconditions
+
+- `SLACK_TEST_CHANNEL` is routed and reachable
+- the Slack app is subscribed to `message.channels` for this routed channel thread
+- the routed channel or inherited config uses `responseMode: "message-tool"`
+- the active agent replies through `muxbot message send ...` into the same Slack thread
+- the thread already has one successful bot reply delivered through the message tool path
+
+### Steps
+
+1. Send a top-level mention in `SLACK_TEST_CHANNEL` to start a routed thread
+2. Let the agent send its visible reply with `muxbot message send ...` instead of pane-settlement delivery
+3. In the same Slack thread, send a plain follow-up without mentioning the bot
+4. Watch the Slack thread, runtime logs, and session identity
+
+### Expected Results
+
+- the message-tool reply still marks the conversation as bot-participated for follow-up purposes
+- the plain no-mention follow-up is accepted as a normal thread continuation
+- the follow-up resolves to the same thread-backed session key as the prior turn
+- the system does not require a fresh explicit mention only because the previous reply came from `muxbot message send ...`
+- no duplicate pane-settlement reply appears when `responseMode` stays on `message-tool`
+
 ## OpenClaw Compatibility Note
 
 Latest OpenClaw `main` models Slack no-mention thread continuation by remembering that it already replied in a thread.

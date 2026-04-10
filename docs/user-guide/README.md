@@ -17,6 +17,7 @@ Related pages:
 
 - [Channel Operations](channels.md)
 - [Channel Accounts](channel-accounts.md)
+- [Agent Progress Replies](agent-progress-replies.md)
 
 If setup is unclear, clone this repo, open it in Codex or Claude Code, and ask it to help set up `muxbot`. The docs here are kept current enough for guided setup and troubleshooting.
 
@@ -125,6 +126,9 @@ Current subcommands:
 - `muxbot agents bind --agent <id> --bind <channel[:accountId]>`
 - `muxbot agents unbind --agent <id> --bind <channel[:accountId]>`
 - `muxbot agents unbind --agent <id> --all`
+- `muxbot agents response-mode status --agent <id>`
+- `muxbot agents response-mode set <capture-pane|message-tool> --agent <id>`
+- `muxbot agents response-mode clear --agent <id>`
 
 Important rules:
 
@@ -139,6 +143,7 @@ Important rules:
 - `agents bootstrap` uses the agent's configured CLI tool to decide which tool-specific bootstrap file is required
 - `agents bootstrap` runs a dry conflict check first and asks for `--force` before overwriting any template markdown file
 - `--bind` may be repeated and currently accepts `slack`, `telegram`, `slack:<accountId>`, or `telegram:<accountId>`
+- `agents response-mode` sets or clears `agents.list[].responseMode`
 
 Examples:
 
@@ -197,6 +202,8 @@ Current subcommands:
 - `muxbot channels remove slack-group <groupId>`
 - `muxbot channels set-token <slack-app|slack-bot|telegram-bot> <value>`
 - `muxbot channels clear-token <slack-app|slack-bot|telegram-bot>`
+- `muxbot channels response-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
+- `muxbot channels response-mode set <capture-pane|message-tool> --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
 - `muxbot channels privilege enable <target>`
 - `muxbot channels privilege disable <target>`
 - `muxbot channels privilege allow-user <target> <userId>`
@@ -211,6 +218,12 @@ Important behavior:
 - `set-token` and `clear-token` update the existing channel token fields in config without changing env names elsewhere
 - `enable` and `disable` do not inject routes, group mappings, or topic mappings
 - `add telegram-group` defaults to `requireMention: true`
+- `channels response-mode` uses message-style addressing:
+  - Slack targets: `channel:<id>`, `group:<id>`, `dm:<id>`
+  - Telegram direct messages: positive chat id
+  - Telegram groups: negative chat id
+  - Telegram topics: negative chat id plus `--topic <topicId>`
+- channel and topic response-mode overrides require the route to exist first
 - `privilege` commands update route-level `privilegeCommands.enabled` and `privilegeCommands.allowUsers`
 - direct-message privilege targets are literal command targets: `slack-dm` and `telegram-dm`
 - if the service is already running, restart it after changing channel enablement

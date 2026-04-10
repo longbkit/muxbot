@@ -28,6 +28,10 @@ import {
 } from "./privilege-commands.ts";
 import { renderPrivilegeCommandHelpLines } from "./privilege-help.ts";
 import type { RunObserverMode, RunUpdate } from "../agents/run-observation.ts";
+import {
+  getConversationResponseMode,
+  setConversationResponseMode,
+} from "./response-mode-config.ts";
 
 export type ChannelInteractionRoute = {
   agentId: string;
@@ -35,6 +39,7 @@ export type ChannelInteractionRoute = {
   commandPrefixes: CommandPrefixes;
   streaming: "off" | "latest" | "all";
   response: "all" | "final";
+  responseMode: "capture-pane" | "message-tool";
   followUp: FollowUpConfig;
 };
 
@@ -144,6 +149,9 @@ function renderRouteStatusMessage(params: {
   }
 
   lines.push(
+    `streaming: \`${params.route.streaming}\``,
+    `response: \`${params.route.response}\``,
+    `responseMode: \`${params.route.responseMode}\``,
     `followUp.mode: \`${params.followUpState.overrideMode ?? params.route.followUp.mode}\``,
     `followUp.windowMinutes: \`${formatFollowUpTtlMinutes(params.route.followUp.participationTtlMs)}\``,
     `run.state: \`${params.runtimeState.state}\``,
@@ -169,10 +177,39 @@ function renderRouteStatusMessage(params: {
     "- `/status`",
     "- `/attach`, `/detach`, `/watch every 30s`",
     "- `/followup status`",
+    "- `/responsemode status`",
     "- `/transcript` and `/bash` require privilege commands",
   );
 
   lines.push("", ...renderPrivilegeCommandHelpLines(params.identity));
+  return lines.join("\n");
+}
+
+function renderResponseModeStatusMessage(params: {
+  route: ChannelInteractionRoute;
+  persisted?: {
+    label: string;
+    responseMode?: "capture-pane" | "message-tool";
+  };
+}) {
+  const lines = [
+    "muxbot response mode",
+    "",
+    `activeRoute.responseMode: \`${params.route.responseMode}\``,
+  ];
+
+  if (params.persisted) {
+    lines.push(`config.target: \`${params.persisted.label}\``);
+    lines.push(`config.responseMode: \`${params.persisted.responseMode ?? "(inherit)"}\``);
+  }
+
+  lines.push(
+    "",
+    "Available values:",
+    "- `capture-pane`: muxbot posts pane-derived progress and final settlement",
+    "- `message-tool`: muxbot still monitors the pane, but the agent should reply with `muxbot message send`",
+  );
+
   return lines.join("\n");
 }
 
@@ -194,11 +231,13 @@ export async function processChannelInteraction<TChunk>(params: {
   identity: ChannelInteractionIdentity;
   senderId?: string;
   text: string;
+  agentPromptText?: string;
   route: ChannelInteractionRoute;
   maxChars: number;
   postText: PostText<TChunk>;
   reconcileText: ReconcileText<TChunk>;
 }) {
+  const channelManagedDelivery = params.route.responseMode === "capture-pane";
   let responseChunks: TChunk[] = [];
   let renderedState: ChannelRenderedMessageState | undefined;
   const observerId = buildChannelObserverId(params.identity);
@@ -415,6 +454,35 @@ export async function processChannelInteraction<TChunk>(params: {
       await params.agentService.recordConversationReply(params.sessionTarget);
       return;
     }
+
+    if (slashCommand.name === "responsemode") {
+      if (slashCommand.action === "status") {
+        const persisted = await getConversationResponseMode({
+          identity: params.identity,
+        });
+        await params.postText(
+          renderResponseModeStatusMessage({
+            route: params.route,
+            persisted,
+          }),
+        );
+      } else if (slashCommand.responseMode) {
+        const persisted = await setConversationResponseMode({
+          identity: params.identity,
+          responseMode: slashCommand.responseMode,
+        });
+        await params.postText(
+          [
+            `Updated response mode for \`${persisted.label}\`.`,
+            `config.responseMode: \`${persisted.responseMode}\``,
+            `config: \`${persisted.configPath}\``,
+            "If config reload is enabled, the new mode should apply automatically shortly.",
+          ].join("\n"),
+        );
+      }
+      await params.agentService.recordConversationReply(params.sessionTarget);
+      return;
+    }
   }
 
   if (slashCommand?.type === "bash") {
@@ -443,10 +511,13 @@ export async function processChannelInteraction<TChunk>(params: {
   try {
     const { positionAhead, result } = params.agentService.enqueuePrompt(
       params.sessionTarget,
-      params.text,
+      params.agentPromptText ?? params.text,
       {
         observerId,
         onUpdate: async (update) => {
+          if (!channelManagedDelivery) {
+            return;
+          }
           if (params.route.streaming === "off" && update.status === "running") {
             return;
           }
@@ -477,7 +548,7 @@ export async function processChannelInteraction<TChunk>(params: {
       },
     );
 
-    if (params.route.streaming !== "off") {
+    if (channelManagedDelivery && params.route.streaming !== "off") {
       const placeholderText = renderPlatformInteraction({
         platform: params.identity.platform,
         status: positionAhead > 0 ? "queued" : "running",
@@ -499,6 +570,26 @@ export async function processChannelInteraction<TChunk>(params: {
 
     const finalResult = await result;
     await renderChain;
+
+    if (!channelManagedDelivery) {
+      if (finalResult.status !== "error") {
+        return;
+      }
+
+      await params.postText(
+        renderPlatformInteraction({
+          platform: params.identity.platform,
+          status: finalResult.status,
+          content: finalResult.note ?? finalResult.snapshot,
+          maxChars: Number.POSITIVE_INFINITY,
+          note: finalResult.note,
+          responsePolicy: "final",
+        }),
+      );
+      await recordReplyIfNeeded();
+      return;
+    }
+
     const nextState = buildRenderedMessageState({
       platform: params.identity.platform,
       status: finalResult.status,

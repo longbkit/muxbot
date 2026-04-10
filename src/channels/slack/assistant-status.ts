@@ -102,3 +102,41 @@ export async function setSlackAssistantThreadStatus(
     return false;
   }
 }
+
+export async function clearSlackAssistantThreadStatus(
+  client: SlackAssistantStatusClient,
+  target: { channel: string; threadTs?: string },
+) {
+  if (!target.threadTs) {
+    return false;
+  }
+
+  if (!client.assistant?.threads?.setStatus) {
+    logSlackAssistantStatusWarningOnce(
+      "slack assistant status unavailable: client does not support assistant.threads.setStatus",
+    );
+    return false;
+  }
+
+  try {
+    await client.assistant.threads.setStatus({
+      channel_id: target.channel,
+      thread_ts: target.threadTs,
+      status: "",
+    });
+    return true;
+  } catch (error) {
+    const metadata = getSlackAssistantStatusErrorMetadata(error);
+    if (
+      metadata.platformError === "missing_scope" &&
+      typeof metadata.neededScope === "string"
+    ) {
+      logSlackAssistantStatusWarningOnce(
+        `slack assistant status disabled: missing scope ${metadata.neededScope}`,
+      );
+      return false;
+    }
+    console.error("slack assistant status clear failed", error);
+    return false;
+  }
+}

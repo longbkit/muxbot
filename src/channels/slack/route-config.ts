@@ -2,7 +2,7 @@ import type { CommandPrefixes } from "../../agents/commands.ts";
 import type { FollowUpConfig } from "../../agents/follow-up-policy.ts";
 import { resolveTopLevelBoundAgentId } from "../../config/bindings.ts";
 import { resolveConfigDurationMs } from "../../config/duration.ts";
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
 import {
   resolvePrivilegeCommands,
   type PrivilegeCommandsConfig,
@@ -19,6 +19,7 @@ export type SlackRoute = {
   commandPrefixes: CommandPrefixes;
   streaming: "off" | "latest" | "all";
   response: "all" | "final";
+  responseMode: "capture-pane" | "message-tool";
   followUp: FollowUpConfig;
 };
 
@@ -35,6 +36,7 @@ type SlackRouteOverride = {
   commandPrefixes?: Partial<CommandPrefixes>;
   streaming?: "off" | "latest" | "all";
   response?: "all" | "final";
+  responseMode?: "capture-pane" | "message-tool";
   followUp?: {
     mode?: FollowUpConfig["mode"];
     participationTtlSec?: number;
@@ -58,14 +60,16 @@ function buildRoute(loadedConfig: LoadedConfig, params: {
     slackConfig.privilegeCommands,
     params.route?.privilegeCommands,
   );
+  const agentId =
+    params.route?.agentId ??
+    resolveTopLevelBoundAgentId(loadedConfig, {
+      channel: "slack",
+      accountId: params.accountId,
+    }) ??
+    slackConfig.defaultAgentId;
+  const agentEntry = getAgentEntry(loadedConfig, agentId);
   return {
-    agentId:
-      params.route?.agentId ??
-      resolveTopLevelBoundAgentId(loadedConfig, {
-        channel: "slack",
-        accountId: params.accountId,
-      }) ??
-      slackConfig.defaultAgentId,
+    agentId,
     requireMention: params.route?.requireMention ?? params.requireMention,
     allowBots: params.route?.allowBots ?? slackConfig.allowBots,
     replyToMode: slackConfig.replyToMode,
@@ -79,6 +83,7 @@ function buildRoute(loadedConfig: LoadedConfig, params: {
     },
     streaming: params.route?.streaming ?? slackConfig.streaming,
     response: params.route?.response ?? slackConfig.response,
+    responseMode: params.route?.responseMode ?? agentEntry?.responseMode ?? slackConfig.responseMode,
     followUp: {
       mode: params.route?.followUp?.mode ?? slackConfig.followUp.mode,
       participationTtlMs: resolveConfigDurationMs({

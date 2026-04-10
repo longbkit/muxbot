@@ -106,6 +106,8 @@ describe("runtime summaries", () => {
     expect(text).toContain("agents=1");
     expect(text).toContain("work tool=codex");
     expect(text).toContain("slack enabled=yes");
+    expect(text).toContain("responseMode=message-tool");
+    expect(text).toContain("Channel health:");
     expect(text).toContain("dm=pairing");
     expect(text).toContain("routes=none");
     expect(text).toContain("telegram: no explicit group or topic routes are configured yet");
@@ -301,7 +303,7 @@ describe("runtime summaries", () => {
     const text = renderStatusSummary(summary);
 
     expect(text).toContain("slack enabled=yes connection=failed");
-    expect(text).toContain("Channel diagnostics:");
+    expect(text).toContain("Channel health:");
     expect(text).toContain("Socket Mode app token was rejected.");
     expect(text).toContain("action: verify `channels.slack.appToken` resolves to an `xapp-` token");
   });

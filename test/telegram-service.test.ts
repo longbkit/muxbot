@@ -29,6 +29,17 @@ function createTelegramConfig(): LoadedConfig["raw"]["channels"]["telegram"] {
     enabled: true,
     mode: "polling",
     botToken: "telegram-token",
+    defaultAccount: "default",
+    accounts: {
+      default: {
+        botToken: "telegram-token",
+      },
+    },
+    agentPrompt: {
+      enabled: true,
+      maxProgressMessages: 3,
+      requireFinalResponse: true,
+    },
     allowBots: false,
     groupPolicy: "allowlist",
     defaultAgentId: "default",
@@ -42,6 +53,7 @@ function createTelegramConfig(): LoadedConfig["raw"]["channels"]["telegram"] {
     },
     streaming: "all",
     response: "final",
+    responseMode: "message-tool",
     followUp: {
       mode: "auto",
       participationTtlMin: 5,
@@ -210,6 +222,7 @@ describe("buildTelegramCommandRegistrations", () => {
       "watch",
       "stop",
       "followup",
+      "responsemode",
       "bash",
     ]);
     expect(registrations[2]?.scope).toEqual({

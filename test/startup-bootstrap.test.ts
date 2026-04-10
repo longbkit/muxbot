@@ -109,6 +109,7 @@ function createConfig(): MuxbotConfig {
         },
         streaming: "all",
         response: "final",
+        responseMode: "message-tool",
         followUp: {
           mode: "auto",
           participationTtlMin: 5,
@@ -140,6 +141,7 @@ function createConfig(): MuxbotConfig {
         },
         streaming: "all",
         response: "final",
+        responseMode: "message-tool",
         followUp: {
           mode: "auto",
           participationTtlMin: 5,

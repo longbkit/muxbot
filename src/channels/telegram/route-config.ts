@@ -2,7 +2,7 @@ import type { CommandPrefixes } from "../../agents/commands.ts";
 import type { FollowUpConfig } from "../../agents/follow-up-policy.ts";
 import { resolveTopLevelBoundAgentId } from "../../config/bindings.ts";
 import { resolveConfigDurationMs } from "../../config/duration.ts";
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
 import {
   resolvePrivilegeCommands,
   type PrivilegeCommandsConfig,
@@ -18,6 +18,7 @@ export type TelegramRoute = {
   commandPrefixes: CommandPrefixes;
   streaming: "off" | "latest" | "all";
   response: "all" | "final";
+  responseMode: "capture-pane" | "message-tool";
   followUp: FollowUpConfig;
 };
 
@@ -34,6 +35,7 @@ type TelegramRouteOverride = {
   commandPrefixes?: Partial<CommandPrefixes>;
   streaming?: "off" | "latest" | "all";
   response?: "all" | "final";
+  responseMode?: "capture-pane" | "message-tool";
   followUp?: {
     mode?: FollowUpConfig["mode"];
     participationTtlSec?: number;
@@ -58,14 +60,16 @@ function buildRoute(
     telegramConfig.privilegeCommands,
     params.route?.privilegeCommands,
   );
+  const agentId =
+    params.route?.agentId ??
+    resolveTopLevelBoundAgentId(loadedConfig, {
+      channel: "telegram",
+      accountId: params.accountId,
+    }) ??
+    telegramConfig.defaultAgentId;
+  const agentEntry = getAgentEntry(loadedConfig, agentId);
   return {
-    agentId:
-      params.route?.agentId ??
-      resolveTopLevelBoundAgentId(loadedConfig, {
-        channel: "telegram",
-        accountId: params.accountId,
-      }) ??
-      telegramConfig.defaultAgentId,
+    agentId,
     requireMention: params.route?.requireMention ?? params.requireMention,
     allowBots: params.route?.allowBots ?? telegramConfig.allowBots,
     privilegeCommands: {
@@ -78,6 +82,8 @@ function buildRoute(
     },
     streaming: params.route?.streaming ?? telegramConfig.streaming,
     response: params.route?.response ?? telegramConfig.response,
+    responseMode:
+      params.route?.responseMode ?? agentEntry?.responseMode ?? telegramConfig.responseMode,
     followUp: {
       mode: params.route?.followUp?.mode ?? telegramConfig.followUp.mode,
       participationTtlMs: resolveConfigDurationMs({

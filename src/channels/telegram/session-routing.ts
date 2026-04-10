@@ -16,6 +16,7 @@ export type TelegramConversationTarget = {
 export function resolveTelegramConversationTarget(params: {
   loadedConfig: LoadedConfig;
   agentId: string;
+  accountId?: string | null;
   chatId: number;
   userId?: number | null;
   conversationKind: TelegramConversationKind;
@@ -34,7 +35,7 @@ export function resolveTelegramConversationTarget(params: {
         agentId: params.agentId,
         mainKey: sessionConfig.mainKey,
         channel: "telegram",
-        accountId: "default",
+        accountId: params.accountId ?? "default",
         peerKind: "dm",
         peerId: String(params.userId ?? params.chatId),
         dmScope: sessionConfig.dmScope,
@@ -55,7 +56,7 @@ export function resolveTelegramConversationTarget(params: {
       agentId: params.agentId,
       mainKey: sessionConfig.mainKey,
       channel: "telegram",
-      accountId: "default",
+      accountId: params.accountId ?? "default",
       peerKind: "group",
       peerId,
     }),

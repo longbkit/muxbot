@@ -28,7 +28,7 @@ Execution detail belongs in `docs/tasks/`.
 
 | State | Area | Feature | Main Doc | Tasks Folder | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Active | surface | channels | [channels](channels/README.md) | [channels tasks](../tasks/features/channels) | 2026-04-08 | Channels now add observer-style attach, detach, and watch controls on top of chat-first rendering for long-running agent sessions. |
+| Active | surface | channels | [channels](channels/README.md) | [channels tasks](../tasks/features/channels) | 2026-04-10 | Channels now support prompt-driven progress replies with stable `responseMode` controls across provider defaults, agent overrides, and surface overrides. |
 | Active | core | agent-os | [agent-os](agent-os/README.md) | [agent-os tasks](../tasks/features/agent-os) | 2026-04-04 | Agent-OS owns agents, sessions, workspaces, memory, tools, skills, queueing, and subagents without depending on tmux-specific mechanics. |
 | Active | core | runners | [runners](runners/README.md) | [runner tasks](../tasks/features/runners) | 2026-04-08 | Runners now need to keep monitoring long-running sessions after request-level detachment so channels can re-attach and still receive final settlement. |
 | Planned | ops | control | [control](control/README.md) | [control tasks](../tasks/features/control) | 2026-04-04 | Operator inspect, attach, restart, stop, and health flows belong to control rather than user-facing channels. |

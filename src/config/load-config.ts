@@ -105,11 +105,26 @@ function getDisabledChannelTokenPaths(parsed: unknown) {
     const slack = isRecord(channels.slack) ? channels.slack : undefined;
     if (slack?.enabled === false) {
       skipPaths.push("channels.slack.appToken", "channels.slack.botToken");
+      const accounts = isRecord(slack.accounts) ? slack.accounts : undefined;
+      if (accounts) {
+        for (const accountId of Object.keys(accounts)) {
+          skipPaths.push(
+            `channels.slack.accounts.${accountId}.appToken`,
+            `channels.slack.accounts.${accountId}.botToken`,
+          );
+        }
+      }
     }
 
     const telegram = isRecord(channels.telegram) ? channels.telegram : undefined;
     if (telegram?.enabled === false) {
       skipPaths.push("channels.telegram.botToken");
+      const accounts = isRecord(telegram.accounts) ? telegram.accounts : undefined;
+      if (accounts) {
+        for (const accountId of Object.keys(accounts)) {
+          skipPaths.push(`channels.telegram.accounts.${accountId}.botToken`);
+        }
+      }
     }
   }
 
