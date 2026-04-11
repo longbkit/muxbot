@@ -67,3 +67,4 @@ Current priority themes:
 - keep busy or idle state truthful across channel and runner layers
 - prevent silent session drift when tmux state is changed outside clisbot’s routed path
 - keep follow-up, queue, and final-settlement behavior deterministic under concurrent human messages
+- keep channel delivery failures contained so Slack or Telegram transport outages degrade one observer instead of terminating run supervision

@@ -34,9 +34,67 @@ type Deferred<T> = {
 type ActiveRun = {
   resolved: ResolvedAgentTarget;
   observers: Map<string, RunObserver>;
+  observerFailures: Map<string, number>;
   initialResult: Deferred<AgentExecutionResult>;
   latestUpdate: RunUpdate;
 };
+
+const OBSERVER_RETRYABLE_FAILURE_LIMIT = 3;
+
+function formatObserverError(error: unknown) {
+  return error instanceof Error ? error.stack ?? error.message : String(error);
+}
+
+function listObserverErrorCodes(error: unknown): string[] {
+  const codes = new Set<string>();
+
+  const visit = (value: unknown) => {
+    if (!value || typeof value !== "object") {
+      return;
+    }
+
+    const candidate = value as {
+      code?: unknown;
+      cause?: unknown;
+      errors?: unknown;
+    };
+    if (typeof candidate.code === "string" && candidate.code.trim()) {
+      codes.add(candidate.code.trim().toUpperCase());
+    }
+    if (Array.isArray(candidate.errors)) {
+      for (const nested of candidate.errors) {
+        visit(nested);
+      }
+    }
+    if (candidate.cause) {
+      visit(candidate.cause);
+    }
+  };
+
+  visit(error);
+  return [...codes];
+}
+
+function isRetryableObserverDeliveryError(error: unknown) {
+  const codes = listObserverErrorCodes(error);
+  if (
+    codes.some((code) =>
+      code === "ETIMEDOUT" ||
+      code === "ECONNRESET" ||
+      code === "ECONNREFUSED" ||
+      code === "EHOSTUNREACH" ||
+      code === "ENETUNREACH" ||
+      code === "UND_ERR_CONNECT_TIMEOUT" ||
+      code === "UND_ERR_HEADERS_TIMEOUT" ||
+      code === "UND_ERR_SOCKET",
+    )
+  ) {
+    return true;
+  }
+
+  const message = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  return /fetch failed|request timed out|network|socket hang up/i.test(message);
+}
 
 export class ActiveRunInProgressError extends Error {
   constructor(readonly update: RunUpdate) {
@@ -121,6 +179,7 @@ export class ActiveRunManager {
       this.activeRuns.set(resolved.sessionKey, {
         resolved,
         observers: new Map(),
+        observerFailures: new Map(),
         initialResult,
         latestUpdate: update,
       });
@@ -169,6 +228,7 @@ export class ActiveRunManager {
     this.activeRuns.set(provisionalResolved.sessionKey, {
       resolved: provisionalResolved,
       observers: new Map([[observer.id, { ...observer }]]),
+      observerFailures: new Map(),
       initialResult,
       latestUpdate: this.createRunUpdate({
         resolved: provisionalResolved,
@@ -235,6 +295,7 @@ export class ActiveRunManager {
       existingRun.observers.set(observer.id, {
         ...observer,
       });
+      existingRun.observerFailures.delete(observer.id);
       return {
         active: !isTerminalRunStatus(existingRun.latestUpdate.status),
         update: existingRun.latestUpdate,
@@ -273,6 +334,7 @@ export class ActiveRunManager {
     }
 
     observer.mode = "passive-final";
+    run.observerFailures.delete(observerId);
     return {
       detached: true,
     };
@@ -311,7 +373,7 @@ export class ActiveRunManager {
     run.latestUpdate = update;
     const now = Date.now();
 
-    for (const observer of run.observers.values()) {
+    for (const [observerId, observer] of run.observers.entries()) {
       if (observer.expiresAt && now >= observer.expiresAt && observer.mode !== "passive-final") {
         observer.mode = "passive-final";
       }
@@ -332,7 +394,33 @@ export class ActiveRunManager {
       }
 
       observer.lastSentAt = now;
-      await observer.onUpdate(update);
+      try {
+        await observer.onUpdate(update);
+        run.observerFailures.delete(observerId);
+      } catch (error) {
+        const retryable = isRetryableObserverDeliveryError(error);
+        const nextFailures = retryable
+          ? (run.observerFailures.get(observerId) ?? 0) + 1
+          : OBSERVER_RETRYABLE_FAILURE_LIMIT;
+        const shouldDetach =
+          !retryable ||
+          isTerminalRunStatus(update.status) ||
+          nextFailures >= OBSERVER_RETRYABLE_FAILURE_LIMIT;
+
+        if (shouldDetach) {
+          run.observers.delete(observerId);
+          run.observerFailures.delete(observerId);
+        } else {
+          run.observerFailures.set(observerId, nextFailures);
+        }
+
+        console.error(
+          shouldDetach
+            ? `run observer '${observerId}' update failed for ${run.resolved.sessionKey}; detaching observer`
+            : `run observer '${observerId}' update failed for ${run.resolved.sessionKey}; keeping observer for retry (${nextFailures}/${OBSERVER_RETRYABLE_FAILURE_LIMIT})`,
+          formatObserverError(error),
+        );
+      }
     }
   }
 

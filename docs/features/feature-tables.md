@@ -28,7 +28,7 @@ Execution detail belongs in `docs/tasks/`.
 
 | State | Area | Feature | Main Doc | Tasks Folder | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Active | surface | channels | [channels](channels/README.md) | [channels tasks](../tasks/features/channels) | 2026-04-10 | Channels now share a first-class plugin seam for Slack and Telegram runtime bootstrap while keeping stable `responseMode`, `additionalMessageMode`, and explicit steer or queue controls. |
+| Active | surface | channels | [channels](channels/README.md) | [channels tasks](../tasks/features/channels) | 2026-04-11 | Channels now share a first-class plugin seam plus an explicit observer-failure boundary so Slack and Telegram delivery faults degrade one thread observer instead of killing runner supervision. |
 | Active | core | agent-os | [agent-os](agent-os/README.md) | [agent-os tasks](../tasks/features/agent-os) | 2026-04-04 | Agent-OS owns agents, sessions, workspaces, memory, tools, skills, queueing, and subagents without depending on tmux-specific mechanics. |
 | Active | core | runners | [runners](runners/README.md) | [runner tasks](../tasks/features/runners) | 2026-04-08 | Runners now need to keep monitoring long-running sessions after request-level detachment so channels can re-attach and still receive final settlement. |
 | Planned | ops | control | [control](control/README.md) | [control tasks](../tasks/features/control) | 2026-04-04 | Operator inspect, attach, restart, stop, and health flows belong to control rather than user-facing channels. |
@@ -39,7 +39,7 @@ Execution detail belongs in `docs/tasks/`.
 | State | Area | Feature | Main Doc | Tasks Folder | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | Active | non-functional | architecture conformance | [architecture-conformance](non-functionals/architecture-conformance/README.md) | [docs/tasks](../tasks) | 2026-04-04 | Use this area to keep implementation aligned with the architecture documents. |
-| Active | non-functional | stability | [stability](non-functionals/stability/README.md) | [stability tasks](../tasks/features/stability) | 2026-04-10 | Stability is a first-class quality area for delay, runtime truthfulness, session drift, and cross-layer recovery behavior. |
+| Active | non-functional | stability | [stability](non-functionals/stability/README.md) | [stability tasks](../tasks/features/stability) | 2026-04-11 | Stability is a first-class quality area for delay, runtime truthfulness, session drift, cross-layer recovery behavior, and channel-failure containment. |
 | Planned | non-functional | runtime benchmarks | [runtime-benchmarks](non-functionals/runtime-benchmarks/README.md) | [runtime-benchmark tasks](../tasks/features/runtime-benchmarks) | 2026-04-04 | Compare Bun, Go, and Rust only after the Bun MVP contract is grounded by shared tests. |
 
 ## Update Rules

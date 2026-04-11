@@ -45,6 +45,12 @@ Channel responsibilities:
 - recognize explicit transcript request commands for that surface when supported
 - stream updates in a way that makes sense for the surface
 
+Channel failure boundary:
+
+- channel transport failures must stay surface-local
+- a failed message edit, post, reaction, typing cue, or status decoration must not terminate the underlying active run by itself
+- channels may retry, degrade one observer, or fall back to final-only delivery, but they must not redefine run truth
+
 ## Channel Rendering Rule
 
 Normal channel interaction should be chat-first.
@@ -58,6 +64,13 @@ That means:
 Full session visibility should still exist, but only through an explicit transcript request command.
 
 That command behavior is a channel concern even when the underlying data originated from tmux.
+
+When live rendering fails temporarily:
+
+- the run still continues under runner supervision
+- the channel may miss intermediate updates
+- the channel should recover on later successful delivery when practical
+- the architecture prefers degraded user-visible delivery over process death or false run failure
 
 ## Control
 

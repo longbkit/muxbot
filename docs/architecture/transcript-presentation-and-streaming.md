@@ -68,6 +68,8 @@ Transport rule:
 - when a channel supports message edits, it should prefer one live edited reply for streaming instead of posting a new progress reply for each update
 - when one rendered reply exceeds the channel message cap, the channel should reconcile one ordered live chunk set by editing existing chunks, adding new chunks, and deleting stale trailing chunks
 - append-only fallback is for channels that cannot edit or when a channel explicitly chooses that transport model
+- transient transport failure during post, edit, or delete must not terminate active-run supervision; it is a surface-delivery failure first
+- channels may keep, downgrade, or detach one observer based on retryable transport policy, but they must not convert one observer failure into canonical run failure without an explicit documented rule
 
 ### Transcript Request Command
 

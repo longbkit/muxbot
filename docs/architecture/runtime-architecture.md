@@ -65,6 +65,19 @@ At minimum, a runner should provide:
 
 Backend quirks belong inside runner implementations, not Agent-OS.
 
+## Run Supervision Rule
+
+Run supervision is authoritative and transport-independent.
+
+That means:
+
+- runner monitoring and active-run lifecycle must stay alive even when a user-facing channel transport is degraded
+- channel observer delivery is best-effort and must not be allowed to terminate runner monitoring
+- transient channel send or edit failures may degrade one observer, but they must not be promoted into canonical run failure by default
+- terminal run state must still settle truthfully even when one observer or one surface cannot currently render live updates
+
+If a channel needs retries, fallback rendering, or observer detachment, that policy belongs at the observer or surface boundary, not inside runner supervision.
+
 ## Configuration Rule
 
 Configuration is the local runtime control plane.

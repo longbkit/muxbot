@@ -8,6 +8,17 @@ Replace one-request-only run waiting with an observer model so long-running sess
 
 Completed
 
+## Completion Note
+
+Completed on 2026-04-11.
+
+The final hardening step was transport-failure containment at the observer boundary:
+
+- transient Slack or Telegram delivery failures no longer terminate active-run supervision
+- retryable observer delivery errors keep a bounded retry budget
+- non-retryable observer bugs detach the observer instead of taking down the run monitor
+- architecture docs now state that channel delivery is best-effort and runner supervision remains authoritative
+
 ## Why
 
 The current prompt lifecycle is too tied to one inbound message.
@@ -77,6 +88,8 @@ That creates the wrong behavior for agentic AI sessions that can run autonomousl
 - [Channels Feature](../features/channels/README.md)
 - [Runners Feature](../features/runners/README.md)
 - [Configuration Feature](../features/configuration/README.md)
+- [Stability Feature](../features/non-functionals/stability/README.md)
 - [Transcript Presentation And Streaming](../architecture/transcript-presentation-and-streaming.md)
 - [Runner Interface Standardization And tmux Runner Hardening](features/runners/2026-04-04-runner-interface-standardization-and-tmux-runner-hardening.md)
 - [Chat-First Streaming And Transcript Request Commands](features/channels/2026-04-04-chat-first-streaming-and-transcript-request-commands.md)
+- [Channel Observer Delivery Must Not Own Run Lifecycle](../lessons/2026-04-11-channel-observer-delivery-must-not-own-run-lifecycle.md)
