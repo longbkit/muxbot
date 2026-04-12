@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 import { fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
-import { DEFAULT_ACTIVITY_STORE_PATH, ensureDir } from "../shared/paths.ts";
+import { ensureDir, getDefaultActivityStorePath } from "../shared/paths.ts";
 
 type ActivityRecord = {
   channel: "slack" | "telegram";
@@ -15,7 +15,7 @@ type ActivityDocument = {
 };
 
 export class ActivityStore {
-  constructor(private readonly filePath = DEFAULT_ACTIVITY_STORE_PATH) {}
+  constructor(private readonly filePath = getDefaultActivityStorePath()) {}
 
   async record(params: {
     agentId: string;

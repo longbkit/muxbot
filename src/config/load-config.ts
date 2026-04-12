@@ -1,10 +1,12 @@
 import {
-  DEFAULT_CONFIG_PATH,
-  DEFAULT_PROCESSED_EVENTS_PATH,
-  DEFAULT_SESSION_STORE_PATH,
-  DEFAULT_STATE_DIR,
-  DEFAULT_TMUX_SOCKET_PATH,
+  collapseHomePath,
   expandHomePath,
+  getDefaultConfigPath,
+  getDefaultProcessedEventsPath,
+  getDefaultSessionStorePath,
+  getDefaultStateDir,
+  getDefaultTmuxSocketPath,
+  getDefaultWorkspaceTemplate,
 } from "../shared/paths.ts";
 import { readTextFile } from "../shared/fs.ts";
 import { resolveConfigDurationMs } from "./duration.ts";
@@ -41,12 +43,13 @@ export type LoadedConfig = {
   raw: ClisbotConfig;
 };
 
-export async function loadConfig(configPath = DEFAULT_CONFIG_PATH): Promise<LoadedConfig> {
+export async function loadConfig(configPath = getDefaultConfigPath()): Promise<LoadedConfig> {
   const expandedConfigPath = expandHomePath(configPath);
   const text = await readTextFile(expandedConfigPath);
   const parsed = JSON.parse(text);
-  const substituted = resolveConfigEnvVars(parsed, process.env, {
-    skipPaths: getDisabledChannelTokenPaths(parsed),
+  const withDynamicDefaults = applyDynamicPathDefaults(parsed);
+  const substituted = resolveConfigEnvVars(withDynamicDefaults, process.env, {
+    skipPaths: getDisabledChannelTokenPaths(withDynamicDefaults),
   }) as unknown;
   const validated = clisbotConfigSchema.parse(substituted);
 
@@ -54,12 +57,12 @@ export async function loadConfig(configPath = DEFAULT_CONFIG_PATH): Promise<Load
 }
 
 export async function loadConfigWithoutEnvResolution(
-  configPath = DEFAULT_CONFIG_PATH,
+  configPath = getDefaultConfigPath(),
 ): Promise<LoadedConfig> {
   const expandedConfigPath = expandHomePath(configPath);
   const text = await readTextFile(expandedConfigPath);
   const parsed = JSON.parse(text);
-  const validated = clisbotConfigSchema.parse(parsed);
+  const validated = clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed));
 
   return materializeLoadedConfig(expandedConfigPath, validated);
 }
@@ -70,28 +73,69 @@ function materializeLoadedConfig(
 ): LoadedConfig {
   return {
     configPath: expandedConfigPath,
-    processedEventsPath: DEFAULT_PROCESSED_EVENTS_PATH,
-    stateDir: DEFAULT_STATE_DIR,
+    processedEventsPath: getDefaultProcessedEventsPath(),
+    stateDir: getDefaultStateDir(),
     raw: {
       ...validated,
       tmux: {
         ...validated.tmux,
-        socketPath: expandHomePath(validated.tmux.socketPath || DEFAULT_TMUX_SOCKET_PATH),
+        socketPath: expandHomePath(validated.tmux.socketPath || getDefaultTmuxSocketPath()),
       },
       session: {
         ...validated.session,
-        storePath: expandHomePath(validated.session.storePath || DEFAULT_SESSION_STORE_PATH),
+        storePath: expandHomePath(validated.session.storePath || getDefaultSessionStorePath()),
       },
       agents: {
         ...validated.agents,
         defaults: {
           ...validated.agents.defaults,
-          workspace: expandHomePath(validated.agents.defaults.workspace),
+          workspace: expandHomePath(
+            validated.agents.defaults.workspace || getDefaultWorkspaceTemplate(),
+          ),
         },
         list: validated.agents.list.map((entry) => ({
           ...entry,
           workspace: entry.workspace ? expandHomePath(entry.workspace) : undefined,
         })),
+      },
+    },
+  };
+}
+
+export function applyDynamicPathDefaults(
+  parsed: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  if (!isRecord(parsed)) {
+    return parsed;
+  }
+
+  const tmux = isRecord(parsed.tmux) ? parsed.tmux : {};
+  const session = isRecord(parsed.session) ? parsed.session : {};
+  const agents = isRecord(parsed.agents) ? parsed.agents : {};
+  const agentDefaults = isRecord(agents.defaults) ? agents.defaults : {};
+
+  return {
+    ...parsed,
+    tmux: {
+      ...tmux,
+      socketPath: typeof tmux.socketPath === "string" && tmux.socketPath.trim()
+        ? tmux.socketPath
+        : collapseHomePath(getDefaultTmuxSocketPath(env)),
+    },
+    session: {
+      ...session,
+      storePath: typeof session.storePath === "string" && session.storePath.trim()
+        ? session.storePath
+        : collapseHomePath(getDefaultSessionStorePath(env)),
+    },
+    agents: {
+      ...agents,
+      defaults: {
+        ...agentDefaults,
+        workspace: typeof agentDefaults.workspace === "string" && agentDefaults.workspace.trim()
+          ? agentDefaults.workspace
+          : collapseHomePath(getDefaultWorkspaceTemplate(env)),
       },
     },
   };
@@ -140,5 +184,5 @@ export function getAgentEntry(config: LoadedConfig, agentId: string): AgentEntry
 }
 
 export function resolveSessionStorePath(config: LoadedConfig) {
-  return config.raw.session.storePath || DEFAULT_SESSION_STORE_PATH;
+  return config.raw.session.storePath || getDefaultSessionStorePath();
 }

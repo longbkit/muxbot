@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { getRuntimeStatus, readRuntimeLog, readRuntimePid } from "../src/control/runtime-process.ts";
 
 const tempDirs: string[] = [];
 const originalClisbotConfigPath = process.env.CLISBOT_CONFIG_PATH;
+const originalClisbotHome = process.env.CLISBOT_HOME;
 const originalClisbotPidPath = process.env.CLISBOT_PID_PATH;
 const originalClisbotLogPath = process.env.CLISBOT_LOG_PATH;
 
@@ -14,6 +15,7 @@ afterEach(() => {
     rmSync(tempDirs.pop()!, { force: true, recursive: true });
   }
   process.env.CLISBOT_CONFIG_PATH = originalClisbotConfigPath;
+  process.env.CLISBOT_HOME = originalClisbotHome;
   process.env.CLISBOT_PID_PATH = originalClisbotPidPath;
   process.env.CLISBOT_LOG_PATH = originalClisbotLogPath;
 });
@@ -63,5 +65,26 @@ describe("runtime path defaults", () => {
     expect(status.configPath).toBe(configPath);
     expect(status.pidPath).toBe(pidPath);
     expect(status.logPath).toBe(logPath);
+  });
+
+  test("uses CLISBOT_HOME for default runtime paths", async () => {
+    const dir = createTempDir();
+    const clisbotHome = join(dir, ".clisbot-dev");
+    const pidPath = join(clisbotHome, "state", "clisbot.pid");
+
+    mkdirSync(join(clisbotHome, "state"), { recursive: true });
+    writeFileSync(pidPath, "12345\n", { flag: "w" });
+    delete process.env.CLISBOT_CONFIG_PATH;
+    delete process.env.CLISBOT_PID_PATH;
+    delete process.env.CLISBOT_LOG_PATH;
+    process.env.CLISBOT_HOME = clisbotHome;
+
+    expect(await readRuntimePid()).toBe(12345);
+
+    const status = await getRuntimeStatus();
+    expect(status.configPath).toBe(join(clisbotHome, "clisbot.json"));
+    expect(status.pidPath).toBe(pidPath);
+    expect(status.logPath).toBe(join(clisbotHome, "state", "clisbot.log"));
+    expect(status.tmuxSocketPath).toBe(join(clisbotHome, "state", "clisbot.sock"));
   });
 });

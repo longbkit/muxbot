@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 import { fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
-import { DEFAULT_RUNTIME_HEALTH_PATH, ensureDir } from "../shared/paths.ts";
+import { ensureDir, getDefaultRuntimeHealthPath } from "../shared/paths.ts";
 
 export type RuntimeChannel = "slack" | "telegram";
 export type RuntimeChannelConnection =
@@ -100,7 +100,7 @@ function summarizeTelegramHealthError(error: unknown) {
 }
 
 export class RuntimeHealthStore {
-  constructor(private readonly filePath = DEFAULT_RUNTIME_HEALTH_PATH) {}
+  constructor(private readonly filePath = getDefaultRuntimeHealthPath()) {}
 
   async read() {
     if (!(await fileExists(this.filePath))) {

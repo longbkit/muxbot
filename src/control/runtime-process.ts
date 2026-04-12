@@ -8,12 +8,12 @@ import { ensureClisbotWrapper } from "./clisbot-wrapper.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
 import { readTextFile, readTextFileSlice, writeTextFile } from "../shared/fs.ts";
 import {
-  DEFAULT_CONFIG_PATH,
-  DEFAULT_RUNTIME_LOG_PATH,
-  DEFAULT_RUNTIME_PID_PATH,
-  DEFAULT_TMUX_SOCKET_PATH,
   ensureDir,
   expandHomePath,
+  getDefaultConfigPath,
+  getDefaultRuntimeLogPath,
+  getDefaultRuntimePidPath,
+  getDefaultTmuxSocketPath,
 } from "../shared/paths.ts";
 import { sleep } from "../shared/process.ts";
 import type { ConfigBootstrapOptions } from "../config/config-file.ts";
@@ -23,15 +23,15 @@ const STOP_WAIT_TIMEOUT_MS = 10_000;
 const PROCESS_POLL_INTERVAL_MS = 100;
 
 function resolveConfigPath(configPath?: string) {
-  return expandHomePath(configPath ?? process.env.CLISBOT_CONFIG_PATH ?? DEFAULT_CONFIG_PATH);
+  return expandHomePath(configPath ?? process.env.CLISBOT_CONFIG_PATH ?? getDefaultConfigPath());
 }
 
 function resolvePidPath(pidPath?: string) {
-  return expandHomePath(pidPath ?? process.env.CLISBOT_PID_PATH ?? DEFAULT_RUNTIME_PID_PATH);
+  return expandHomePath(pidPath ?? process.env.CLISBOT_PID_PATH ?? getDefaultRuntimePidPath());
 }
 
 function resolveLogPath(logPath?: string) {
-  return expandHomePath(logPath ?? process.env.CLISBOT_LOG_PATH ?? DEFAULT_RUNTIME_LOG_PATH);
+  return expandHomePath(logPath ?? process.env.CLISBOT_LOG_PATH ?? getDefaultRuntimeLogPath());
 }
 
 export type RuntimeStartResult = {
@@ -394,7 +394,7 @@ function renderStartFailureReason(
 async function resolveTmuxSocketPath(configPath?: string) {
   const expandedConfigPath = resolveConfigPath(configPath);
   if (!existsSync(expandedConfigPath)) {
-    return expandHomePath(DEFAULT_TMUX_SOCKET_PATH);
+    return getDefaultTmuxSocketPath();
   }
 
   try {
@@ -408,9 +408,9 @@ async function resolveTmuxSocketPath(configPath?: string) {
         return expandHomePath(parsed.tmux.socketPath);
       }
     } catch {
-      return expandHomePath(DEFAULT_TMUX_SOCKET_PATH);
+      return getDefaultTmuxSocketPath();
     }
   }
 
-  return expandHomePath(DEFAULT_TMUX_SOCKET_PATH);
+  return getDefaultTmuxSocketPath();
 }

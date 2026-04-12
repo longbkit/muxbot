@@ -16,7 +16,12 @@ import {
 } from "../config/agent-tool-presets.ts";
 import { ActivityStore } from "./activity-store.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
-import { DEFAULT_ACTIVITY_STORE_PATH, DEFAULT_RUNTIME_HEALTH_PATH } from "../shared/paths.ts";
+import {
+  collapseHomePath,
+  getDefaultActivityStorePath,
+  getDefaultConfigPath,
+  getDefaultRuntimeHealthPath,
+} from "../shared/paths.ts";
 import {
   renderOperatorHelpLines,
   renderPairingSetupHelpLines,
@@ -129,9 +134,11 @@ export async function getRuntimeOperatorSummary(params: {
 }) {
   const loadedConfig = await loadOperatorSummaryConfig(params.configPath);
   const agentService = new AgentService(loadedConfig);
-  const activityStore = new ActivityStore(params.activityPath ?? DEFAULT_ACTIVITY_STORE_PATH);
+  const activityStore = new ActivityStore(params.activityPath ?? getDefaultActivityStorePath());
   const activities = await activityStore.read();
-  const runtimeHealthStore = new RuntimeHealthStore(params.healthPath ?? DEFAULT_RUNTIME_HEALTH_PATH);
+  const runtimeHealthStore = new RuntimeHealthStore(
+    params.healthPath ?? getDefaultRuntimeHealthPath(),
+  );
   const runtimeHealth = await runtimeHealthStore.read();
   const runningTmuxSessions = params.runtimeRunning ? await getRunningTmuxSessions(loadedConfig) : 0;
 
@@ -395,6 +402,7 @@ export function renderRuntimeDiagnosticsSummary(summary: RuntimeOperatorSummary)
 }
 
 export function renderStartSummary(summary: RuntimeOperatorSummary) {
+  const configPath = collapseHomePath(getDefaultConfigPath());
   const lines = [
     ...renderAgentSummaryLines(summary),
     ...renderChannelSummaryLines(summary),
@@ -442,7 +450,7 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
     lines.push("");
     lines.push("  Next steps after bootstrap:");
     lines.push("  - chat with the bot or open the workspace, then follow BOOTSTRAP.md");
-    lines.push("  - configure Slack channels or Telegram groups/topics in ~/.clisbot/clisbot.json");
+    lines.push(`  - configure Slack channels or Telegram groups/topics in ${configPath}`);
     lines.push("  - run `clisbot status` to recheck runtime and bootstrap state");
     lines.push("  - run `clisbot logs` if the bot does not answer as expected");
     lines.push(
@@ -466,7 +474,7 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
 
   lines.push("");
   lines.push("Next steps:");
-  lines.push("  - configure Slack channels or Telegram groups/topics in ~/.clisbot/clisbot.json");
+  lines.push(`  - configure Slack channels or Telegram groups/topics in ${configPath}`);
   lines.push("  - verify routing and defaultAgentId values match the agent you want to expose");
   lines.push("  - send a test message from Slack or Telegram");
   lines.push("  - run `clisbot status` to inspect agents, channels, and tmux session state");
@@ -513,7 +521,7 @@ function appendChannelSetupNotes(
         `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
       );
       lines.push(
-        `${prefix}    route: add channels.telegram.groups.<chatId> in ~/.clisbot/clisbot.json`,
+        `${prefix}    route: add channels.telegram.groups.<chatId> in ${collapseHomePath(getDefaultConfigPath())}`,
       );
       lines.push(
         `${prefix}    example: channels.telegram.groups."-1001234567890".agentId = "default"`,

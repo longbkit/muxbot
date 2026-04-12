@@ -2,10 +2,18 @@ import { chmod } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, sep } from "node:path";
 import { fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
-import { APP_HOME_DIR, ensureDir, expandHomePath } from "../shared/paths.ts";
+import { ensureDir, expandHomePath, resolveAppHomeDir } from "../shared/paths.ts";
 
-export const DEFAULT_CLISBOT_BIN_DIR = join(APP_HOME_DIR, "bin");
-export const DEFAULT_CLISBOT_WRAPPER_PATH = join(DEFAULT_CLISBOT_BIN_DIR, "clisbot");
+export function getDefaultClisbotBinDir(env: NodeJS.ProcessEnv = process.env) {
+  return join(resolveAppHomeDir(env), "bin");
+}
+
+export function getDefaultClisbotWrapperPath(env: NodeJS.ProcessEnv = process.env) {
+  return join(getDefaultClisbotBinDir(env), "clisbot");
+}
+
+export const DEFAULT_CLISBOT_BIN_DIR = getDefaultClisbotBinDir();
+export const DEFAULT_CLISBOT_WRAPPER_PATH = getDefaultClisbotWrapperPath();
 
 function shellQuote(value: string) {
   if (/^[a-zA-Z0-9_./:@=-]+$/.test(value)) {
@@ -24,7 +32,7 @@ function isPackagedRuntime() {
 }
 
 export function getClisbotWrapperPath() {
-  return expandHomePath(process.env.CLISBOT_WRAPPER_PATH || DEFAULT_CLISBOT_WRAPPER_PATH);
+  return expandHomePath(process.env.CLISBOT_WRAPPER_PATH || getDefaultClisbotWrapperPath());
 }
 
 export function getClisbotPromptCommand() {

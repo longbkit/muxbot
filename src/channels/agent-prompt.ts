@@ -151,7 +151,7 @@ function buildReplyCommand(params: {
       lines.push(`  --thread-id ${params.identity.threadTs} \\`);
     }
     lines.push("  --final \\");
-    lines.push('  --message "$(cat <<\'__CLISBOT_MESSAGE__\'');
+    lines.push('  --message "$(cat <<\\__CLISBOT_MESSAGE__');
     lines.push("<short progress update>");
     lines.push("__CLISBOT_MESSAGE__");
     lines.push(')" \\');
@@ -165,7 +165,7 @@ function buildReplyCommand(params: {
     lines.push(`  --thread-id ${params.identity.topicId} \\`);
   }
   lines.push("  --final \\");
-  lines.push('  --message "$(cat <<\'__CLISBOT_MESSAGE__\'');
+  lines.push('  --message "$(cat <<\\__CLISBOT_MESSAGE__');
   lines.push("<short progress update>");
   lines.push("__CLISBOT_MESSAGE__");
   lines.push(')" \\');

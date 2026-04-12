@@ -1,4 +1,10 @@
 import { normalizeEnvReference } from "../shared/env-references.ts";
+import {
+  collapseHomePath,
+  getDefaultSessionStorePath,
+  getDefaultTmuxSocketPath,
+  getDefaultWorkspaceTemplate,
+} from "../shared/paths.ts";
 
 type DefaultChannelBootstrapOptions = {
   slackEnabled?: boolean;
@@ -24,6 +30,9 @@ function renderEnvReference(
 export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOptions = {}) {
   const slackEnabled = options.slackEnabled === true;
   const telegramEnabled = options.telegramEnabled === true;
+  const tmuxSocketPath = collapseHomePath(getDefaultTmuxSocketPath());
+  const sessionStorePath = collapseHomePath(getDefaultSessionStorePath());
+  const workspaceTemplate = collapseHomePath(getDefaultWorkspaceTemplate());
 
   return JSON.stringify(
     {
@@ -32,17 +41,17 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
         lastTouchedAt: new Date().toISOString(),
       },
       tmux: {
-        socketPath: "~/.clisbot/state/clisbot.sock",
+        socketPath: tmuxSocketPath,
       },
       session: {
         mainKey: "main",
         dmScope: "main",
         identityLinks: {},
-        storePath: "~/.clisbot/state/sessions.json",
+        storePath: sessionStorePath,
       },
       agents: {
         defaults: {
-          workspace: "~/.clisbot/workspaces/{agentId}",
+          workspace: workspaceTemplate,
           runner: {
             command: "codex",
             args: [

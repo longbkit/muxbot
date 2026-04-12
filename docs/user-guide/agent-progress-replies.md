@@ -36,13 +36,19 @@ Preferred reply pattern for multi-line or quote-heavy content:
   --channel slack \
   --target channel:C1234567890 \
   --thread-id 1712345678.123456 \
-  --message "$(cat <<'__CLISBOT_MESSAGE__'
+  --message "$(cat <<\__CLISBOT_MESSAGE__
 working on it
 
 step 1 complete
 __CLISBOT_MESSAGE__
 )"
 ```
+
+Why this exact form:
+
+- keep the delimiter unquoted as `<<\__CLISBOT_MESSAGE__` so the rendered prompt carries fewer nested quotes and is less likely to break when another tool wraps it inside JSON or shell strings
+- keep `__CLISBOT_MESSAGE__` alone on its own line when closing the heredoc
+- this pattern is now regression-tested against multi-line text, mixed quotes, shell-like text, steering-style blocks, and markdown code fences
 
 ## Important Rules
 

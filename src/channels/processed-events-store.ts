@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { DEFAULT_PROCESSED_EVENTS_PATH } from "../shared/paths.ts";
+import { getDefaultProcessedEventsPath } from "../shared/paths.ts";
 
 type ProcessedEventStatus = "processing" | "completed";
 
@@ -20,7 +20,7 @@ export class ProcessedEventsStore {
   private document: StoreDocument = { events: {} };
 
   constructor(
-    private readonly filePath = DEFAULT_PROCESSED_EVENTS_PATH,
+    private readonly filePath = getDefaultProcessedEventsPath(),
     private readonly ttlMs = DEFAULT_TTL_MS,
   ) {}
 

@@ -11,6 +11,7 @@ import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 describe("runtime summaries", () => {
   let tempDir = "";
+  const originalClisbotHome = process.env.CLISBOT_HOME;
   const originalSlackAppToken = process.env.SLACK_APP_TOKEN;
   const originalSlackBotToken = process.env.SLACK_BOT_TOKEN;
   const originalTelegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -19,6 +20,7 @@ describe("runtime summaries", () => {
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true });
     }
+    process.env.CLISBOT_HOME = originalClisbotHome;
     process.env.SLACK_APP_TOKEN = originalSlackAppToken;
     process.env.SLACK_BOT_TOKEN = originalSlackBotToken;
     process.env.TELEGRAM_BOT_TOKEN = originalTelegramBotToken;
@@ -51,6 +53,38 @@ describe("runtime summaries", () => {
     expect(text).toContain("team-assistant = one shared assistant for a team or channel.");
     expect(text).toContain("clisbot start --cli codex --bootstrap personal-assistant");
     expect(text).toContain("Help: clisbot --help");
+  });
+
+  test("renders CLISBOT_HOME-derived paths in operator guidance", async () => {
+    process.env.CLISBOT_HOME = "~/.clisbot-dev";
+    process.env.TELEGRAM_BOT_TOKEN = "telegram";
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = clisbotConfigSchema.parse(
+      JSON.parse(
+        renderDefaultConfigTemplate({
+          slackEnabled: false,
+          telegramEnabled: true,
+        }),
+      ),
+    );
+    config.agents.list = [
+      {
+        id: "default",
+        cliTool: "codex",
+      },
+    ];
+    await writeEditableConfig(configPath, config);
+
+    const summary = await getRuntimeOperatorSummary({
+      configPath,
+      runtimeRunning: false,
+    });
+    const text = renderStartSummary(summary);
+
+    expect(text).toContain("configure Slack channels or Telegram groups/topics in ~/.clisbot-dev/clisbot.json");
+    expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock list-sessions");
+    expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock attach -t <session-name>");
   });
 
   test("renders agent and channel activity in status output", async () => {

@@ -170,13 +170,13 @@ For product or runtime work, use the available tools end-to-end when relevant:
 - for Slack live validation, always use the channel id from `SLACK_TEST_CHANNEL`; do not switch to ad hoc channels or DMs unless the user explicitly asks for that
 - for the shared bot Claude Code CLI route in this repo, `SLACK_TEST_CHANNEL` must point to `C0AQW4DUSDC`
 - for Telegram live validation, always use the configured Telegram test surface only:
-- `TELEGRAM_BOT_USERNAME`
+- `TELEGRAM_DEV_BOT_USERNAME`
 - `TELEGRAM_CONTROL_BOT_USERNAME`
 - `TELEGRAM_TEST_GROUP_ID`
 - `TELEGRAM_TEST_TOPIC_CODEX_ID`
 - `TELEGRAM_TEST_TOPIC_CLAUDE_ID`
 - do not switch to other Telegram groups, topics, or DMs unless the user explicitly asks for that
 - use `TELEGRAM_CONTROL_BOT_TOKEN` only for control-bot-driven testing against the configured Telegram test group
-- use `TELEGRAM_BOT_TOKEN` only for the target bot route under test
+- use `TELEGRAM_DEV_BOT_TOKEN` only for the target bot route under test in this repo
 
 Do not claim completion based only on static code review when runtime verification is practical.

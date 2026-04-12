@@ -1,5 +1,10 @@
 import { existsSync } from "node:fs";
-import { DEFAULT_CONFIG_PATH, expandHomePath } from "../shared/paths.ts";
+import {
+  collapseHomePath,
+  expandHomePath,
+  getDefaultConfigPath,
+  getDefaultTmuxSocketPath,
+} from "../shared/paths.ts";
 import {
   describeEnvReference,
   extractEnvReferenceName,
@@ -83,13 +88,14 @@ export function renderDisabledConfiguredChannelWarningLines(
   availability: DefaultChannelAvailability,
 ) {
   const lines: string[] = [];
+  const configPath = collapseHomePath(getDefaultConfigPath());
 
   if (availability.slack && !config.channels.slack.enabled) {
     lines.push(
       "warning default Slack tokens are available in SLACK_APP_TOKEN and SLACK_BOT_TOKEN, but channels.slack.enabled is false in the existing config.",
     );
     lines.push(
-      "Run `clisbot channels enable slack` to enable Slack quickly, or update ~/.clisbot/clisbot.json manually.",
+      `Run \`clisbot channels enable slack\` to enable Slack quickly, or update ${configPath} manually.`,
     );
   }
 
@@ -98,7 +104,7 @@ export function renderDisabledConfiguredChannelWarningLines(
       "warning default Telegram token is available in TELEGRAM_BOT_TOKEN, but channels.telegram.enabled is false in the existing config.",
     );
     lines.push(
-      "Run `clisbot channels enable telegram` to enable Telegram quickly, or update ~/.clisbot/clisbot.json manually.",
+      `Run \`clisbot channels enable telegram\` to enable Telegram quickly, or update ${configPath} manually.`,
     );
   }
 
@@ -335,10 +341,11 @@ export function renderPairingSetupHelpLines(
 }
 
 export function renderTmuxDebugHelpLines(prefix = "") {
+  const socketPath = collapseHomePath(getDefaultTmuxSocketPath());
   return [
     `${prefix}tmux debug:`,
-    `${prefix}  - list sessions: \`tmux -S ~/.clisbot/state/clisbot.sock list-sessions\``,
-    `${prefix}  - attach to a session: \`tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>\``,
+    `${prefix}  - list sessions: \`tmux -S ${socketPath} list-sessions\``,
+    `${prefix}  - attach to a session: \`tmux -S ${socketPath} attach -t <session-name>\``,
   ];
 }
 
@@ -360,7 +367,7 @@ export function renderChannelSetupHelpLines(
   ];
 }
 
-export function shouldBootstrapFirstRunConfig(configPath = DEFAULT_CONFIG_PATH) {
+export function shouldBootstrapFirstRunConfig(configPath = getDefaultConfigPath()) {
   return !existsSync(expandHomePath(configPath));
 }
 

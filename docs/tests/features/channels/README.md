@@ -308,6 +308,33 @@ Live proof on April 5, 2026:
 - the system does not require a fresh explicit mention only because the previous reply came from `clisbot message send ...`
 - no duplicate pane-settlement reply appears when `responseMode` stays on `message-tool`
 
+## Test Case 2J: Message-Tool Heredoc Reply Survives Tricky Multi-Line Content
+
+### Preconditions
+
+- the routed Slack or Telegram surface uses `responseMode: "message-tool"`
+- the injected prompt includes the local `clisbot message send ...` reply command
+- the local machine has a working wrapper path such as `~/.clisbot/bin/clisbot`
+
+### Steps
+
+1. Start a real routed conversation so the agent receives the message-tool prompt block
+2. Use the documented heredoc reply pattern with a body that includes several difficult shapes:
+   - multiple lines
+   - mixed single and double quotes
+   - shell-looking text such as `$HOME`, `$(...)`, backticks, or `)`
+   - XML-like or steering-style blocks such as `<system>...</system>`
+   - markdown code fences
+3. Send that reply through `clisbot message send ...`
+4. Verify the delivered surface message text exactly matches the intended body
+
+### Expected Results
+
+- the shell accepts the generated heredoc command without `unexpected EOF` or missing delimiter errors
+- `clisbot message send` receives the full body instead of a truncated or reinterpreted shell fragment
+- the visible Slack or Telegram reply preserves the original content exactly, including line breaks and quotes
+- the route does not emit a second pane-settlement reply when `responseMode` is `message-tool`
+
 ## OpenClaw Compatibility Note
 
 Latest OpenClaw `main` models Slack no-mention thread continuation by remembering that it already replied in a thread.

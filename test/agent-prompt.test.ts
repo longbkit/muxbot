@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { buildAgentPromptText } from "../src/channels/agent-prompt.ts";
 
 describe("agent prompt envelope", () => {
@@ -42,7 +43,7 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("  --target channel:C123 \\");
     expect(prompt).toContain("  --thread-id 171234.5678 \\");
     expect(prompt).toContain("  --final \\");
-    expect(prompt).toContain("--message \"$(cat <<'__CLISBOT_MESSAGE__'");
+    expect(prompt).toContain("--message \"$(cat <<\\__CLISBOT_MESSAGE__");
     expect(prompt).toContain("__CLISBOT_MESSAGE__");
     expect(prompt).toContain("  [--media /absolute/path/to/file]");
     expect(prompt).toContain("progress updates: at most 3");
@@ -131,5 +132,27 @@ describe("agent prompt envelope", () => {
     expect(prompt).not.toContain("/tmp/clis message send \\");
     expect(prompt).not.toContain("progress updates: at most 3");
     expect(prompt).not.toContain("final response: send exactly 1 final user-facing response");
+  });
+
+  test("heredoc command substitution survives tricky message bodies", () => {
+    const messageBodies = [
+      "plain text",
+      "line 1\nline 2",
+      "quote mix: 'single' and \"double\"",
+      "shell-ish: $HOME $(whoami) `uname` ) ] }",
+      "<system>\n[clisbot steering message]\nA new user message arrived.\n</system>",
+      "markdown-ish:\n- item 1\n- item 2\n\n```ts\nconsole.log('hi')\n```",
+    ];
+
+    for (const messageBody of messageBodies) {
+      const command = `printf '%s' "$(cat <<\\__CLISBOT_MESSAGE__\n${messageBody}\n__CLISBOT_MESSAGE__\n)"`;
+      const result = spawnSync("bash", ["-lc", command], {
+        encoding: "utf8",
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toBe(messageBody);
+    }
   });
 });

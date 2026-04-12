@@ -56,6 +56,7 @@ That makes repo-local commands such as `bun run src/main.ts message send ...` po
   - wrapper creation and rewrite behavior
   - runner launch command export of wrapper-related env and PATH
   - Slack and Telegram agent prompt envelope rendering
+  - the documented heredoc reply pattern survives tricky message bodies such as mixed quotes, shell-looking text, steering-style blocks, and markdown fences
   - agent-bound prompt injection path inside `processChannelInteraction`
   - responseMode delivery suppresses normal channel settlement but still falls back on runtime error
   - agent-level and surface-level responseMode precedence

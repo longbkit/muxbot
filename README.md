@@ -161,6 +161,7 @@ Fresh config now starts with no configured agents, and first-run `clisbot start`
 Fresh config also starts with no preconfigured Slack channels or Telegram groups/topics. Add those routes manually in `~/.clisbot/clisbot.json`.
 `clisbot start` now also requires Slack or Telegram token references before it bootstraps anything. By default it looks for `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN`, and `TELEGRAM_BOT_TOKEN`, but you can pass custom placeholders such as `--slack-app-token '${CUSTOM_SLACK_APP_TOKEN}'`.
 On startup, `clisbot` now prints which token env names it is checking and whether each one is set or missing.
+Set `CLISBOT_HOME` if you want a fully separate local config, state, tmux socket, wrapper, and workspace root, for example when running a dev instance beside your main bot.
 
 ## Setup Guide
 
@@ -178,6 +179,17 @@ If you prefer to configure things yourself:
 2. Copy it to `~/.clisbot/clisbot.json` and adjust channels, bindings, workspaces, and policies for your environment.
 3. Add agents through the CLI so tool defaults, startup options, and bootstrap templates stay consistent.
 4. Set the required environment variables in your shell startup file so `clisbot` can read them consistently.
+
+Separate dev home example:
+
+```bash
+export CLISBOT_HOME=~/.clisbot-dev
+export TELEGRAM_BOT_TOKEN=...
+clisbot start --cli codex --bootstrap team-assistant
+```
+
+- `CLISBOT_HOME` changes the default config path, runtime state dir, tmux socket, local wrapper path, and default workspaces together
+- `CLISBOT_CONFIG_PATH` still works when you want to point at one exact config file manually
 
 Channel route setup is manual by design:
 

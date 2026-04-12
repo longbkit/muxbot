@@ -3,15 +3,18 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadConfig } from "../src/config/load-config.ts";
+import { readEditableConfig } from "../src/config/config-file.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 describe("loadConfig", () => {
   let tempDir = "";
+  const originalClisbotHome = process.env.CLISBOT_HOME;
 
   afterEach(() => {
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true });
     }
+    process.env.CLISBOT_HOME = originalClisbotHome;
   });
 
   test("loads config and expands env vars", async () => {
@@ -477,5 +480,73 @@ describe("loadConfig", () => {
     expect(loaded.raw.channels.slack.botToken).toBe("bot-token");
     expect(loaded.raw.channels.telegram.enabled).toBe(false);
     expect(loaded.raw.channels.telegram.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
+  });
+
+  test("uses CLISBOT_HOME for dynamic default paths", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const clisbotHome = join(tempDir, "dev-home");
+
+    process.env.CLISBOT_HOME = clisbotHome;
+
+    await Bun.write(
+      configPath,
+      JSON.stringify({
+        channels: {
+          slack: { enabled: false },
+          telegram: { enabled: false },
+        },
+      }),
+    );
+
+    const loaded = await loadConfig(configPath);
+    expect(loaded.raw.tmux.socketPath).toBe(join(clisbotHome, "state", "clisbot.sock"));
+    expect(loaded.raw.session.storePath).toBe(join(clisbotHome, "state", "sessions.json"));
+    expect(loaded.raw.agents.defaults.workspace).toBe(join(clisbotHome, "workspaces", "{agentId}"));
+    expect(loaded.processedEventsPath).toBe(join(clisbotHome, "state", "processed-slack-events.json"));
+    expect(loaded.stateDir).toBe(join(clisbotHome, "state"));
+  });
+
+  test("uses CLISBOT_HOME for editable config defaults too", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const clisbotHome = join(tempDir, "editable-home");
+
+    process.env.CLISBOT_HOME = clisbotHome;
+
+    await Bun.write(
+      configPath,
+      JSON.stringify({
+        channels: {
+          slack: { enabled: false },
+          telegram: { enabled: false },
+        },
+      }),
+    );
+
+    const editable = await readEditableConfig(configPath);
+    expect(editable.config.tmux.socketPath).toBe(join(clisbotHome, "state", "clisbot.sock"));
+    expect(editable.config.session.storePath).toBe(join(clisbotHome, "state", "sessions.json"));
+    expect(editable.config.agents.defaults.workspace).toBe(
+      join(clisbotHome, "workspaces", "{agentId}"),
+    );
+  });
+});
+
+describe("renderDefaultConfigTemplate", () => {
+  const originalClisbotHome = process.env.CLISBOT_HOME;
+
+  afterEach(() => {
+    process.env.CLISBOT_HOME = originalClisbotHome;
+  });
+
+  test("renders default paths from CLISBOT_HOME", () => {
+    process.env.CLISBOT_HOME = "~/.clisbot-dev";
+
+    const template = JSON.parse(renderDefaultConfigTemplate());
+
+    expect(template.tmux.socketPath).toBe("~/.clisbot-dev/state/clisbot.sock");
+    expect(template.session.storePath).toBe("~/.clisbot-dev/state/sessions.json");
+    expect(template.agents.defaults.workspace).toBe("~/.clisbot-dev/workspaces/{agentId}");
   });
 });

@@ -3,6 +3,7 @@ import type {
   AgentCliToolId,
 } from "./config/agent-tool-presets.ts";
 import { REPO_HELP_HINT, USER_GUIDE_DOC_PATH } from "./control/startup-bootstrap.ts";
+import { collapseHomePath, getDefaultConfigPath } from "./shared/paths.ts";
 import { getClisbotVersion } from "./version.ts";
 
 export type ParsedCliCommand =
@@ -120,6 +121,7 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
 }
 
 export function renderCliHelp() {
+  const configPath = collapseHomePath(getDefaultConfigPath());
   return [
     `clisbot v${getClisbotVersion()}`,
     "",
@@ -164,7 +166,7 @@ export function renderCliHelp() {
     "  clisbot --help",
     "",
     "Commands:",
-    "  start              Seed ~/.clisbot/clisbot.json if missing, optionally create the first agent, and start clisbot in the background.",
+    `  start              Seed ${configPath} if missing, optionally create the first agent, and start clisbot in the background.`,
     "  restart            Stop the running clisbot process, then start it again.",
     "  stop               Stop the running clisbot process.",
     "  stop --hard        Stop clisbot and kill all tmux sessions on the configured clisbot socket.",
@@ -184,7 +186,7 @@ export function renderCliHelp() {
     "  message            Run provider message actions such as send, react, read, edit, delete, and pins.",
     "  agents             Manage configured agents and top-level bindings.",
     "  pairing            Run the pairing control CLI.",
-    "  init               Seed ~/.clisbot/clisbot.json and optionally create the first agent without starting clisbot.",
+    `  init               Seed ${configPath} and optionally create the first agent without starting clisbot.`,
     "  --version, -v      Show the installed clisbot version.",
     "  --help             Show this help text.",
     "",

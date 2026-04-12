@@ -1,0 +1,74 @@
+# tmux Submit Truthfulness And Telegram Send Reliability
+
+## Summary
+
+Investigate and fix cases where a routed user message appears to reach `clisbot`, but the tmux-backed agent session does not actually submit the prompt successfully on the first try.
+
+The reported symptom is that the human sends a message, nothing gets processed, then asks again once or twice and only then the prompt takes effect. The issue is reported more often on Telegram than on Slack.
+
+## Status
+
+Planned
+
+## Why
+
+This is both a stability and delay problem.
+
+If `clisbot` accepts a message but fails to truthfully complete the tmux submit path, the surface lies about the real system state:
+
+- the channel thinks a prompt was sent
+- the runner may still be idle
+- the human waits and retries manually
+- retries can later create duplicate or ambiguous execution if the first submit actually went through late
+
+The fix must respect the project requirement that stability and speed are both first-class metrics. A naive retry policy that hides uncertainty by blindly re-sending input could make the system less truthful or create duplicate runs.
+
+## Scope
+
+- reproduce the failed-or-lost first-submit symptom on the current Telegram route and compare it against Slack
+- trace the full path from channel event acceptance to tmux input injection and post-submit observation
+- verify whether the failure comes from:
+  - tmux input delivery not actually happening
+  - Enter submission not reaching the pane
+  - prompt submission succeeding but first-output observation being too weak or too delayed
+  - channel-level busy-state or progress feedback masking a still-idle runner
+- define a truthful success criterion for "submit completed" instead of assuming that sending keystrokes means the prompt is now running
+- improve reliability without regressing visible latency or creating duplicate prompt submission
+- add regression coverage for Telegram-heavy cases
+
+## Current Truth
+
+- the product currently treats delay and stability as explicit top-level metrics
+- tmux submit latency is already measured in the Slack latency audit, but Telegram-specific submit reliability has not been audited the same way
+- there is now a real user report that first-turn submit sometimes does not take effect until one or two extra follow-up messages are sent
+- the issue appears more common on Telegram than on Slack, which suggests either different timing pressure, different follow-up behavior, or different visibility of a shared runner weakness
+
+## Non-Goals
+
+- papering over uncertainty by sending duplicate prompt submissions automatically
+- optimizing only Slack while leaving Telegram reliability behind
+- redesigning the whole runner architecture in this slice
+
+## Subtasks
+
+- [ ] capture a reproducible Telegram case with timing notes and runtime logs
+- [ ] compare Telegram and Slack timing around `tmux-submit-start`, `tmux-submit-complete`, and first meaningful output
+- [ ] verify whether tmux key injection and final Enter submission are actually reaching the pane in the failure case
+- [ ] define a truthful post-submit observation rule that distinguishes "submitted and running" from "keystrokes attempted"
+- [ ] fix the reliability gap without increasing duplicate-submit risk
+- [ ] add automated coverage for the failing path and for no-duplicate guarantees
+- [ ] document any new latency or reliability instrumentation needed for future audits
+
+## Exit Criteria
+
+- a normal routed Telegram message reliably causes prompt execution on the first try under the tested failure scenario
+- the same fix does not regress Slack behavior
+- `clisbot` does not silently double-submit prompts just to look responsive
+- timing and status signals remain truthful enough for operators to debug real failures
+
+## Related Docs
+
+- [Stability](../../../features/non-functionals/stability/README.md)
+- [Runner Interface Standardization And tmux Runner Hardening](../runners/2026-04-04-runner-interface-standardization-and-tmux-runner-hardening.md)
+- [Slack Latency And Stability Audit](../../../research/channels/2026-04-10-slack-latency-and-stability-audit.md)
+- [Telegram Topics Channel MVP](../channels/2026-04-05-telegram-topics-channel-mvp.md)
