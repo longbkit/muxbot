@@ -1,9 +1,9 @@
 # clisbot - Agentic Coding CLI & chat bot
 The cheapest, simplest path to frontier LLMs and agentic CLI workflows for teams and individuals.
 
-`clisbot` exposes native agentic AI tool CLIs like Claude Code / Codex through multi-channel chat surfaces, with each agent running inside its own durable tmux session and ready to behave like a real bot, a real assistant - with SOUL, IDENTITY & MEMORY, not just a coding tool.
+`clisbot` is not just another tmux bridge, as many GitHub projects already are. It exposes native agentic AI tool CLIs like Claude Code / Codex through multi-channel chat surfaces, with each agent running inside its own durable tmux session and ready to behave like a real bot, a real assistant - with SOUL, IDENTITY & MEMORY, just as OpenClaw, not just a coding tool.
 
-It is not just another tmux bridge or Telegram bridge. `clisbot` is meant to grow into a reusable agent runtime layer that can support many CLI tools, many channels, and many workflow shapes on top of the same durable agent session.
+`clisbot` is meant to grow into a reusable agent runtime layer that can support many CLI tools, many channels, and many workflow shapes on top of the same durable agent session.
 
 Agentic AI is powerful, but only with frontier models. OpenClaw took off because people found many ways to access strong frontier models cheaply through subscription-based OAuth. Recent Anthropic enforcement around third-party and proxy-style usage made that risk harder to ignore.
 
