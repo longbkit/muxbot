@@ -93,3 +93,11 @@ That creates the wrong behavior for agentic AI sessions that can run autonomousl
 - [Runner Interface Standardization And tmux Runner Hardening](features/runners/2026-04-04-runner-interface-standardization-and-tmux-runner-hardening.md)
 - [Chat-First Streaming And Transcript Request Commands](features/channels/2026-04-04-chat-first-streaming-and-transcript-request-commands.md)
 - [Channel Observer Delivery Must Not Own Run Lifecycle](../lessons/2026-04-11-channel-observer-delivery-must-not-own-run-lifecycle.md)
+
+## Follow-Up Backlog Note
+
+The completed observer model still leaves one planned follow-up:
+
+- active-run supervision state should eventually be split from the broader session continuity record
+- today the same store still carries both tmux continuity hints and chat-level active-run ownership
+- that is acceptable for normal operation, but restart or crash recovery semantics are still too implicit when tmux sessions survive while runtime supervision does not

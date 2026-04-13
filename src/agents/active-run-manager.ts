@@ -135,6 +135,7 @@ function createDeferred<T>(): Deferred<T> {
 
 export class ActiveRunManager {
   private readonly activeRuns = new Map<string, ActiveRun>();
+  private stopping = false;
 
   constructor(
     private readonly tmux: TmuxClient,
@@ -199,6 +200,10 @@ export class ActiveRunManager {
     observer: Omit<RunObserver, "lastSentAt">,
     options: { allowFreshRetryBeforePrompt?: boolean } = {},
   ): Promise<AgentExecutionResult> {
+    if (this.stopping) {
+      throw new Error("Runtime is stopping and cannot accept a new prompt.");
+    }
+
     const existingActiveRun = this.activeRuns.get(target.sessionKey);
     if (existingActiveRun) {
       throw new ActiveRunInProgressError(existingActiveRun.latestUpdate);
@@ -255,6 +260,9 @@ export class ActiveRunManager {
       const startedAt = Date.now();
       const run = this.activeRuns.get(provisionalResolved.sessionKey);
       if (!run) {
+        if (this.stopping) {
+          throw new Error("Runtime stopped before the active run finished startup.");
+        }
         throw new Error(`Active run disappeared during startup for ${provisionalResolved.sessionKey}.`);
       }
 
@@ -342,6 +350,17 @@ export class ActiveRunManager {
 
   hasActiveRun(target: AgentSessionTarget) {
     return this.activeRuns.has(target.sessionKey);
+  }
+
+  async stop() {
+    this.stopping = true;
+    const activeRuns = [...this.activeRuns.values()];
+    for (const run of activeRuns) {
+      await this.sessionState.setSessionRuntime(run.resolved, {
+        state: "idle",
+      });
+    }
+    this.activeRuns.clear();
   }
 
   private buildDetachedNote(resolved: ResolvedAgentTarget) {

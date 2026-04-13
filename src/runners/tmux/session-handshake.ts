@@ -6,8 +6,11 @@ import type { TmuxClient, TmuxPaneState } from "./client.ts";
 
 const TRUST_PROMPT_POLL_INTERVAL_MS = 250;
 const TRUST_PROMPT_MAX_WAIT_MS = 10_000;
-const TRUST_PROMPT_SETTLE_DELAY_MS = 1500;
 const SESSION_BOOTSTRAP_POLL_INTERVAL_MS = 100;
+const PASTE_SETTLE_POLL_INTERVAL_MS = 40;
+const PASTE_SETTLE_QUIET_WINDOW_MS = 60;
+const PASTE_SETTLE_MULTILINE_MAX_WAIT_MS = 800;
+const PASTE_SETTLE_SINGLE_LINE_MAX_WAIT_MS = 80;
 const SUBMIT_CONFIRM_POLL_INTERVAL_MS = 40;
 const SUBMIT_CONFIRM_MAX_WAIT_MS = 160;
 
@@ -18,9 +21,15 @@ export async function submitTmuxSessionInput(params: {
   promptSubmitDelayMs: number;
   timingContext?: LatencyDebugContext;
 }) {
+  const prePasteState = await params.tmux.getPaneState(params.sessionName);
   await params.tmux.sendLiteral(params.sessionName, params.text);
-  await sleep(params.promptSubmitDelayMs);
-  const preSubmitState = await params.tmux.getPaneState(params.sessionName);
+  const preSubmitState = await waitForPanePasteSettlement({
+    tmux: params.tmux,
+    sessionName: params.sessionName,
+    baseline: prePasteState,
+    text: params.text,
+    minDelayMs: params.promptSubmitDelayMs,
+  });
 
   await params.tmux.sendKey(params.sessionName, "Enter");
   if (
@@ -65,8 +74,6 @@ export async function captureTmuxSessionIdentity(params: {
   timeoutMs: number;
   pollIntervalMs: number;
 }) {
-  let deadline = Date.now() + params.timeoutMs;
-
   await submitTmuxSessionInput({
     tmux: params.tmux,
     sessionName: params.sessionName,
@@ -74,6 +81,7 @@ export async function captureTmuxSessionIdentity(params: {
     promptSubmitDelayMs: params.promptSubmitDelayMs,
     timingContext: undefined,
   });
+  let deadline = Date.now() + params.timeoutMs;
 
   while (Date.now() < deadline) {
     await sleep(params.pollIntervalMs);
@@ -81,7 +89,11 @@ export async function captureTmuxSessionIdentity(params: {
       await params.tmux.capturePane(params.sessionName, params.captureLines),
     );
     if (hasTrustPrompt(snapshot)) {
-      await dismissTrustPrompt(params.tmux, params.sessionName);
+      await dismissTrustPrompt({
+        tmux: params.tmux,
+        sessionName: params.sessionName,
+        captureLines: params.captureLines,
+      });
       deadline = Date.now() + params.timeoutMs;
       await submitTmuxSessionInput({
         tmux: params.tmux,
@@ -123,7 +135,11 @@ export async function dismissTmuxTrustPromptIfPresent(params: {
       return;
     }
 
-    await dismissTrustPrompt(params.tmux, params.sessionName);
+    await dismissTrustPrompt({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      captureLines: params.captureLines,
+    });
   }
 }
 
@@ -158,16 +174,25 @@ export async function waitForTmuxSessionBootstrap(params: {
   return "";
 }
 
-function hasTrustPrompt(snapshot: string) {
-  return (
-    snapshot.includes("Do you trust the contents of this directory?") ||
-    snapshot.includes("Press enter to continue")
-  );
-}
+async function dismissTrustPrompt(params: {
+  tmux: TmuxClient;
+  sessionName: string;
+  captureLines: number;
+}) {
+  await params.tmux.sendKey(params.sessionName, "Enter");
 
-async function dismissTrustPrompt(tmux: TmuxClient, sessionName: string) {
-  await tmux.sendKey(sessionName, "Enter");
-  await sleep(TRUST_PROMPT_SETTLE_DELAY_MS);
+  const deadline = Date.now() + TRUST_PROMPT_MAX_WAIT_MS;
+  while (Date.now() <= deadline) {
+    await sleep(TRUST_PROMPT_POLL_INTERVAL_MS);
+    const snapshot = normalizePaneText(
+      await params.tmux.capturePane(params.sessionName, params.captureLines),
+    );
+    if (!snapshot || hasTrustPrompt(snapshot)) {
+      continue;
+    }
+
+    return;
+  }
 }
 
 async function waitForPaneSubmitConfirmation(params: {
@@ -190,10 +215,77 @@ async function waitForPaneSubmitConfirmation(params: {
   }
 }
 
+async function waitForPanePasteSettlement(params: {
+  tmux: TmuxClient;
+  sessionName: string;
+  baseline: TmuxPaneState;
+  text: string;
+  minDelayMs: number;
+}) {
+  await sleep(params.minDelayMs);
+
+  let currentState = await params.tmux.getPaneState(params.sessionName);
+  let sawChange = hasPaneStateChanged(params.baseline, currentState);
+  let lastChangeAt = Date.now();
+  const deadline =
+    Date.now() +
+    (shouldWaitForVisiblePaste(params.text)
+      ? PASTE_SETTLE_MULTILINE_MAX_WAIT_MS
+      : PASTE_SETTLE_SINGLE_LINE_MAX_WAIT_MS);
+
+  while (true) {
+    if (sawChange && Date.now() - lastChangeAt >= PASTE_SETTLE_QUIET_WINDOW_MS) {
+      return currentState;
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      return currentState;
+    }
+
+    await sleep(Math.min(PASTE_SETTLE_POLL_INTERVAL_MS, remainingMs));
+    const nextState = await params.tmux.getPaneState(params.sessionName);
+    if (!arePaneStatesEqual(currentState, nextState)) {
+      currentState = nextState;
+      if (hasPaneStateChanged(params.baseline, currentState)) {
+        sawChange = true;
+      }
+      lastChangeAt = Date.now();
+    }
+  }
+}
+
 function hasPaneStateChanged(left: TmuxPaneState, right: TmuxPaneState) {
   return (
     left.cursorX !== right.cursorX ||
     left.cursorY !== right.cursorY ||
     left.historySize !== right.historySize
   );
+}
+
+function arePaneStatesEqual(left: TmuxPaneState, right: TmuxPaneState) {
+  return (
+    left.cursorX === right.cursorX &&
+    left.cursorY === right.cursorY &&
+    left.historySize === right.historySize
+  );
+}
+
+function looksLikeClaudeTrustPrompt(snapshot: string) {
+  return (
+    snapshot.includes("Quick safety check:") &&
+    snapshot.includes("Yes, I trust this folder")
+  ) || snapshot.includes("Enter to confirm · Esc to cancel");
+}
+
+function hasTrustPrompt(snapshot: string) {
+  return (
+    snapshot.includes("Do you trust the contents of this directory?") ||
+    snapshot.includes("Press enter to continue") ||
+    looksLikeClaudeTrustPrompt(snapshot)
+  );
+}
+
+function shouldWaitForVisiblePaste(text: string) {
+  return text.includes("\n");
 }

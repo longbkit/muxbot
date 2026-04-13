@@ -45,6 +45,14 @@ The fix must respect the project requirement that stability and speed are both f
 - current implementation work in this slice now uses tmux bracketed paste for literal prompt injection instead of raw `send-keys -l`
 - current implementation work now treats submit as tentatively incomplete until pane state changes after `Enter`
 - current implementation work retries only `Enter` once when pane state stays unchanged inside a short confirmation budget, instead of re-sending the whole prompt
+- live Claude tracing on April 13, 2026 confirmed two concrete runner-side gaps:
+  - Claude trust prompt startup text had drifted away from the older Codex-style trust prompt detection, so a fresh Claude workspace could still be blocked even when higher layers thought startup had finished
+  - multiline prompt paste could become visibly settled only after the fixed `promptSubmitDelayMs`, so the first `Enter` could be sent too early and get ignored
+- after the latest fix, a new real-world failure was still observed at least once, so the current strategy is improved but not yet stable enough to be treated as closed
+- the next validation pass needs to cover cases that may stress the current confirmation heuristic more than the traced Slack Claude slice did:
+  - prompts with embedded newlines
+  - longer prompt bodies
+  - broader pane-state inspection to understand what changed, or failed to change, when submit confirmation still misses reality
 
 ## Non-Goals
 
@@ -56,6 +64,8 @@ The fix must respect the project requirement that stability and speed are both f
 
 - [ ] capture a reproducible Telegram case with timing notes and runtime logs
 - [ ] compare Telegram and Slack timing around `tmux-submit-start`, `tmux-submit-complete`, and first meaningful output
+- [ ] add explicit validation cases for prompts with embedded newlines and longer prompt bodies
+- [ ] widen submit-confirmation inspection enough to explain which pane signals make the current heuristic fail in the new reported case
 - [x] verify whether tmux key injection and final Enter submission are actually reaching the pane in the failure case
 - [x] define a truthful post-submit observation rule that distinguishes "submitted and running" from "keystrokes attempted"
 - [x] fix the reliability gap without increasing duplicate-submit risk
@@ -65,7 +75,7 @@ The fix must respect the project requirement that stability and speed are both f
 ## Implementation Notes
 
 - prompt text injection now uses tmux buffer paste with bracketed paste mode so multiline and long prompt delivery is less fragile than raw literal key injection
-- after paste settles for the configured `promptSubmitDelayMs`, clisbot captures a lightweight tmux pane state based on cursor position and history size
+- after the configured minimum `promptSubmitDelayMs`, clisbot now waits for visible paste settlement before locking the pre-submit pane baseline
 - clisbot then sends `Enter` and waits only a short confirmation window for pane state to change
 - if pane state still does not change, clisbot retries only `Enter` once
 - if pane state remains unchanged after that second `Enter`, clisbot throws an explicit submit-unconfirmed error instead of pretending the prompt was submitted
@@ -76,10 +86,17 @@ The fix must respect the project requirement that stability and speed are both f
   - no duplicate prompt body resend
   - no open-ended polling
   - only one extra `Enter`
+- this strategy is still provisional:
+  - it has reduced the traced failure modes
+  - but it has not yet proven stable across all real prompt shapes, especially multiline or longer prompt bodies
+- Claude-specific hardening now also:
+  - recognizes the current Claude trust prompt shape such as `Quick safety check:` and `Enter to confirm · Esc to cancel`
+  - waits for visible multiline paste settlement before sending the final `Enter`, so `Enter` is not fired while Claude is still folding the bracketed paste block into its UI
+- `capture.mode: "status-command"` time budgets now start after the status command submit completes, not before, so the capture timeout still measures post-submit observation instead of being partially consumed by submit latency itself
 
 ## Exit Criteria
 
-- a normal routed Telegram message reliably causes prompt execution on the first try under the tested failure scenario
+- a normal routed Telegram message reliably causes prompt execution on the first try under the tested failure scenarios, including multiline and longer prompt cases that currently still need deeper validation
 - the same fix does not regress Slack behavior
 - `clisbot` does not silently double-submit prompts just to look responsive
 - timing and status signals remain truthful enough for operators to debug real failures

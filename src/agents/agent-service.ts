@@ -72,6 +72,7 @@ export class AgentService {
   private readonly sessionState: AgentSessionState;
   private runnerSessions: RunnerSessionService;
   private activeRuns: ActiveRunManager;
+  private stopping = false;
   private cleanupTimer?: ReturnType<typeof setInterval>;
   private loopTimers = new Set<ReturnType<typeof setTimeout>>();
   private intervalLoops = new Map<string, ManagedIntervalLoop>();
@@ -131,6 +132,7 @@ export class AgentService {
   }
 
   async stop() {
+    this.stopping = true;
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = undefined;
@@ -145,6 +147,7 @@ export class AgentService {
       clearTimeout(timer);
     }
     this.loopTimers.clear();
+    await this.activeRuns.stop();
   }
 
   async cleanupStaleSessions() {
@@ -573,6 +576,9 @@ export class AgentService {
       },
     );
     void result.catch((error) => {
+      if (this.shouldSuppressLoopShutdownError(error)) {
+        return;
+      }
       console.error("loop execution failed", error);
     });
 
@@ -602,6 +608,9 @@ export class AgentService {
       }
       current.timer = undefined;
       void this.runIntervalLoopIteration(loopId).catch((error) => {
+        if (this.shouldSuppressLoopShutdownError(error)) {
+          return;
+        }
         console.error("loop execution failed", error);
       });
     }, delayMs);
@@ -622,6 +631,16 @@ export class AgentService {
     }
     managed.loop = nextLoopState;
     return true;
+  }
+
+  private shouldSuppressLoopShutdownError(error: unknown) {
+    if (!this.stopping) {
+      return false;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    return /Runtime stopped before the active run finished startup|Runtime is stopping and cannot accept a new prompt/i
+      .test(message);
   }
 
   private computeNextManagedLoopRunAtMs(loop: StoredIntervalLoop, nowMs: number) {

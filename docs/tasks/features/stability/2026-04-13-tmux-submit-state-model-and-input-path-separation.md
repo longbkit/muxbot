@@ -27,6 +27,7 @@ Different input categories have different semantics:
 - submitting a fresh prompt into an idle session
 - steering or injecting text into an already-active run
 - slash-style control input used for session identity capture or status checks
+- prompt shapes that may stress different confirmation behavior, such as multiline paste or long prompt bodies
 
 Keeping one implicit confirmation rule across those paths risks hidden side effects later, especially if a terminal redraw, prompt UI change, or active runner state makes pane-state movement ambiguous.
 
@@ -41,6 +42,7 @@ Keeping one implicit confirmation rule across those paths risks hidden side effe
   - input delivered
   - enter confirmed
   - first run signal observed
+- decide which pane-region or pane-state signals should be sampled for each path, instead of relying on one narrow confirmation window everywhere
 - document which failures should retry, which should fail fast, and which should stay observer-only
 - keep the latency budget tight and avoid hidden retries or duplicate prompt delivery
 
@@ -55,6 +57,7 @@ Keeping one implicit confirmation rule across those paths risks hidden side effe
 - `clisbot` has explicit, path-specific submit semantics instead of one shared implicit rule
 - idle prompt delivery and active steering delivery can evolve independently without hidden coupling
 - operators can reason about submit truthfulness from logs and docs without guessing which fallback rule fired
+- submit confirmation is robust enough to explain failures on multiline or long prompts instead of only reporting that the narrow heuristic saw no change
 
 ## Related Docs
 

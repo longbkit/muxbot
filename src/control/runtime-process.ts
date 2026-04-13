@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
-import { closeSync, existsSync, openSync, rmSync, statSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { kill } from "node:process";
 import { loadConfig } from "../config/load-config.ts";
@@ -85,6 +85,22 @@ type WaitForStartResult =
       childPid: number;
     };
 
+export type ProcessLiveness = "running" | "zombie" | "missing";
+
+type ProcessLivenessDependencies = {
+  platform: NodeJS.Platform;
+  signalCheck: (pid: number) => boolean;
+  readLinuxProcStat: (pid: number) => ProcessLiveness | "unknown";
+  readPsStat: (pid: number) => ProcessLiveness | "unknown";
+};
+
+const DEFAULT_PROCESS_LIVENESS_DEPENDENCIES: ProcessLivenessDependencies = {
+  platform: process.platform,
+  signalCheck: signalCheckProcess,
+  readLinuxProcStat: readLinuxProcStatLiveness,
+  readPsStat: readPsStatLiveness,
+};
+
 export function readRuntimePid(pidPath?: string) {
   const expandedPidPath = resolvePidPath(pidPath);
   if (!existsSync(expandedPidPath)) {
@@ -99,12 +115,37 @@ export function readRuntimePid(pidPath?: string) {
 }
 
 export function isProcessRunning(pid: number) {
-  try {
-    kill(pid, 0);
-    return true;
-  } catch {
-    return false;
+  return getProcessLiveness(pid) === "running";
+}
+
+export function getProcessLiveness(
+  pid: number,
+  dependencies: Partial<ProcessLivenessDependencies> = {},
+): ProcessLiveness {
+  const resolvedDependencies = {
+    ...DEFAULT_PROCESS_LIVENESS_DEPENDENCIES,
+    ...dependencies,
+  } satisfies ProcessLivenessDependencies;
+
+  if (!resolvedDependencies.signalCheck(pid)) {
+    return "missing";
   }
+
+  if (resolvedDependencies.platform === "win32") {
+    return "running";
+  }
+
+  const linuxState = resolvedDependencies.readLinuxProcStat(pid);
+  if (linuxState !== "unknown") {
+    return linuxState;
+  }
+
+  const psState = resolvedDependencies.readPsStat(pid);
+  if (psState !== "unknown") {
+    return psState;
+  }
+
+  return "running";
 }
 
 export async function ensureConfigFile(
@@ -220,18 +261,31 @@ export async function stopDetachedRuntime(params: {
   hard?: boolean;
   configPath?: string;
   runtimeCredentialsPath?: string;
-}) {
+}, dependencies: {
+  processLiveness?: (pid: number) => ProcessLiveness;
+  sendSignal?: typeof kill;
+  sleep?: typeof sleep;
+} = {}) {
   const pidPath = resolvePidPath(params.pidPath);
   const runtimeCredentialsPath = resolveRuntimeCredentialsPath(params.runtimeCredentialsPath);
   const existingPid = await readRuntimePid(pidPath);
   let stopped = false;
+  const processLiveness = dependencies.processLiveness ?? getProcessLiveness;
+  const sendSignal = dependencies.sendSignal ?? kill;
+  const sleepFn = dependencies.sleep ?? sleep;
 
-  if (existingPid && isProcessRunning(existingPid)) {
-    kill(existingPid, "SIGTERM");
-    const exited = await waitForProcessExit(existingPid, STOP_WAIT_TIMEOUT_MS);
+  const existingLiveness = existingPid ? processLiveness(existingPid) : "missing";
+  if (existingPid && existingLiveness === "running") {
+    sendSignal(existingPid, "SIGTERM");
+    const exited = await waitForProcessExit(existingPid, STOP_WAIT_TIMEOUT_MS, {
+      processLiveness,
+      sleep: sleepFn,
+    });
     if (!exited) {
       throw new Error(`clisbot did not stop within ${STOP_WAIT_TIMEOUT_MS}ms`);
     }
+    stopped = true;
+  } else if (existingPid && existingLiveness === "zombie") {
     stopped = true;
   }
 
@@ -288,10 +342,11 @@ export async function getRuntimeStatus(params: {
   const pidPath = resolvePidPath(params.pidPath);
   const logPath = resolveLogPath(params.logPath);
   const pid = await readRuntimePid(pidPath);
+  const liveness = pid ? getProcessLiveness(pid) : "missing";
 
   return {
-    running: Boolean(pid && isProcessRunning(pid)),
-    pid: pid && isProcessRunning(pid) ? pid : undefined,
+    running: liveness === "running",
+    pid: liveness === "running" && pid ? pid : undefined,
     configPath,
     pidPath,
     logPath,
@@ -377,15 +432,24 @@ async function waitForStart(params: {
   };
 }
 
-async function waitForProcessExit(pid: number, timeoutMs: number) {
+async function waitForProcessExit(
+  pid: number,
+  timeoutMs: number,
+  dependencies: {
+    processLiveness?: (pid: number) => ProcessLiveness;
+    sleep?: typeof sleep;
+  } = {},
+) {
+  const processLiveness = dependencies.processLiveness ?? getProcessLiveness;
+  const sleepFn = dependencies.sleep ?? sleep;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (!isProcessRunning(pid)) {
+    if (processLiveness(pid) !== "running") {
       return true;
     }
-    await sleep(PROCESS_POLL_INTERVAL_MS);
+    await sleepFn(PROCESS_POLL_INTERVAL_MS);
   }
-  return !isProcessRunning(pid);
+  return processLiveness(pid) !== "running";
 }
 
 async function cleanupFailedStartChild(
@@ -449,4 +513,71 @@ async function resolveTmuxSocketPath(configPath?: string) {
   }
 
   return getDefaultTmuxSocketPath();
+}
+
+function signalCheckProcess(pid: number) {
+  try {
+    kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readLinuxProcStatLiveness(pid: number): ProcessLiveness | "unknown" {
+  if (process.platform !== "linux") {
+    return "unknown";
+  }
+
+  try {
+    const raw = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const state = extractLinuxProcState(raw);
+    if (!state) {
+      return "unknown";
+    }
+    return state.includes("Z") ? "zombie" : "running";
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      return "missing";
+    }
+    return "unknown";
+  }
+}
+
+function readPsStatLiveness(pid: number): ProcessLiveness | "unknown" {
+  try {
+    const raw = execFileSync("ps", ["-o", "stat=", "-p", String(pid)], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (!raw) {
+      return "missing";
+    }
+    return raw.includes("Z") ? "zombie" : "running";
+  } catch (error) {
+    const commandError = error as NodeJS.ErrnoException & { status?: number | null };
+    if (commandError.code === "ENOENT") {
+      return "unknown";
+    }
+    if (commandError.status === 1) {
+      return "missing";
+    }
+    return "unknown";
+  }
+}
+
+function extractLinuxProcState(raw: string) {
+  const closingParenIndex = raw.lastIndexOf(")");
+  if (closingParenIndex < 0) {
+    return null;
+  }
+
+  const remainder = raw.slice(closingParenIndex + 1).trim();
+  if (!remainder) {
+    return null;
+  }
+
+  const [state] = remainder.split(/\s+/, 1);
+  return state?.trim() || null;
 }

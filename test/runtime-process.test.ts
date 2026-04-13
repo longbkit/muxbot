@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
+  getProcessLiveness,
   getRuntimeStatus,
+  type ProcessLiveness,
   readRuntimeLog,
   readRuntimePid,
   stopDetachedRuntime,
@@ -212,6 +214,41 @@ describe("runtime path defaults", () => {
   });
 });
 
+describe("getProcessLiveness", () => {
+  test("treats zombie processes as not running on posix", () => {
+    const liveness = getProcessLiveness(12345, {
+      platform: "linux",
+      signalCheck: () => true,
+      readLinuxProcStat: () => "zombie",
+      readPsStat: () => "unknown",
+    });
+
+    expect(liveness).toBe("zombie");
+  });
+
+  test("falls back to ps state when linux proc state is unavailable", () => {
+    const liveness = getProcessLiveness(12345, {
+      platform: "darwin",
+      signalCheck: () => true,
+      readLinuxProcStat: () => "unknown",
+      readPsStat: () => "running",
+    });
+
+    expect(liveness).toBe("running");
+  });
+
+  test("returns missing when the pid no longer exists", () => {
+    const liveness = getProcessLiveness(12345, {
+      platform: "linux",
+      signalCheck: () => false,
+      readLinuxProcStat: () => "running",
+      readPsStat: () => "running",
+    });
+
+    expect(liveness).toBe("missing");
+  });
+});
+
 describe("stopDetachedRuntime", () => {
   test("deactivates persisted mem accounts in config even when the runtime is already gone", async () => {
     const dir = createTempDir();
@@ -227,5 +264,71 @@ describe("stopDetachedRuntime", () => {
     const updated = JSON.parse(await Bun.file(configPath).text());
     expect(updated.channels.telegram.enabled).toBe(false);
     expect(updated.channels.telegram.accounts.default.enabled).toBe(false);
+  });
+
+  test("treats a zombie pid as already stopped and still cleans up state", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "clisbot.json");
+    const pidPath = join(dir, "clisbot.pid");
+    const runtimeCredentialsPath = join(dir, "state", "runtime-credentials.json");
+    writeFileSync(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`);
+    writeFileSync(pidPath, "424242\n");
+    mkdirSync(join(dir, "state"), { recursive: true });
+    writeFileSync(runtimeCredentialsPath, "{\n  \"telegram\": \"token\"\n}\n");
+    const signals: Array<{ pid: number; signal: NodeJS.Signals }> = [];
+
+    const result = await stopDetachedRuntime(
+      {
+        configPath,
+        pidPath,
+        runtimeCredentialsPath,
+      },
+      {
+        processLiveness: () => "zombie",
+        sendSignal: ((pid: number, signal: NodeJS.Signals) => {
+          signals.push({ pid, signal });
+          return true;
+        }) as typeof process.kill,
+        sleep: async () => undefined,
+      },
+    );
+
+    expect(result.stopped).toBe(true);
+    expect(signals).toEqual([]);
+    expect(await readRuntimePid(pidPath)).toBeNull();
+    expect(existsSync(runtimeCredentialsPath)).toBe(false);
+    const updated = JSON.parse(await Bun.file(configPath).text());
+    expect(updated.channels.telegram.enabled).toBe(false);
+    expect(updated.channels.telegram.accounts.default.enabled).toBe(false);
+  });
+
+  test("accepts a post-sigterm zombie transition as a clean stop", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "clisbot.json");
+    const pidPath = join(dir, "clisbot.pid");
+    writeFileSync(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`);
+    writeFileSync(pidPath, "424242\n");
+
+    const livenessStates: ProcessLiveness[] = ["running", "zombie"];
+    const signals: Array<{ pid: number; signal: NodeJS.Signals }> = [];
+
+    const result = await stopDetachedRuntime(
+      {
+        configPath,
+        pidPath,
+        runtimeCredentialsPath: join(dir, "state", "runtime-credentials.json"),
+      },
+      {
+        processLiveness: () => livenessStates.shift() ?? "zombie",
+        sendSignal: ((pid: number, signal: NodeJS.Signals) => {
+          signals.push({ pid, signal });
+          return true;
+        }) as typeof process.kill,
+        sleep: async () => undefined,
+      },
+    );
+
+    expect(result.stopped).toBe(true);
+    expect(signals).toEqual([{ pid: 424242, signal: "SIGTERM" }]);
   });
 });

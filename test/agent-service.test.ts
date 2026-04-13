@@ -22,6 +22,7 @@ type FakeSession = {
   longRunning: boolean;
   longRunningStep: number;
   trustPromptOnCapture?: number;
+  trustPromptVariant?: "codex" | "claude";
   ignoreNextEnter?: boolean;
 };
 
@@ -34,6 +35,7 @@ class FakeTmuxClient {
   private readonly duplicateOnNewSession = new Set<string>();
   private serverRunning = true;
   private nextTrustPromptCaptureCount: number | null = null;
+  private nextTrustPromptVariant: "codex" | "claude" = "codex";
   private ignoreNextEnterSessionNames = new Set<string>();
 
   markInvalidResumeSessionId(sessionId: string) {
@@ -56,8 +58,12 @@ class FakeTmuxClient {
     this.serverRunning = value;
   }
 
-  setTrustPromptOnNextSessionCapture(captureCount: number) {
+  setTrustPromptOnNextSessionCapture(
+    captureCount: number,
+    variant: "codex" | "claude" = "codex",
+  ) {
     this.nextTrustPromptCaptureCount = captureCount;
+    this.nextTrustPromptVariant = variant;
   }
 
   ignoreNextEnter(sessionName: string) {
@@ -95,9 +101,11 @@ class FakeTmuxClient {
         longRunning: false,
         longRunningStep: 0,
         trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
+        trustPromptVariant: this.nextTrustPromptVariant,
         ignoreNextEnter: this.ignoreNextEnterSessionNames.delete(params.sessionName),
       });
       this.nextTrustPromptCaptureCount = null;
+      this.nextTrustPromptVariant = "codex";
       throw new Error(`duplicate session: ${params.sessionName}`);
     }
     if (
@@ -117,9 +125,11 @@ class FakeTmuxClient {
       longRunning: false,
       longRunningStep: 0,
       trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
+      trustPromptVariant: this.nextTrustPromptVariant,
       ignoreNextEnter: this.ignoreNextEnterSessionNames.delete(params.sessionName),
     });
     this.nextTrustPromptCaptureCount = null;
+    this.nextTrustPromptVariant = "codex";
     this.serverRunning = true;
   }
 
@@ -136,7 +146,8 @@ class FakeTmuxClient {
     const session = this.requireSession(sessionName);
     if (
       session.snapshot.includes("Do you trust the contents of this directory?") ||
-      session.snapshot.includes("Press enter to continue")
+      session.snapshot.includes("Press enter to continue") ||
+      session.snapshot.includes("Enter to confirm · Esc to cancel")
     ) {
       session.snapshot = `READY ${session.sessionId}`;
       session.cursorX = session.snapshot.length;
@@ -184,7 +195,14 @@ class FakeTmuxClient {
     if (session.trustPromptOnCapture != null) {
       if (session.trustPromptOnCapture <= 0) {
         session.snapshot =
-          "Do you trust the contents of this directory?\nPress enter to continue";
+          session.trustPromptVariant === "claude"
+            ? [
+                "Quick safety check:",
+                "❯ 1. Yes, I trust this folder",
+                "  2. No, exit",
+                "Enter to confirm · Esc to cancel",
+              ].join("\n")
+            : "Do you trust the contents of this directory?\nPress enter to continue";
         session.trustPromptOnCapture = undefined;
       } else {
         session.trustPromptOnCapture -= 1;
@@ -808,6 +826,69 @@ describe("AgentService session identity", () => {
         onUpdate: () => undefined,
       }).result;
       expect(result.snapshot).not.toContain("Do you trust the contents of this directory?");
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("waits for a delayed Claude trust prompt on first startup", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c123:thread:1",
+      };
+
+      fakeTmux.setTrustPromptOnNextSessionCapture(1, "claude");
+
+      const result = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(result.snapshot).not.toContain("Quick safety check:");
+      expect(result.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
       expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -1557,6 +1638,78 @@ describe("AgentService session identity", () => {
       }).result.catch((error) => error);
       expect(second).toBeInstanceOf(ActiveRunInProgressError);
       await recoveredService.stop();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("clears persisted active run state on graceful stop", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              updateIntervalMs: 5,
+              idleTimeoutMs: 5000,
+              noOutputTimeoutMs: 5000,
+              maxRuntimeSec: 1,
+            },
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c8:thread:903.1003",
+      };
+
+      const first = await service.enqueuePrompt(target, "stream-forever", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(first.status).toBe("detached");
+      expect(readSessionEntry(storePath, target.sessionKey)?.runtime?.state).toBe("detached");
+      expect((await service.listActiveSessionRuntimes()).length).toBe(1);
+
+      await service.stop();
+
+      expect(readSessionEntry(storePath, target.sessionKey)?.runtime?.state).toBe("idle");
+      expect(await service.listActiveSessionRuntimes()).toEqual([]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

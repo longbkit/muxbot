@@ -135,6 +135,62 @@ describe("tmux runner latency behavior", () => {
     expect(enterCount).toBe(2);
   });
 
+  test("submitTmuxSessionInput waits for multiline paste to settle before Enter", async () => {
+    let pastePolls = 0;
+    let enterCount = 0;
+    let pasteSettled = false;
+    let state = {
+      cursorX: 2,
+      cursorY: 13,
+      historySize: 0,
+    };
+
+    const fakeTmux = {
+      async sendLiteral() {
+        pastePolls = 0;
+        pasteSettled = false;
+      },
+      async sendKey() {
+        enterCount += 1;
+        if (!pasteSettled) {
+          return;
+        }
+        state = {
+          cursorX: 2,
+          cursorY: 19,
+          historySize: 8,
+        };
+      },
+      async getPaneState() {
+        if (!pasteSettled) {
+          pastePolls += 1;
+          if (pastePolls >= 3) {
+            pasteSettled = true;
+            state = {
+              cursorX: 27,
+              cursorY: 13,
+              historySize: 0,
+            };
+          }
+        }
+        return state;
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      submitTmuxSessionInput({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        text: "[clisbot steering message]\nReply with exactly PONG and nothing else.",
+        promptSubmitDelayMs: 1,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(enterCount).toBe(1);
+    expect(pasteSettled).toBe(true);
+    expect(state.historySize).toBe(8);
+  });
+
   test("submitTmuxSessionInput fails when pane state never confirms submit", async () => {
     const fakeTmux = {
       async sendLiteral() {
