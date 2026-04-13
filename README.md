@@ -22,11 +22,10 @@ Strong vendor investment in security and safety does not make frontier agentic C
 
 ## Why clisbot
 
-- Optimized for single subscription-backed usage with tools like Codex CLI and Claude CLI, so one strong CLI can cover both agentic AI assistant work and agentic engineering or coding work without forcing you into separate products or extra model spend.
-- Reuses the native CLI tools you already know and subscribe to, such as Claude Code, Codex, and Gemini CLI, then extends them across coding, chatbot, and non-dev workflows without forcing you to switch tools.
+- Reuses the native CLI tools you already know and subscribe to, such as Claude Code, Codex, and Gemini CLI, then extends them across coding, chatbot, and non-dev workflows without forcing you to switch tools or pay for separate products when one subscription-backed CLI can already cover both agentic AI assistant work and agentic engineering or coding work.
 - Compatible with OpenClaw-style configuration, commands and some concepts, agent personality for bot usecases, and workspace bootstrap templates, help Openclaw users to quickly get started.
 - Strong chat-first communication support in Slack and Telegram, with follow-up controls that keep conversations natural when useful and quiet when teams need the bot to stay out of the way.
-- Team-first by design, with `AGENTS` and `MEMORY` context guidance optimized for shared team reality: team members, projects, ongoing work, and timeline continuity, instead of defaulting to the more personal context shape common in OpenClaw.
+- Team-first by design, with `AGENTS`, `USER`, and `MEMORY` context guidance optimized for shared team reality: team members, projects, ongoing work, and timeline continuity, instead of defaulting to the more personal context shape common in OpenClaw.
 - Useful as a bot for coding, operations, teamwork, and general work in team environment, or on the go
 - Fast operator shortcuts for shell execution: `!<command>` or `/bash <command>`, plus slash-prefix mappings such as `\bash` or `::bash` when Slack slash-command handling is incompatible. Turns Slack / Telegram into a terminal interface on the go.
 - The proof of concept already shows high potential beyond internal coding workflows, including customer chatbot use cases once messaging MCP or CLI-based skills let the agent send messages proactively in a cleaner way.
