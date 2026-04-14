@@ -11,6 +11,7 @@ export function buildAgentPromptText(params: {
   text: string;
   identity: ChannelInteractionIdentity;
   config: ChannelAgentPromptConfig;
+  cliTool?: "codex" | "claude" | "gemini";
   responseMode?: "capture-pane" | "message-tool";
 }) {
   if (!params.config.enabled) {
@@ -24,6 +25,7 @@ export function buildAgentPromptText(params: {
 function renderAgentPromptInstruction(params: {
   identity: ChannelInteractionIdentity;
   config: ChannelAgentPromptConfig;
+  cliTool?: "codex" | "claude" | "gemini";
   responseMode?: "capture-pane" | "message-tool";
 }) {
   const messageToolMode = (params.responseMode ?? "message-tool") === "message-tool";
@@ -32,7 +34,7 @@ function renderAgentPromptInstruction(params: {
     "",
     "You are operating inside clisbot.",
     messageToolMode
-      ? "channel auto-delivery is disabled for this conversation; send user-facing progress updates and the final response yourself with the reply command"
+      ? "To send a user-visible progress update or final reply, use the following CLI command:"
       : "channel auto-delivery remains enabled for this conversation; do not send user-facing progress updates or the final response with clisbot message send",
   ];
 
@@ -42,15 +44,16 @@ function renderAgentPromptInstruction(params: {
       identity: params.identity,
     });
     lines.push(
-      "Use the exact command below when you need to send progress updates, media attachments, or the final response back to the user.",
-      "reply command:",
       replyCommand,
-      `progress updates: at most ${params.config.maxProgressMessages}`,
+      "When replying to the user:",
+      "- put the user-facing message inside the --message body of that command",
+      "- use that command to send progress updates and the final reply back to the conversation",
+      `- send at most ${params.config.maxProgressMessages} progress updates`,
       params.config.requireFinalResponse
-        ? "final response: send exactly 1 final user-facing response"
-        : "final response: optional",
-      "keep progress updates short and meaningful",
-      "do not send progress updates for trivial internal steps",
+        ? "- send exactly 1 final user-facing response"
+        : "- final response is optional",
+      "- keep progress updates short and meaningful",
+      "- do not send progress updates for trivial internal steps",
     );
   }
 

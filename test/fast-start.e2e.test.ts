@@ -6,6 +6,7 @@ import { getCanonicalTelegramBotTokenPath } from "../src/config/channel-credenti
 
 describe("fast start e2e", () => {
   let tempDir = "";
+  const bunExecutable = Bun.which("bun") ?? process.execPath;
 
   afterEach(() => {
     if (tempDir) {
@@ -19,7 +20,7 @@ describe("fast start e2e", () => {
     const configPath = join(tempDir, "clisbot.json");
 
     const subprocess = Bun.spawn([
-      "bun",
+      bunExecutable,
       "src/main.ts",
       "init",
       "--cli",
@@ -30,7 +31,7 @@ describe("fast start e2e", () => {
       "123456:telegram-dev-token",
       "--persist",
     ], {
-      cwd: "/home/node/projects/clisbot",
+      cwd: process.cwd(),
       env: {
         ...process.env,
         CLISBOT_HOME: tempDir,
@@ -56,6 +57,67 @@ describe("fast start e2e", () => {
       CLISBOT_HOME: tempDir,
     }), "utf8").trim()).toBe("123456:telegram-dev-token");
     expect(stdout).toContain("Persisted telegram/default");
+  });
+
+  test("init rejects literal telegram tokens unless --persist is passed", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-fast-start-e2e-"));
+    const configPath = join(tempDir, "clisbot.json");
+
+    const subprocess = Bun.spawn([
+      bunExecutable,
+      "src/main.ts",
+      "init",
+      "--cli",
+      "codex",
+      "--bot-type",
+      "personal",
+      "--telegram-bot-token",
+      "123456:telegram-dev-token",
+    ], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        CLISBOT_HOME: tempDir,
+        CLISBOT_CONFIG_PATH: configPath,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const exitCode = await subprocess.exited;
+    const stderr = await new Response(subprocess.stderr).text();
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("`clisbot init` with literal channel tokens requires --persist.");
+  });
+
+  test("start repeats FAILED at the end when long first-run guidance is rendered", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-fast-start-e2e-"));
+    const configPath = join(tempDir, "clisbot.json");
+
+    const subprocess = Bun.spawn([
+      bunExecutable,
+      "src/main.ts",
+      "start",
+    ], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        CLISBOT_HOME: tempDir,
+        CLISBOT_CONFIG_PATH: configPath,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const exitCode = await subprocess.exited;
+    const stderr = await new Response(subprocess.stderr).text();
+    const stdout = await new Response(subprocess.stdout).text();
+    const trimmed = stdout.trimEnd();
+
+    expect(exitCode).toBe(0);
+    expect(stderr.trim()).toBe("");
+    expect(trimmed.endsWith("+---------+\n| FAILED  |\n+---------+")).toBe(true);
   });
 
   test("stop disables stale mem-backed accounts in config", async () => {
@@ -178,11 +240,11 @@ describe("fast start e2e", () => {
     }, null, 2)}\n`);
 
     const subprocess = Bun.spawn([
-      "bun",
+      bunExecutable,
       "src/main.ts",
       "stop",
     ], {
-      cwd: "/home/node/projects/clisbot",
+      cwd: process.cwd(),
       env: {
         ...process.env,
         CLISBOT_HOME: tempDir,
@@ -195,9 +257,11 @@ describe("fast start e2e", () => {
 
     const exitCode = await subprocess.exited;
     const stderr = await new Response(subprocess.stderr).text();
+    const stdout = await new Response(subprocess.stdout).text();
 
     expect(exitCode).toBe(0);
     expect(stderr.trim()).toBe("");
+    expect(stdout.trimEnd().endsWith("+---------+\n| FAILED  |\n+---------+")).toBe(true);
 
     const config = JSON.parse(readFileSync(configPath, "utf8"));
     expect(config.channels.telegram.enabled).toBe(false);

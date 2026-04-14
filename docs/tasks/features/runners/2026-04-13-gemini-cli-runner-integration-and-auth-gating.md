@@ -42,9 +42,11 @@ Implemented:
 - Gemini preset and bootstrap wiring
 - `GEMINI.md` bootstrap template support
 - startup ready pattern and timeout truthfulness
+- runner-managed first-start Gemini trust-folder dismissal during readiness polling
 - auth-blocker detection for Gemini OAuth startup and auth-recovery screens
 - `/stats session` capture and `--resume <sessionId>` reuse
 - transcript normalization coverage
+- Gemini `message-tool` prompt wording is clarified for routed reply delivery without changing the configured route default
 
 Still pending:
 

@@ -29,6 +29,7 @@ After this task:
   - `user-message`
   - `steering-message`
   - `loop-message`
+- review queue and loop prompt wording alongside the normal user and steering templates so the shipped defaults stay consistent
 - add bounded behavior modes:
   - `off`
   - `prepend-system`
@@ -192,6 +193,7 @@ Per-agent overrides:
 
 - defaults by origin are acceptable
 - `steering-message` default remains conservative
+- queue and loop wording stay minimal but still clear enough for the target CLIs
 - loop-origin wording can be tuned independently
 - editable app-level files are the right operator surface
 

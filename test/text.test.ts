@@ -312,6 +312,28 @@ Hi
     expect(cleaned).toBe("Hi");
   });
 
+  test("strips Gemini trust-screen chrome while keeping the answer", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▝▜▄     Gemini CLI v0.37.1
+
+Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.
+
+Do you trust the files in this folder?
+
+Trusting a folder allows Gemini CLI to load its local configurations, including custom commands, hooks, MCP servers, agent skills, and settings. These configurations could execute code on your behalf or change the behavior of the CLI.
+
+1. Trust folder (default)
+2. Trust parent folder (workspaces)
+3. Don't trust
+
+Trusted. Ready.
+
+Hi
+    `);
+
+    expect(cleaned).toBe("Trusted. Ready.\n\nHi");
+  });
+
   test("strips claude chrome and prompt echo while keeping the answer", () => {
     const cleaned = cleanInteractionSnapshot(`
 ╭─── Claude Code v2.1.92 ───────────────────────────────────────────────────────────────────╮

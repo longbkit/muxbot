@@ -104,7 +104,7 @@ export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTempl
   gemini: {
     command: "gemini",
     startupOptions: ["--approval-mode=yolo", "--sandbox=false"],
-    trustWorkspace: false,
+    trustWorkspace: true,
     startupDelayMs: 15_000,
     startupReadyPattern: "Type your message or @path/to/file",
     startupBlockers: [

@@ -171,7 +171,7 @@ Parser rule:
 - never persist it into `~/.clisbot/clisbot.json`
 - never echo it in status, logs, or operator remediation output
 
-This mode is intentionally convenience-first and should carry a short warning that command-line literals can leak through shell history or process inspection.
+This mode is intentionally convenience-first. The runtime accepts the literal only as launch-scoped input and does not repeat the token or persist it into config.
 
 When this mode is active, config should still make the source visible:
 

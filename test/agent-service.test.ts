@@ -23,7 +23,7 @@ type FakeSession = {
   longRunning: boolean;
   longRunningStep: number;
   trustPromptOnCapture?: number;
-  trustPromptVariant?: "codex" | "claude";
+  trustPromptVariant?: "codex" | "claude" | "gemini";
   ignoreNextEnter?: boolean;
 };
 
@@ -36,7 +36,7 @@ class FakeTmuxClient {
   private readonly duplicateOnNewSession = new Set<string>();
   private serverRunning = true;
   private nextTrustPromptCaptureCount: number | null = null;
-  private nextTrustPromptVariant: "codex" | "claude" = "codex";
+  private nextTrustPromptVariant: "codex" | "claude" | "gemini" = "codex";
   private ignoreNextEnterSessionNames = new Set<string>();
 
   markInvalidResumeSessionId(sessionId: string) {
@@ -61,7 +61,7 @@ class FakeTmuxClient {
 
   setTrustPromptOnNextSessionCapture(
     captureCount: number,
-    variant: "codex" | "claude" = "codex",
+    variant: "codex" | "claude" | "gemini" = "codex",
   ) {
     this.nextTrustPromptCaptureCount = captureCount;
     this.nextTrustPromptVariant = variant;
@@ -148,7 +148,9 @@ class FakeTmuxClient {
     if (
       session.snapshot.includes("Do you trust the contents of this directory?") ||
       session.snapshot.includes("Press enter to continue") ||
-      session.snapshot.includes("Enter to confirm · Esc to cancel")
+      session.snapshot.includes("Enter to confirm · Esc to cancel") ||
+      session.snapshot.includes("Do you trust the files in this folder?") ||
+      session.snapshot.includes("Trust folder (default)")
     ) {
       session.snapshot = `READY ${session.sessionId}`;
       session.cursorX = session.snapshot.length;
@@ -195,7 +197,7 @@ class FakeTmuxClient {
     }
     if (session.trustPromptOnCapture != null) {
       if (session.trustPromptOnCapture <= 0) {
-        session.snapshot =
+      session.snapshot =
           session.trustPromptVariant === "claude"
             ? [
                 "Quick safety check:",
@@ -203,6 +205,18 @@ class FakeTmuxClient {
                 "  2. No, exit",
                 "Enter to confirm · Esc to cancel",
               ].join("\n")
+            : session.trustPromptVariant === "gemini"
+              ? [
+                  "Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.",
+                  "",
+                  "Do you trust the files in this folder?",
+                  "",
+                  "Trusting a folder allows Gemini CLI to load its local configurations, including custom commands, hooks, MCP servers, agent skills, and settings. These configurations could execute code on your behalf or change the behavior of the CLI.",
+                  "",
+                  "1. Trust folder (default)",
+                  "2. Trust parent folder (workspaces)",
+                  "3. Don't trust",
+                ].join("\n")
             : "Do you trust the contents of this directory?\nPress enter to continue";
         session.trustPromptOnCapture = undefined;
       } else {
@@ -896,6 +910,72 @@ describe("AgentService session identity", () => {
         onUpdate: () => undefined,
       }).result;
       expect(result.snapshot).not.toContain("Quick safety check:");
+      expect(result.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("waits for a delayed Gemini trust prompt on first startup when readiness requires a ready banner", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "gemini",
+            runnerArgs: ["--approval-mode=yolo", "--sandbox=false"],
+            trustWorkspace: true,
+            startupDelayMs: 100,
+            startupReadyPattern: "READY",
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["--resume", "{sessionId}", "--approval-mode=yolo", "--sandbox=false"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:main",
+      };
+
+      fakeTmux.setTrustPromptOnNextSessionCapture(1, "gemini");
+
+      const result = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(result.snapshot).not.toContain("Do you trust the files in this folder?");
       expect(result.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
       expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
     } finally {

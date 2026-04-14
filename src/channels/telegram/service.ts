@@ -6,7 +6,7 @@ import {
 import { parseAgentCommand } from "../../agents/commands.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
 import { processChannelInteraction } from "../interaction-processing.ts";
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
 import { isTelegramSenderAllowed } from "../pairing/access.ts";
 import { buildPairingReply } from "../pairing/messages.ts";
 import {
@@ -505,10 +505,12 @@ export class TelegramPollingService {
         topicId:
           routeInfo.topicId != null ? String(routeInfo.topicId) : undefined,
       };
+      const cliTool = getAgentEntry(this.loadedConfig, routeInfo.route.agentId)?.cliTool;
       const agentPromptText = buildAgentPromptText({
         text,
         identity,
         config: this.loadedConfig.raw.channels.telegram.agentPrompt,
+        cliTool,
         responseMode: routeInfo.route.responseMode,
       });
       const timingContext = {
@@ -544,6 +546,7 @@ export class TelegramPollingService {
                 text: nextText,
                 identity,
                 config: this.loadedConfig.raw.channels.telegram.agentPrompt,
+                cliTool,
                 responseMode: routeInfo.route.responseMode,
               }),
             route: routeInfo.route,

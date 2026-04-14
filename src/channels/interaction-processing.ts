@@ -307,12 +307,14 @@ function buildChannelObserverId(identity: ChannelInteractionIdentity) {
 
 function buildSteeringMessage(text: string) {
   return [
+    "<system>",
+    "A new user message arrived while you were still working.",
+    "Adjust your current work if needed and continue.",
+    "</system>",
     "",
-    "[clisbot steering message]",
-    "A new user message arrived while you were already processing the current run.",
-    "Adjust the current work if needed and continue.",
-    "",
+    "<user>",
     text,
+    "</user>",
   ].join("\n");
 }
 

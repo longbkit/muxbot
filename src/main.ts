@@ -4,7 +4,11 @@ import { runPairingCli } from "./channels/pairing/cli.ts";
 import { addAgentToEditableConfig, runAgentsCli } from "./control/agents-cli.ts";
 import { runAccountsCli } from "./control/accounts-cli.ts";
 import { runChannelsCli } from "./control/channels-cli.ts";
-import { parseBootstrapFlags, type ParsedBootstrapFlags } from "./control/channel-bootstrap-flags.ts";
+import {
+  hasLiteralBootstrapCredentials,
+  parseBootstrapFlags,
+  type ParsedBootstrapFlags,
+} from "./control/channel-bootstrap-flags.ts";
 import { runLoopsCli } from "./control/loops-cli.ts";
 import { runMessageCli } from "./control/message-cli.ts";
 import { RuntimeSupervisor } from "./control/runtime-supervisor.ts";
@@ -74,6 +78,10 @@ function printCommandOutcomeBanner(outcome: "success" | "failure") {
   console.log("");
 }
 
+function printCommandOutcomeFooter(outcome: "success" | "failure") {
+  printCommandOutcomeBanner(outcome);
+}
+
 function getPrimaryWorkspacePath(
   summary: Awaited<ReturnType<typeof getRuntimeOperatorSummary>>,
 ) {
@@ -109,10 +117,13 @@ function printMissingBootstrapOptions(commandName: "init" | "start") {
   for (const line of renderOperatorHelpLines()) {
     console.log(line);
   }
+  if (commandName === "start") {
+    printCommandOutcomeFooter("failure");
+  }
 }
 
 function hasLiteralMemCredentials(flags: ParsedBootstrapFlags) {
-  return flags.literalWarnings.length > 0;
+  return hasLiteralBootstrapCredentials(flags);
 }
 
 async function prepareBootstrapState(
@@ -136,6 +147,9 @@ async function prepareBootstrapState(
     }
     for (const line of renderMissingTokenWarningLines()) {
       console.log(line);
+    }
+    if (commandName === "start") {
+      printCommandOutcomeFooter("failure");
     }
     return null;
   }
@@ -233,6 +247,7 @@ async function ensureDefaultAgentBootstrap(
       for (const line of renderOperatorHelpLines()) {
         console.log(line);
       }
+      printCommandOutcomeFooter("failure");
       return false;
     }
   }
@@ -324,14 +339,17 @@ async function serveForeground() {
 async function start(args: string[] = []) {
   const runtimeStatus = await getRuntimeStatus();
   const bootstrapFlags = parseBootstrapFlags(args);
-  if (runtimeStatus.running && hasLiteralMemCredentials(bootstrapFlags) && !bootstrapFlags.persist) {
-    throw new Error(
-      "Raw channel token input on `clisbot start` requires the runtime to be stopped first, unless you also pass --persist.",
-    );
+  const restartForLiteralBootstrap =
+    runtimeStatus.running && hasLiteralMemCredentials(bootstrapFlags);
+
+  if (restartForLiteralBootstrap) {
+    await stopDetachedRuntime({
+      configPath: runtimeStatus.configPath,
+    });
   }
 
   const state = await prepareBootstrapState(args, "start", {
-    runtimeRunning: runtimeStatus.running,
+    runtimeRunning: restartForLiteralBootstrap ? false : runtimeStatus.running,
     bootstrapFlags,
   });
   if (!state) {
@@ -353,13 +371,14 @@ async function start(args: string[] = []) {
   for (const line of renderConfiguredChannelTokenStatusLines(state.config, runtimeMemEnv)) {
     console.log(line);
   }
-  if (!runtimeStatus.running) {
+  if (restartForLiteralBootstrap || !runtimeStatus.running) {
     const tokenIssueLines = renderConfiguredChannelTokenIssueLines(state.config, runtimeMemEnv);
     for (const line of tokenIssueLines) {
       console.log(line);
     }
     if (tokenIssueLines.length > 0) {
       printCommandOutcomeBanner("failure");
+      printCommandOutcomeFooter("failure");
       return;
     }
   }
@@ -378,7 +397,7 @@ async function start(args: string[] = []) {
   const result = await startDetachedRuntime({
     scriptPath: fileURLToPath(import.meta.url),
     configPath: state.configResult.configPath,
-    extraEnv: runtimeStatus.running ? undefined : runtimeMemEnv,
+    extraEnv: restartForLiteralBootstrap || !runtimeStatus.running ? runtimeMemEnv : undefined,
     runtimeCredentialsPath: getDefaultRuntimeCredentialsPath(),
   });
 
@@ -399,6 +418,7 @@ async function start(args: string[] = []) {
       console.log(`config: ${result.configPath}`);
       console.log(`log: ${result.logPath}`);
       console.log(renderStartSummary(summary));
+      printCommandOutcomeFooter("success");
     } catch (error) {
       printCommandOutcomeBanner("success");
       console.log(`clisbot is already running with pid: ${result.pid}`);
@@ -409,6 +429,7 @@ async function start(args: string[] = []) {
       for (const line of renderRuntimeErrorLines("failed to render already-running summary", error)) {
         console.error(line);
       }
+      printCommandOutcomeFooter("success");
     }
     return;
   }
@@ -433,6 +454,7 @@ async function start(args: string[] = []) {
     console.log(`config: ${result.configPath}`);
     console.log(`log: ${result.logPath}`);
     console.log(renderStartSummary(summary));
+    printCommandOutcomeFooter("success");
   } catch (error) {
     printCommandOutcomeBanner("success");
     console.log(`clisbot started with pid: ${result.pid}`);
@@ -441,6 +463,7 @@ async function start(args: string[] = []) {
     for (const line of renderRuntimeErrorLines("failed to render start summary", error)) {
       console.error(line);
     }
+    printCommandOutcomeFooter("success");
   }
 }
 
@@ -491,6 +514,7 @@ async function stop(hard = false) {
   if (!result.stopped && !hard) {
     printCommandOutcomeBanner("failure");
     console.log("clisbot is not running");
+    printCommandOutcomeFooter("failure");
     return;
   }
 
@@ -501,11 +525,13 @@ async function stop(hard = false) {
         ? "clisbot stopped and tmux sessions cleaned up"
         : "clisbot was not running, but tmux sessions were cleaned up",
     );
+    printCommandOutcomeFooter("success");
     return;
   }
 
   printCommandOutcomeBanner("success");
   console.log("clisbot stopped");
+  printCommandOutcomeFooter("success");
 }
 
 async function restart() {

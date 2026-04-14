@@ -309,6 +309,7 @@ export class RunnerSessionService {
       sessionName: resolved.sessionName,
       captureLines: resolved.stream.captureLines,
       startupDelayMs: resolved.runner.startupDelayMs,
+      trustWorkspace: resolved.runner.trustWorkspace,
       readyPattern: resolved.runner.startupReadyPattern,
       blockers: resolved.runner.startupBlockers,
     });

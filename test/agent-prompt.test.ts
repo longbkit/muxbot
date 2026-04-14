@@ -31,13 +31,12 @@ describe("agent prompt envelope", () => {
         maxProgressMessages: 3,
         requireFinalResponse: true,
       },
+      cliTool: "claude",
       responseMode: "message-tool",
     });
 
     expect(prompt).toContain("<system>");
-    expect(prompt).toContain("channel auto-delivery is disabled for this conversation");
-    expect(prompt).toContain("Use the exact command below when you need to send progress updates, media attachments, or the final response back to the user.");
-    expect(prompt).toContain("reply command:");
+    expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
     expect(prompt).toContain("/tmp/clis message send \\");
     expect(prompt).toContain("  --channel slack \\");
     expect(prompt).toContain("  --target channel:C123 \\");
@@ -46,8 +45,11 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("--message \"$(cat <<\\__CLISBOT_MESSAGE__");
     expect(prompt).toContain("__CLISBOT_MESSAGE__");
     expect(prompt).toContain("  [--media /absolute/path/to/file]");
-    expect(prompt).toContain("progress updates: at most 3");
-    expect(prompt).toContain("final response: send exactly 1 final user-facing response");
+    expect(prompt).toContain("When replying to the user:");
+    expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
+    expect(prompt).toContain("- use that command to send progress updates and the final reply back to the conversation");
+    expect(prompt).toContain("- send at most 3 progress updates");
+    expect(prompt).toContain("- send exactly 1 final user-facing response");
     expect(prompt).toContain("<user>\nplease investigate\n</user>");
   });
 
@@ -74,6 +76,7 @@ describe("agent prompt envelope", () => {
         maxProgressMessages: 2,
         requireFinalResponse: true,
       },
+      cliTool: "claude",
       responseMode: "message-tool",
     });
 
@@ -122,16 +125,46 @@ describe("agent prompt envelope", () => {
         maxProgressMessages: 3,
         requireFinalResponse: true,
       },
+      cliTool: "gemini",
       responseMode: "capture-pane",
     });
 
     expect(prompt).toContain("channel auto-delivery remains enabled for this conversation");
     expect(prompt).toContain("do not send user-facing progress updates or the final response with clisbot message send");
-    expect(prompt).not.toContain("Use the exact command below when you need to send progress updates, media attachments, or the final response back to the user.");
-    expect(prompt).not.toContain("reply command:");
+    expect(prompt).not.toContain("To send a user-visible progress update or final reply, use the following CLI command:");
     expect(prompt).not.toContain("/tmp/clis message send \\");
-    expect(prompt).not.toContain("progress updates: at most 3");
-    expect(prompt).not.toContain("final response: send exactly 1 final user-facing response");
+    expect(prompt).not.toContain("When replying to the user:");
+    expect(prompt).not.toContain("- send at most 3 progress updates");
+    expect(prompt).not.toContain("- send exactly 1 final user-facing response");
+  });
+
+  test("uses the same shared reply instructions for Gemini in message-tool mode", () => {
+    previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
+    previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;
+    process.env.CLISBOT_WRAPPER_PATH = "/tmp/clisbot-wrapper";
+    process.env.CLISBOT_PROMPT_COMMAND = "/tmp/clis";
+
+    const prompt = buildAgentPromptText({
+      text: "reply to the user",
+      identity: {
+        platform: "slack",
+        conversationKind: "dm",
+        channelId: "D123",
+        threadTs: "171234.5678",
+      },
+      config: {
+        enabled: true,
+        maxProgressMessages: 3,
+        requireFinalResponse: true,
+      },
+      cliTool: "gemini",
+      responseMode: "message-tool",
+    });
+
+    expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
+    expect(prompt).toContain("When replying to the user:");
+    expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
+    expect(prompt).not.toContain("Gemini-specific rule:");
   });
 
   test("heredoc command substitution survives tricky message bodies", () => {

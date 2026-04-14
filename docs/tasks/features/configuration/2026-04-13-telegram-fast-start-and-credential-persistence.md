@@ -80,7 +80,7 @@ The task should preserve two principles at the same time:
 
 - literal `--telegram-bot-token` values are allowed for convenience
 - literal CLI tokens are treated as ephemeral and process-local
-- `clisbot` must print a short warning that CLI literals can leak through shell history or `ps`
+- `clisbot` accepts literal CLI tokens as launch-scoped input without echoing them back in startup warnings
 - canonical credential-file discovery is the preferred persistence model
 - canonical discovery must be visible in startup and status output
 - canonical discovery must also be visible in config through `credentialType: "tokenFile"`

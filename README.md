@@ -2,14 +2,14 @@
 Want to use OpenClaw but are struggling because:
 
 - API cost is too high, so you end up looking for LLM proxy workarounds
-- you have to switch between OpenClaw for daily work and Claude / Codex for real coding
+- you have to switch between OpenClaw for daily work and Claude / Codex / Gemini for real coding
 - you want to code on the go and work on the go
 
 `clisbot` is the right solution for you.
 
 `clisbot` turns native frontier agent CLIs like Claude Code, Codex, and Gemini CLI into durable Slack and Telegram bots. Each agent runs inside its own tmux session, keeps a real workspace, and can behave like a coding bot, a daily-work assistant, or a team assistant with SOUL, IDENTITY, and MEMORY.
 
-It is a cheaper, simpler path to frontier agent workflows for teams and individuals because it reuses the CLI subscriptions you already have instead of forcing a separate API-heavy stack. If you already trust Claude Code or Codex for real work, `clisbot` lets you keep those tools as the core runtime and add chat surfaces, follow-up control, team workflows, and on-the-go access around them.
+It is a cheaper, simpler path to frontier agent workflows for teams and individuals because it reuses the CLI subscriptions you already have instead of forcing a separate API-heavy stack. If you already trust Claude Code, Codex, or Gemini CLI for real work, `clisbot` lets you keep those tools as the core runtime and add chat surfaces, follow-up control, team workflows, and on-the-go access around them.
 
 `clisbot` is also meant to grow into a reusable agent runtime layer that can support many CLI tools, many channels, and many workflow shapes on top of the same durable agent session.
 
@@ -135,7 +135,7 @@ The easiest setup flow is still:
 If you want the repo-guided setup path:
 
 1. Clone this repo.
-2. Open Claude Code or Codex in this repo.
+2. Open Claude Code, Codex, or Gemini CLI in this repo.
 3. Ask it to help you set up `clisbot`.
 
 The docs in this repo are kept current, including the [User Guide](docs/user-guide/README.md), so the agent should have enough context to walk you through setup, configuration, and troubleshooting directly inside the repo.
@@ -180,7 +180,7 @@ clisbot start \
 
 If the quick start does not work, check these in order:
 
-- If setup feels unclear, open Claude Code or Codex in this repo and ask it to help using the local docs.
+- If setup feels unclear, open Claude Code, Codex, or Gemini CLI in this repo and ask it to help using the local docs.
 - If config behavior is confusing, inspect [config/clisbot.json.template](config/clisbot.json.template) first, then compare it with [docs/user-guide/README.md](docs/user-guide/README.md).
 - If `clisbot start` says no agents are configured, prefer `clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>`.
 - If you want later runs to work with plain `clisbot start`, rerun your successful first-run command with `--persist`.
@@ -302,7 +302,7 @@ Follow-up behavior matters in team threads:
 
 `clisbot` is growing toward a broader agent runtime layer:
 
-- more CLI tool support beyond Claude Code and Codex
+- more CLI tool support beyond Claude Code, Codex, and Gemini CLI
 - more communication channels beyond Slack and Telegram
 - simple workflow building blocks such as cron jobs, heartbeat jobs, and loops
 - durable agent sessions, workspaces, follow-up policy, commands, attachments, and operator controls that stay reusable across all those surfaces
@@ -332,7 +332,7 @@ Short snapshot:
 
 ## Completed
 
-- [x] Multiple Codex and Claude sessions with streaming on/off support.
+- [x] Multiple Codex, Claude, and Gemini sessions with streaming on/off support.
 - [x] Stale tmux session cleanup and session resume.
 - [x] OpenClaw-compatible configuration system.
 - [x] Slack channel support with streaming and attachments, smart follow mode

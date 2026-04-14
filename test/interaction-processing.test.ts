@@ -832,8 +832,12 @@ describe("processChannelInteraction agent prompt text", () => {
       reconcileText: async (_chunks, text) => [text],
     });
 
-    expect(submitted[0]).toContain("[clisbot steering message]");
+    expect(submitted[0]).toContain("<system>");
+    expect(submitted[0]).toContain("A new user message arrived while you were still working.");
+    expect(submitted[0]).toContain("</system>");
+    expect(submitted[0]).toContain("<user>");
     expect(submitted[0]).toContain("please focus on the regression first");
+    expect(submitted[0]).toContain("</user>");
     expect(posted).toEqual([]);
     expect(replyCalls).toBe(0);
   });
@@ -963,8 +967,12 @@ describe("processChannelInteraction agent prompt text", () => {
       reconcileText: async (_chunks, text) => [text],
     });
 
-    expect(submitted[0]).toContain("[clisbot steering message]");
+    expect(submitted[0]).toContain("<system>");
+    expect(submitted[0]).toContain("A new user message arrived while you were still working.");
+    expect(submitted[0]).toContain("</system>");
+    expect(submitted[0]).toContain("<user>");
     expect(submitted[0]).toContain("focus on the failing test first");
+    expect(submitted[0]).toContain("</user>");
     expect(posted[0]).toBe("Steered.");
   });
 

@@ -414,6 +414,12 @@ function shouldDropGeminiChromeLine(line: string) {
     trimmed.includes("What's Changing:") ||
     trimmed.includes("How it affects you:") ||
     trimmed.includes("Read more: https://goo.gle/geminicli-updates") ||
+    trimmed.includes("Skipping project agents due to untrusted folder.") ||
+    trimmed.includes("Do you trust the files in this folder?") ||
+    trimmed.includes("Trusting a folder allows Gemini CLI to load its local configurations") ||
+    trimmed === "1. Trust folder (default)" ||
+    trimmed === "2. Trust parent folder (workspaces)" ||
+    trimmed === "3. Don't trust" ||
     trimmed.includes("Tips for getting started") ||
     /^Create GEMINI\.md files to customize your interactions$/i.test(trimmed) ||
     /^\/help for more information$/i.test(trimmed) ||

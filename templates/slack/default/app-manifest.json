@@ -1,0 +1,80 @@
+{
+    "display_information": {
+        "name": "pai",
+        "description": "Product AI - I'm here to help",
+        "background_color": "#3768fa"
+    },
+    "features": {
+        "app_home": {
+            "home_tab_enabled": false,
+            "messages_tab_enabled": true,
+            "messages_tab_read_only_enabled": false
+        },
+        "bot_user": {
+            "display_name": "pai",
+            "always_online": true
+        }
+    },
+    "oauth_config": {
+        "scopes": {
+            "user": [
+                "search:read",
+                "channels:history",
+                "groups:history",
+                "im:history",
+                "mpim:history",
+                "search:read.files",
+                "search:read.private",
+                "search:read.im",
+                "search:read.users",
+                "search:read.mpim",
+                "search:read.public"
+            ],
+            "bot": [
+                "files:write",
+                "app_mentions:read",
+                "assistant:write",
+                "channels:history",
+                "channels:read",
+                "chat:write",
+                "files:read",
+                "groups:history",
+                "groups:read",
+                "im:history",
+                "im:read",
+                "im:write",
+                "incoming-webhook",
+                "mpim:history",
+                "mpim:read",
+                "reactions:read",
+                "reactions:write",
+                "team:read",
+                "users.profile:read",
+                "users:read",
+                "users:read.email",
+                "search:read.files",
+                "commands"
+            ]
+        },
+        "pkce_enabled": false
+    },
+    "settings": {
+        "event_subscriptions": {
+            "bot_events": [
+                "app_mention",
+                "channel_history_changed",
+                "function_executed",
+                "message.channels",
+                "message.im"
+            ]
+        },
+        "interactivity": {
+            "is_enabled": false
+        },
+        "org_deploy_enabled": true,
+        "socket_mode_enabled": true,
+        "token_rotation_enabled": false,
+        "hermes_app_type": "remote",
+        "function_runtime": "remote"
+    }
+}

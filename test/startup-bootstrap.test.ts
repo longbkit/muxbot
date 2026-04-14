@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { collapseHomePath, getDefaultConfigPath } from "../src/shared/paths.ts";
 import {
   CHANNEL_ACCOUNT_DOC_PATH,
   getChannelAvailabilityForBootstrap,
@@ -273,6 +274,7 @@ describe("startup bootstrap helpers", () => {
 
   test("warns when default tokens are present but the existing config keeps a channel disabled", () => {
     const config = createConfig();
+    const configPath = collapseHomePath(getDefaultConfigPath());
 
     const lines = renderDisabledConfiguredChannelWarningLines(config, {
       slack: true,
@@ -282,7 +284,9 @@ describe("startup bootstrap helpers", () => {
     expect(lines).toContain(
       "warning default Slack tokens are available in SLACK_APP_TOKEN and SLACK_BOT_TOKEN, but channels.slack.enabled is false in the existing config.",
     );
-    expect(lines).toContain("Run `clisbot channels enable slack` to enable Slack quickly, or update ~/.clisbot/clisbot.json manually.");
+    expect(lines).toContain(
+      `Run \`clisbot channels enable slack\` to enable Slack quickly, or update ${configPath} manually.`,
+    );
     expect(config.channels.slack.enabled).toBe(false);
   });
 

@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { parseBootstrapFlags } from "../src/control/channel-bootstrap-flags.ts";
+import {
+  hasLiteralBootstrapCredentials,
+  parseBootstrapFlags,
+} from "../src/control/channel-bootstrap-flags.ts";
 
 describe("parseBootstrapFlags", () => {
   test("maps --bot-type personal to the internal bootstrap mode", () => {
@@ -49,5 +52,37 @@ describe("parseBootstrapFlags", () => {
         "TELEGRAM_BOT_TOKEN",
       ]),
     ).toThrow("Invalid bot type: ops");
+  });
+
+  test("does not emit literal token warnings for raw startup tokens", () => {
+    const parsed = parseBootstrapFlags([
+      "--slack-app-token",
+      "xapp-literal",
+      "--slack-bot-token",
+      "xoxb-literal",
+      "--telegram-account",
+      "ops",
+      "--telegram-bot-token",
+      "123:literal",
+    ]);
+
+    expect(parsed.literalWarnings).toEqual([]);
+    expect(parsed.slackAccounts[0]?.appToken?.kind).toBe("mem");
+    expect(parsed.slackAccounts[0]?.botToken?.kind).toBe("mem");
+    expect(parsed.telegramAccounts[0]?.botToken?.kind).toBe("mem");
+  });
+
+  test("detects literal bootstrap credentials independently of warning output", () => {
+    const raw = parseBootstrapFlags([
+      "--telegram-bot-token",
+      "123:literal",
+    ]);
+    const envOnly = parseBootstrapFlags([
+      "--telegram-bot-token",
+      "TELEGRAM_BOT_TOKEN",
+    ]);
+
+    expect(hasLiteralBootstrapCredentials(raw)).toBe(true);
+    expect(hasLiteralBootstrapCredentials(envOnly)).toBe(false);
   });
 });

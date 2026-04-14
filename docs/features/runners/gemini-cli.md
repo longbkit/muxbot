@@ -19,6 +19,10 @@ Gemini support is real, but it has one important operational prerequisite:
 
 Without that prerequisite, `clisbot` now fails fast and truthfully instead of pretending the tmux session is ready.
 
+Gemini also has one current routed-delivery limitation:
+
+- Gemini `message-tool` behavior still needs prompt-side hardening and live validation for Slack or Telegram routed replies
+
 ## Why This Exists
 
 Gemini is part of the intended launch CLI trio with Claude and Codex.
@@ -37,7 +41,7 @@ Current Gemini preset:
 
 - command: `gemini`
 - startup args: `--approval-mode=yolo --sandbox=false`
-- trust prompt automation: off
+- trust prompt automation: on for the current Gemini untrusted-folder screen when `trustWorkspace` is enabled
 - startup ready pattern: `Type your message or @path/to/file`
 - session-id create mode: runner-generated
 - session-id capture mode: `status-command` via `/stats session`
@@ -48,7 +52,8 @@ Current Gemini preset:
 Gemini startup now follows two explicit rules:
 
 1. If the configured ready pattern appears, the session is considered ready.
-2. If a configured startup blocker appears first, or the ready pattern never appears before the startup budget expires, the runner fails startup and kills the half-ready tmux session.
+2. If a runner-managed trust prompt appears first and `trustWorkspace` is enabled, the runner dismisses it and continues waiting for readiness.
+3. If a configured startup blocker appears first, or the ready pattern never appears before the startup budget expires, the runner fails startup and kills the half-ready tmux session.
 
 Current built-in blocker:
 
@@ -61,6 +66,41 @@ Current built-in blocker:
   - `Manual authorization is required but the current session is non-interactive`
 
 This prevents stale half-ready Gemini sessions from being reused by later prompts.
+
+## Trust Flow Note
+
+Gemini runner support originally shipped with `trustWorkspace: false` because the earlier validated Gemini path did not show a runner-managed trust screen.
+
+Live validation later showed a different first-start behavior:
+
+- Gemini can stop at an untrusted-folder screen before the ready prompt
+- that screen blocks the normal startup ready pattern
+- a post-start trust-dismiss step is too late for that shape
+
+Current rule:
+
+- Gemini now uses the same runner-owned trust-flow handling model as the other supported CLIs
+- startup polling dismisses the current Gemini trust screen before continuing toward the ready banner
+
+One operational consequence matters for upgrades:
+
+- changing the preset default does not rewrite existing agent configs
+- if an existing Gemini agent already persisted `runner.trustWorkspace: false`, that override must be updated in config before the live runtime will use the new behavior
+
+## Routed Reply Delivery
+
+Gemini was also validated against the channel `message-tool` path.
+
+Current observed behavior is not strong enough to make that the default:
+
+- Gemini can print the `clisbot message send ...` reply command instead of executing it
+- stronger instruction can move Gemini into an extra execution-approval prompt for the local shell command
+
+Current delivery rule:
+
+- routed Gemini conversations continue to use the configured channel or agent `responseMode`
+- Gemini-specific prompt wording adds extra clarity that the user-facing message should be sent using the provided `clisbot message send ...` command
+- the prompt should clarify the intended send workflow without relying on overly forceful wording
 
 ## Session Continuity
 
@@ -102,3 +142,4 @@ Still environment-dependent:
 - [tmux Runner](tmux-runner.md)
 - [Runner Tests](../../tests/features/runners/README.md)
 - [New CLI Test Suites](../../tests/new-cli-tests-suites.md)
+- [CLI Trust-Flow Drift Must Update Runner Defaults And Existing Agent Config](../../lessons/2026-04-13-cli-trust-flow-drift-must-update-runner-defaults-and-existing-agent-config.md)

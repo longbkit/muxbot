@@ -27,6 +27,10 @@ export type ParsedBootstrapFlags = {
   literalWarnings: string[];
 };
 
+function isLiteralToken(token?: ParsedTokenInput) {
+  return token?.kind === "mem";
+}
+
 function parseBotType(rawValue: string) {
   const value = rawValue.trim().toLowerCase();
   if (value === "personal" || value === "personal-assistant") {
@@ -96,7 +100,6 @@ function validateTelegramAccount(account: ParsedTelegramAccountFlags) {
 export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
   const slackAccounts: ParsedSlackAccountFlags[] = [];
   const telegramAccounts: ParsedTelegramAccountFlags[] = [];
-  const literalWarnings: string[] = [];
   let currentSlackAccountId: string | undefined;
   let currentTelegramAccountId: string | undefined;
   let cliTool: AgentCliToolId | undefined;
@@ -149,11 +152,6 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
       const token = parseTokenInput(parseOptionValue(args, arg, index));
       const account = getOrCreateSlackAccount(slackAccounts, currentSlackAccountId ?? "default");
       account.appToken = token;
-      if (token.kind === "mem") {
-        literalWarnings.push(
-          `Slack account ${account.accountId} uses a literal CLI token; shell history or process inspection may expose it.`,
-        );
-      }
       sawCredentialFlags = true;
       sawSlackFlags = true;
       index += 1;
@@ -163,11 +161,6 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
       const token = parseTokenInput(parseOptionValue(args, arg, index));
       const account = getOrCreateSlackAccount(slackAccounts, currentSlackAccountId ?? "default");
       account.botToken = token;
-      if (token.kind === "mem") {
-        literalWarnings.push(
-          `Slack account ${account.accountId} uses a literal CLI token; shell history or process inspection may expose it.`,
-        );
-      }
       sawCredentialFlags = true;
       sawSlackFlags = true;
       index += 1;
@@ -180,11 +173,6 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
         currentTelegramAccountId ?? "default",
       );
       account.botToken = token;
-      if (token.kind === "mem") {
-        literalWarnings.push(
-          `Telegram account ${account.accountId} uses a literal CLI token; shell history or process inspection may expose it.`,
-        );
-      }
       sawCredentialFlags = true;
       sawTelegramFlags = true;
       index += 1;
@@ -210,6 +198,15 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
     sawCredentialFlags,
     sawSlackFlags,
     sawTelegramFlags,
-    literalWarnings,
+    literalWarnings: [],
   };
+}
+
+export function hasLiteralBootstrapCredentials(flags: ParsedBootstrapFlags) {
+  return (
+    flags.slackAccounts.some(
+      (account) => isLiteralToken(account.appToken) || isLiteralToken(account.botToken),
+    ) ||
+    flags.telegramAccounts.some((account) => isLiteralToken(account.botToken))
+  );
 }

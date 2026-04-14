@@ -5,7 +5,7 @@ import {
 } from "../../agents/follow-up-policy.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
 import { processChannelInteraction } from "../interaction-processing.ts";
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
 import { isSlackSenderAllowed } from "../pairing/access.ts";
 import { buildPairingReply } from "../pairing/messages.ts";
 import {
@@ -399,6 +399,7 @@ export class SlackSocketService {
       timestamp: messageTs,
     };
     let responseChunks: SlackPostedMessageChunk[] = [];
+    const cliTool = getAgentEntry(this.loadedConfig, params.route.agentId)?.cliTool;
     const agentPromptText = buildAgentPromptText({
       text,
       identity: {
@@ -410,6 +411,7 @@ export class SlackSocketService {
         threadTs,
       },
       config: this.loadedConfig.raw.channels.slack.agentPrompt,
+      cliTool,
       responseMode: params.route.responseMode,
     });
     const timingContext = {
@@ -477,6 +479,7 @@ export class SlackSocketService {
               threadTs,
             },
             config: this.loadedConfig.raw.channels.slack.agentPrompt,
+            cliTool,
             responseMode: params.route.responseMode,
           }),
         route: params.route,

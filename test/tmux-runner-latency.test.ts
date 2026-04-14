@@ -113,6 +113,47 @@ describe("tmux runner latency behavior", () => {
     });
   });
 
+  test("waitForTmuxSessionBootstrap dismisses Gemini trust prompts before ready-pattern matching", async () => {
+    let captureCount = 0;
+    let trustDismissed = false;
+    let enterCount = 0;
+    const fakeTmux = {
+      async capturePane() {
+        captureCount += 1;
+        if (!trustDismissed) {
+          return [
+            "Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.",
+            "Do you trust the files in this folder?",
+            "1. Trust folder (default)",
+          ].join("\n");
+        }
+        return "Type your message or @path/to/file";
+      },
+      async sendKey(_sessionName: string, key: string) {
+        if (key === "Enter") {
+          enterCount += 1;
+          trustDismissed = true;
+        }
+      },
+    } as unknown as TmuxClient;
+
+    const result = await waitForTmuxSessionBootstrap({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      captureLines: 80,
+      startupDelayMs: 500,
+      trustWorkspace: true,
+      readyPattern: "Type your message or @path/to/file",
+    });
+
+    expect(result).toEqual({
+      status: "ready",
+      snapshot: "Type your message or @path/to/file",
+    });
+    expect(enterCount).toBe(1);
+    expect(captureCount).toBeGreaterThanOrEqual(2);
+  });
+
   test("monitorTmuxRun polls quickly for the first visible output", async () => {
     let snapshot = "";
     let submitted = false;

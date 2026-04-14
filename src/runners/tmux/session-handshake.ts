@@ -163,6 +163,7 @@ export async function waitForTmuxSessionBootstrap(params: {
   sessionName: string;
   captureLines: number;
   startupDelayMs: number;
+  trustWorkspace?: boolean;
   readyPattern?: string;
   blockers?: Array<{
     pattern: string;
@@ -195,6 +196,15 @@ export async function waitForTmuxSessionBootstrap(params: {
     }
     if (snapshot) {
       lastSnapshot = snapshot;
+      if (params.trustWorkspace && hasTrustPrompt(snapshot)) {
+        await dismissTrustPrompt({
+          tmux: params.tmux,
+          sessionName: params.sessionName,
+          captureLines: params.captureLines,
+        });
+        await sleep(SESSION_BOOTSTRAP_POLL_INTERVAL_MS);
+        continue;
+      }
       for (const blocker of blockerPatterns) {
         if (blocker.regex.test(snapshot)) {
           return {
@@ -327,11 +337,22 @@ function looksLikeClaudeTrustPrompt(snapshot: string) {
   ) || snapshot.includes("Enter to confirm · Esc to cancel");
 }
 
+function looksLikeGeminiTrustPrompt(snapshot: string) {
+  return (
+    snapshot.includes("Skipping project agents due to untrusted folder.") &&
+    snapshot.includes("Do you trust the files in this folder?")
+  ) || (
+    snapshot.includes("Trusting a folder allows Gemini CLI to load its local configurations") &&
+    snapshot.includes("Trust folder (default)")
+  );
+}
+
 function hasTrustPrompt(snapshot: string) {
   return (
     snapshot.includes("Do you trust the contents of this directory?") ||
     snapshot.includes("Press enter to continue") ||
-    looksLikeClaudeTrustPrompt(snapshot)
+    looksLikeClaudeTrustPrompt(snapshot) ||
+    looksLikeGeminiTrustPrompt(snapshot)
   );
 }
 
