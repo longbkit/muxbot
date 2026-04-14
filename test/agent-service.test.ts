@@ -1269,6 +1269,85 @@ describe("AgentService session identity", () => {
     await secondService.stop();
   });
 
+  test("managed loop execution rebuilds prompt instructions from current streaming-off route policy", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-loop-policy-"));
+    const storePath = join(tempDir, "sessions.json");
+    const socketPath = join(tempDir, "clisbot.sock");
+    const workspaceTemplate = join(tempDir, "workspaces", "{agentId}");
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify(
+        buildConfig({
+          socketPath,
+          storePath,
+          workspaceTemplate,
+          runnerCommand: "codex",
+          runnerArgs: ["-C", "{workspace}"],
+          sessionId: {
+            create: { mode: "runner", args: [] },
+            capture: {
+              mode: "status-command",
+              statusCommand: "/status",
+              pattern: RUNNER_GENERATED_ID,
+              timeoutMs: 10,
+              pollIntervalMs: 1,
+            },
+            resume: { mode: "command", args: ["resume", "{sessionId}"] },
+          },
+          cleanupEnabled: false,
+        }),
+        null,
+        2,
+      ),
+    );
+
+    const loadedConfig = await loadConfig(configPath);
+    loadedConfig.raw.channels.slack.agentPrompt.enabled = true;
+    loadedConfig.raw.channels.slack.channels["c4"] = {
+      requireMention: true,
+      allowBots: false,
+      responseMode: "message-tool",
+      streaming: "off",
+    };
+
+    const tmux = new FakeTmuxClient() as unknown as TmuxClient;
+    const service = new AgentService(loadedConfig, { tmux });
+    const target = {
+      agentId: "default",
+      sessionKey: "agent:default:slack:channel:c4:thread:loop-policy",
+    };
+
+    await service.createIntervalLoop({
+      target,
+      promptText: "legacy wrapped prompt with progress instructions",
+      canonicalPromptText: "check deploy",
+      promptSummary: "check deploy",
+      promptSource: "custom",
+      surfaceBinding: {
+        platform: "slack",
+        conversationKind: "channel",
+        channelId: "c4",
+        threadTs: "loop-policy",
+      },
+      intervalMs: 60_000,
+      maxRuns: 1,
+      createdBy: "U123",
+      force: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const transcript = await service.captureTranscript(target);
+
+    expect(transcript.snapshot).toContain("check deploy");
+    expect(transcript.snapshot).toContain("To send the final user-visible reply, use the following CLI command:");
+    expect(transcript.snapshot).toContain("do not send user-facing progress updates for this conversation");
+    expect(transcript.snapshot).not.toContain("legacy wrapped prompt with progress instructions");
+    expect(transcript.snapshot).not.toContain("send at most 3 progress updates");
+
+    await service.stop();
+  });
+
   test("persists and restores managed calendar loops across service restart", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-calendar-loops-"));
     const storePath = join(tempDir, "sessions.json");

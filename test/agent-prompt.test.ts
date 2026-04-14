@@ -33,6 +33,7 @@ describe("agent prompt envelope", () => {
       },
       cliTool: "claude",
       responseMode: "message-tool",
+      streaming: "all",
     });
 
     expect(prompt).toContain("<system>");
@@ -78,6 +79,7 @@ describe("agent prompt envelope", () => {
       },
       cliTool: "claude",
       responseMode: "message-tool",
+      streaming: "all",
     });
 
     expect(prompt).toContain("/tmp/clis message send \\");
@@ -127,6 +129,7 @@ describe("agent prompt envelope", () => {
       },
       cliTool: "gemini",
       responseMode: "capture-pane",
+      streaming: "all",
     });
 
     expect(prompt).toContain("channel auto-delivery remains enabled for this conversation");
@@ -159,12 +162,44 @@ describe("agent prompt envelope", () => {
       },
       cliTool: "gemini",
       responseMode: "message-tool",
+      streaming: "all",
     });
 
     expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
     expect(prompt).toContain("When replying to the user:");
     expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
     expect(prompt).not.toContain("Gemini-specific rule:");
+  });
+
+  test("suppresses progress instructions when streaming is off in message-tool mode", () => {
+    previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
+    previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;
+    process.env.CLISBOT_WRAPPER_PATH = "/tmp/clisbot-wrapper";
+    process.env.CLISBOT_PROMPT_COMMAND = "/tmp/clis";
+
+    const prompt = buildAgentPromptText({
+      text: "reply only when finished",
+      identity: {
+        platform: "telegram",
+        conversationKind: "topic",
+        chatId: "-1001",
+        topicId: "4",
+      },
+      config: {
+        enabled: true,
+        maxProgressMessages: 3,
+        requireFinalResponse: true,
+      },
+      responseMode: "message-tool",
+      streaming: "off",
+    });
+
+    expect(prompt).toContain("To send the final user-visible reply, use the following CLI command:");
+    expect(prompt).toContain("- use that command only for the final user-facing reply");
+    expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
+    expect(prompt).toContain("- send exactly 1 final user-facing response");
+    expect(prompt).not.toContain("- send at most 3 progress updates");
+    expect(prompt).not.toContain("- keep progress updates short and meaningful");
   });
 
   test("heredoc command substitution survives tricky message bodies", () => {

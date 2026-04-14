@@ -1316,23 +1316,27 @@ describe("processChannelInteraction agent prompt text", () => {
   test("queue mode forces queued acknowledgment and clisbot-managed settlement while busy", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
+    let observedPrompt = "";
 
     await processChannelInteraction({
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
-        enqueuePrompt: () => ({
-          positionAhead: 1,
-          result: Promise.resolve({
-            status: "completed",
-            agentId: "default",
-            sessionKey: createTarget().sessionKey,
-            sessionName: "session",
-            workspacePath: "/tmp/workspace",
-            snapshot: "queued mode final",
-            fullSnapshot: "queued mode final",
-            initialSnapshot: "",
-          }),
-        }),
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = prompt;
+          return {
+            positionAhead: 1,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "queued mode final",
+              fullSnapshot: "queued mode final",
+              initialSnapshot: "",
+            }),
+          };
+        },
         recordConversationReply: async () => undefined,
       } as any,
       sessionTarget: createTarget(),
@@ -1355,8 +1359,62 @@ describe("processChannelInteraction agent prompt text", () => {
       },
     });
 
-    expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(reconciled.at(-1)).toContain("queued mode final");
+    expect(observedPrompt).toBe("follow up after the active run");
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("queued mode final");
+    expect(reconciled).toEqual([]);
+  });
+
+  test("explicit queue command stays silent until final settlement when streaming is off", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    let observedPrompt = "";
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => true,
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = prompt;
+          return {
+            positionAhead: 1,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "queued final only",
+              fullSnapshot: "queued final only",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue send the short summary after the current run",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(observedPrompt).toBe("send the short summary after the current run");
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("queued final only");
+    expect(reconciled).toEqual([]);
   });
 
   test("explicit steer command injects a steering message into the active run", async () => {
@@ -1628,12 +1686,68 @@ describe("processChannelInteraction agent prompt text", () => {
       reconcileText: async (_chunks, text) => [text],
     });
 
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
     expect(posted[0]).toContain("Started loop for 3 iterations.");
     expect(enqueued).toEqual([
       "wrapped:/codereview",
       "wrapped:/codereview",
       "wrapped:/codereview",
     ]);
+  });
+
+  test("loop times mode does not emit queued placeholders when streaming is off", async () => {
+    const posted: string[] = [];
+    const enqueued: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        getLoopConfig: () => ({
+          maxRunsPerLoop: 20,
+          maxActiveLoops: 10,
+        }),
+        getWorkspacePath: () => "/tmp/workspace",
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          enqueued.push(prompt);
+          return {
+            positionAhead: enqueued.length - 1,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: `done ${enqueued.length}`,
+              fullSnapshot: `done ${enqueued.length}`,
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/loop 3 /codereview",
+      agentPromptBuilder: (text) => `wrapped:${text}`,
+      route: createRoute({
+        responseMode: "capture-pane",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(posted[0]).toContain("Started loop for 3 iterations.");
+    expect(posted.some((text) => text.includes("Queued:"))).toBe(false);
+    expect(posted.some((text) => text.includes("Working"))).toBe(false);
+    expect(enqueued).toHaveLength(3);
   });
 
   test("loop interval mode starts immediately and passes the configured interval to the scheduler", async () => {

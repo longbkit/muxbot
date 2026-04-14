@@ -56,6 +56,7 @@ import { fileExists, readTextFile } from "../shared/fs.ts";
 import { sleep } from "../shared/process.ts";
 import { join } from "node:path";
 import type { ProcessingIndicatorLifecycle } from "./processing-indicator.ts";
+import type { ChannelIdentity } from "./channel-identity.ts";
 
 export type ChannelInteractionRoute = {
   agentId: string;
@@ -70,19 +71,7 @@ export type ChannelInteractionRoute = {
   timezone?: string;
 };
 
-export type ChannelInteractionIdentity = {
-  platform: "slack" | "telegram";
-  conversationKind: "dm" | "channel" | "group" | "topic";
-  senderId?: string;
-  senderName?: string;
-  channelId?: string;
-  channelName?: string;
-  chatId?: string;
-  chatName?: string;
-  threadTs?: string;
-  topicId?: string;
-  topicName?: string;
-};
+export type ChannelInteractionIdentity = ChannelIdentity;
 
 type PostText<TChunk> = (text: string) => Promise<TChunk[]>;
 type ReconcileText<TChunk> = (chunks: TChunk[], text: string) => Promise<TChunk[]>;
@@ -585,6 +574,17 @@ async function resolveLoopPromptText(params: {
   };
 }
 
+function buildLoopSurfaceBinding(identity: ChannelInteractionIdentity) {
+  return {
+    platform: identity.platform,
+    conversationKind: identity.conversationKind,
+    channelId: identity.channelId,
+    chatId: identity.chatId,
+    threadTs: identity.threadTs,
+    topicId: identity.topicId,
+  };
+}
+
 async function executePromptDelivery<TChunk>(params: {
   agentService: AgentService;
   sessionTarget: AgentSessionTarget;
@@ -801,7 +801,7 @@ async function executePromptDelivery<TChunk>(params: {
         text: placeholderText,
         body: "",
       };
-    } else if (paneManagedDelivery && positionAhead > 0) {
+    } else if (paneManagedDelivery && positionAhead > 0 && params.route.streaming !== "off") {
       const queuedText = renderPlatformInteraction({
         platform: params.identity.platform,
         status: "queued",
@@ -1042,6 +1042,8 @@ export async function processChannelInteraction<TChunk>(params: {
   );
   const queueByMode = !explicitQueueMessage && params.route.additionalMessageMode === "queue" && sessionBusy;
   const forceQueuedDelivery = typeof explicitQueueMessage === "string" || queueByMode;
+  const delayedPromptText =
+    explicitQueueMessage ?? params.agentPromptText ?? params.text;
   const isSensitiveCommand = slashCommand?.type === "bash";
 
   if (
@@ -1467,11 +1469,13 @@ export async function processChannelInteraction<TChunk>(params: {
       const createdLoop = await params.agentService.createCalendarLoop({
         target: params.sessionTarget,
         promptText: buildLoopPromptText(resolvedLoopPrompt.text),
+        canonicalPromptText: resolvedLoopPrompt.text,
         promptSummary: summarizeLoopPrompt(
           resolvedLoopPrompt.text,
           resolvedLoopPrompt.maintenancePrompt,
         ),
         promptSource: resolvedLoopPrompt.maintenancePrompt ? "LOOP.md" : "custom",
+        surfaceBinding: buildLoopSurfaceBinding(params.identity),
         cadence: slashCommand.params.cadence,
         dayOfWeek: slashCommand.params.dayOfWeek,
         localTime: slashCommand.params.localTime,
@@ -1507,11 +1511,13 @@ export async function processChannelInteraction<TChunk>(params: {
     const createdLoop = await params.agentService.createIntervalLoop({
       target: params.sessionTarget,
       promptText: buildLoopPromptText(resolvedLoopPrompt.text),
+      canonicalPromptText: resolvedLoopPrompt.text,
       promptSummary: summarizeLoopPrompt(
         resolvedLoopPrompt.text,
         resolvedLoopPrompt.maintenancePrompt,
       ),
       promptSource: resolvedLoopPrompt.maintenancePrompt ? "LOOP.md" : "custom",
+      surfaceBinding: buildLoopSurfaceBinding(params.identity),
       intervalMs: effectiveIntervalMs!,
       maxRuns: maxRunsPerLoop,
       createdBy: params.senderId,
@@ -1610,7 +1616,7 @@ export async function processChannelInteraction<TChunk>(params: {
     identity: params.identity,
     route: params.route,
     maxChars: params.maxChars,
-    promptText: forceQueuedDelivery ? explicitQueueMessage! : params.agentPromptText ?? params.text,
+    promptText: delayedPromptText,
     postText: params.postText,
     reconcileText: params.reconcileText,
     observerId,

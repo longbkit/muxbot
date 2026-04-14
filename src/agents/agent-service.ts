@@ -24,6 +24,11 @@ import {
   type LoadedConfig,
   resolveSessionStorePath,
 } from "../config/load-config.ts";
+import { buildAgentPromptText } from "../channels/agent-prompt.ts";
+import {
+  buildConfiguredTargetFromIdentity,
+  resolveConfiguredSurfaceModeTarget,
+} from "../channels/mode-config-shared.ts";
 import {
   resolveAgentTarget,
   type AgentSessionTarget,
@@ -43,6 +48,8 @@ import {
 } from "./active-run-manager.ts";
 export { ActiveRunInProgressError };
 import type { LatencyDebugContext } from "../control/latency-debug.ts";
+import type { ChannelIdentity } from "../channels/channel-identity.ts";
+import type { StoredLoopSurfaceBinding } from "./loop-state.ts";
 
 type StreamUpdate = RunUpdate;
 
@@ -269,8 +276,10 @@ export class AgentService {
   async createIntervalLoop(params: {
     target: AgentSessionTarget;
     promptText: string;
+    canonicalPromptText?: string;
     promptSummary: string;
     promptSource: "custom" | "LOOP.md";
+    surfaceBinding?: StoredLoopSurfaceBinding;
     intervalMs: number;
     maxRuns: number;
     createdBy?: string;
@@ -294,10 +303,12 @@ export class AgentService {
       updatedAt: Date.now(),
       nextRunAt: Date.now(),
       promptText: params.promptText,
+      canonicalPromptText: params.canonicalPromptText,
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
       createdBy: params.createdBy,
       force: params.force,
+      surfaceBinding: params.surfaceBinding,
     };
 
     const resolved = this.resolveTarget(params.target);
@@ -313,8 +324,10 @@ export class AgentService {
   async createCalendarLoop(params: {
     target: AgentSessionTarget;
     promptText: string;
+    canonicalPromptText?: string;
     promptSummary: string;
     promptSource: "custom" | "LOOP.md";
+    surfaceBinding?: StoredLoopSurfaceBinding;
     cadence: LoopCalendarCadence;
     dayOfWeek?: number;
     localTime: string;
@@ -355,6 +368,7 @@ export class AgentService {
       updatedAt: Date.now(),
       nextRunAt,
       promptText: params.promptText,
+      canonicalPromptText: params.canonicalPromptText,
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
       createdBy: params.createdBy,
@@ -365,6 +379,7 @@ export class AgentService {
       minute: params.minute,
       timezone: params.timezone,
       force: false,
+      surfaceBinding: params.surfaceBinding,
     };
 
     const resolved = this.resolveTarget(params.target);
@@ -569,9 +584,10 @@ export class AgentService {
       return;
     }
 
+    const promptText = this.buildManagedLoopPrompt(managed.target.agentId, nextLoopState);
     const { result } = this.enqueuePrompt(
       managed.target,
-      nextLoopState.promptText,
+      promptText,
       {
         observerId: `loop:${loopId}:${attemptedRuns}`,
         onUpdate: async () => undefined,
@@ -659,5 +675,78 @@ export class AgentService {
       );
     }
     return nowMs + loop.intervalMs;
+  }
+
+  private buildManagedLoopPrompt(agentId: string, loop: StoredIntervalLoop) {
+    if (!loop.canonicalPromptText || !loop.surfaceBinding) {
+      return loop.promptText;
+    }
+
+    const identity = this.buildLoopChannelIdentity(loop.surfaceBinding);
+    const channelConfig =
+      identity.platform === "slack"
+        ? this.loadedConfig.raw.channels.slack
+        : this.loadedConfig.raw.channels.telegram;
+    const { responseMode, streaming } = this.resolveLoopSurfaceModes(identity);
+
+    return buildAgentPromptText({
+      text: loop.canonicalPromptText,
+      identity,
+      config: channelConfig.agentPrompt,
+      cliTool: getAgentEntry(this.loadedConfig, agentId)?.cliTool,
+      responseMode,
+      streaming,
+    });
+  }
+
+  private buildLoopChannelIdentity(binding: StoredLoopSurfaceBinding): ChannelIdentity {
+    return {
+      platform: binding.platform,
+      conversationKind: binding.conversationKind,
+      channelId: binding.channelId,
+      chatId: binding.chatId,
+      threadTs: binding.threadTs,
+      topicId: binding.topicId,
+    };
+  }
+
+  private resolveLoopSurfaceModes(identity: ChannelIdentity) {
+    const channelConfig =
+      identity.platform === "slack"
+        ? this.loadedConfig.raw.channels.slack
+        : this.loadedConfig.raw.channels.telegram;
+
+    let responseMode = channelConfig.responseMode;
+    let streaming = channelConfig.streaming;
+
+    if (identity.conversationKind === "dm") {
+      responseMode = channelConfig.directMessages.responseMode ?? responseMode;
+      streaming = channelConfig.directMessages.streaming ?? streaming;
+    }
+
+    try {
+      responseMode = resolveConfiguredSurfaceModeTarget(
+        this.loadedConfig.raw,
+        "responseMode",
+        buildConfiguredTargetFromIdentity(identity),
+      ).get() ?? responseMode;
+    } catch {
+      // Fall back to channel-level defaults if the original route no longer exists.
+    }
+
+    try {
+      streaming = resolveConfiguredSurfaceModeTarget(
+        this.loadedConfig.raw,
+        "streaming",
+        buildConfiguredTargetFromIdentity(identity),
+      ).get() ?? streaming;
+    } catch {
+      // Fall back to channel-level defaults if the original route no longer exists.
+    }
+
+    return {
+      responseMode,
+      streaming,
+    };
   }
 }

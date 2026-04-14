@@ -1,4 +1,4 @@
-import type { ChannelInteractionIdentity } from "./interaction-processing.ts";
+import type { ChannelIdentity } from "./channel-identity.ts";
 import { getClisbotPromptCommand } from "../control/clisbot-wrapper.ts";
 
 export type ChannelAgentPromptConfig = {
@@ -9,10 +9,11 @@ export type ChannelAgentPromptConfig = {
 
 export function buildAgentPromptText(params: {
   text: string;
-  identity: ChannelInteractionIdentity;
+  identity: ChannelIdentity;
   config: ChannelAgentPromptConfig;
   cliTool?: "codex" | "claude" | "gemini";
   responseMode?: "capture-pane" | "message-tool";
+  streaming?: "off" | "latest" | "all";
 }) {
   if (!params.config.enabled) {
     return params.text;
@@ -23,18 +24,22 @@ export function buildAgentPromptText(params: {
 }
 
 function renderAgentPromptInstruction(params: {
-  identity: ChannelInteractionIdentity;
+  identity: ChannelIdentity;
   config: ChannelAgentPromptConfig;
   cliTool?: "codex" | "claude" | "gemini";
   responseMode?: "capture-pane" | "message-tool";
+  streaming?: "off" | "latest" | "all";
 }) {
   const messageToolMode = (params.responseMode ?? "message-tool") === "message-tool";
+  const progressAllowed = messageToolMode && (params.streaming ?? "all") !== "off";
   const lines = [
     `[${renderPromptTimestamp()}] ${renderIdentitySummary(params.identity)}`,
     "",
     "You are operating inside clisbot.",
     messageToolMode
-      ? "To send a user-visible progress update or final reply, use the following CLI command:"
+      ? progressAllowed
+        ? "To send a user-visible progress update or final reply, use the following CLI command:"
+        : "To send the final user-visible reply, use the following CLI command:"
       : "channel auto-delivery remains enabled for this conversation; do not send user-facing progress updates or the final response with clisbot message send",
   ];
 
@@ -47,13 +52,21 @@ function renderAgentPromptInstruction(params: {
       replyCommand,
       "When replying to the user:",
       "- put the user-facing message inside the --message body of that command",
-      "- use that command to send progress updates and the final reply back to the conversation",
-      `- send at most ${params.config.maxProgressMessages} progress updates`,
+      progressAllowed
+        ? "- use that command to send progress updates and the final reply back to the conversation"
+        : "- use that command only for the final user-facing reply",
+      ...(progressAllowed
+        ? [`- send at most ${params.config.maxProgressMessages} progress updates`]
+        : ["- do not send user-facing progress updates for this conversation"]),
       params.config.requireFinalResponse
         ? "- send exactly 1 final user-facing response"
         : "- final response is optional",
-      "- keep progress updates short and meaningful",
-      "- do not send progress updates for trivial internal steps",
+      ...(progressAllowed
+        ? [
+            "- keep progress updates short and meaningful",
+            "- do not send progress updates for trivial internal steps",
+          ]
+        : []),
     );
   }
 
@@ -75,7 +88,7 @@ function renderPromptTimestamp() {
   return formatter.format(date).replace(",", "");
 }
 
-function renderIdentitySummary(identity: ChannelInteractionIdentity) {
+function renderIdentitySummary(identity: ChannelIdentity) {
   const segments = [renderConversationSummary(identity)];
   const sender = renderSenderSummary(identity);
   if (sender) {
@@ -84,7 +97,7 @@ function renderIdentitySummary(identity: ChannelInteractionIdentity) {
   return segments.join(" | ");
 }
 
-function renderConversationSummary(identity: ChannelInteractionIdentity) {
+function renderConversationSummary(identity: ChannelIdentity) {
   if (identity.platform === "slack") {
     const scopeLabel =
       identity.conversationKind === "dm"
@@ -120,7 +133,7 @@ function renderConversationSummary(identity: ChannelInteractionIdentity) {
     .join(" ");
 }
 
-function renderSenderSummary(identity: ChannelInteractionIdentity) {
+function renderSenderSummary(identity: ChannelIdentity) {
   const sender = renderLabeledTarget(identity.senderName, identity.senderId);
   return sender ? `sender ${sender}` : "";
 }
@@ -144,7 +157,7 @@ function renderNamedValue(label: string, name?: string, id?: string) {
 
 function buildReplyCommand(params: {
   command: string;
-  identity: ChannelInteractionIdentity;
+  identity: ChannelIdentity;
 }) {
   const lines = [`${params.command} message send \\`];
   if (params.identity.platform === "slack") {

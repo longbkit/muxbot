@@ -1,5 +1,5 @@
 import type { ClisbotConfig } from "../config/schema.ts";
-import type { ChannelInteractionIdentity } from "./interaction-processing.ts";
+import type { ChannelIdentity } from "./channel-identity.ts";
 import { renderTelegramRouteChoiceMessage } from "./telegram/route-guidance.ts";
 
 export type ResponseMode = "capture-pane" | "message-tool";
@@ -50,7 +50,7 @@ function resolveSlackConfigTarget<TField extends SurfaceModeField>(
   field: TField,
   params: {
     target?: string;
-    conversationKind?: ChannelInteractionIdentity["conversationKind"];
+    conversationKind?: ChannelIdentity["conversationKind"];
   },
 ): SurfaceModeTargetBinding<TField> {
   if (!params.target) {
@@ -119,7 +119,7 @@ function resolveTelegramConfigTarget<TField extends SurfaceModeField>(
   params: {
     target?: string;
     topic?: string;
-    conversationKind?: ChannelInteractionIdentity["conversationKind"];
+    conversationKind?: ChannelIdentity["conversationKind"];
   },
 ): SurfaceModeTargetBinding<TField> {
   if (!params.target) {
@@ -189,7 +189,7 @@ export function resolveConfiguredSurfaceModeTarget<TField extends SurfaceModeFie
   config: ClisbotConfig,
   field: TField,
   params: ConfiguredSurfaceModeTarget & {
-    conversationKind?: ChannelInteractionIdentity["conversationKind"];
+    conversationKind?: ChannelIdentity["conversationKind"];
   },
 ) {
   if (params.channel === "slack") {
@@ -206,7 +206,7 @@ export function resolveConfiguredSurfaceModeTarget<TField extends SurfaceModeFie
   });
 }
 
-export function buildConfiguredTargetFromIdentity(identity: ChannelInteractionIdentity) {
+export function buildConfiguredTargetFromIdentity(identity: ChannelIdentity) {
   return {
     channel: identity.platform,
     target:
@@ -218,7 +218,7 @@ export function buildConfiguredTargetFromIdentity(identity: ChannelInteractionId
     topic: identity.topicId,
     conversationKind: identity.conversationKind,
   } satisfies ConfiguredSurfaceModeTarget & {
-    conversationKind: ChannelInteractionIdentity["conversationKind"];
+    conversationKind: ChannelIdentity["conversationKind"];
   };
 }
 

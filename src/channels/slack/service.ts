@@ -416,6 +416,7 @@ export class SlackSocketService {
       config: this.loadedConfig.raw.channels.slack.agentPrompt,
       cliTool,
       responseMode: params.route.responseMode,
+      streaming: params.route.streaming,
     });
     const timingContext = {
       platform: "slack" as const,
@@ -505,6 +506,7 @@ export class SlackSocketService {
             config: this.loadedConfig.raw.channels.slack.agentPrompt,
             cliTool,
             responseMode: params.route.responseMode,
+            streaming: params.route.streaming,
           }),
         route: params.route,
         maxChars: this.getSlackMaxChars(params.route.agentId),

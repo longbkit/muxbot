@@ -515,6 +515,7 @@ export class TelegramPollingService {
         config: this.loadedConfig.raw.channels.telegram.agentPrompt,
         cliTool,
         responseMode: routeInfo.route.responseMode,
+        streaming: routeInfo.route.streaming,
       });
       const timingContext = {
         platform: "telegram" as const,
@@ -559,6 +560,7 @@ export class TelegramPollingService {
               config: this.loadedConfig.raw.channels.telegram.agentPrompt,
               cliTool,
               responseMode: routeInfo.route.responseMode,
+              streaming: routeInfo.route.streaming,
             }),
           route: routeInfo.route,
           maxChars: this.getTelegramMaxChars(routeInfo.route.agentId),
