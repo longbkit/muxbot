@@ -18,6 +18,7 @@ The project will only scale to ACP and SDK integrations if the current tmux path
 - normalize input submission, output capture, snapshots, and streaming
 - keep backend-specific quirks inside runner implementations
 - harden the tmux runner as the first implementation
+- handle commands that hand control to a secondary interactive shell or pager such as `vi`, `nano`, `less`, or `git diff`
 - expose enough normalized transcript structure for default Slack interaction rendering
 - define runner lifecycle hooks needed for session resume and runner sunsetting
 
@@ -53,6 +54,11 @@ That means the tmux runner must expose a normalized view of session progress tha
 - [ ] define the minimum normalized transcript fields needed by default Slack interaction rendering
 - [ ] map current tmux pane behavior into that contract
 - [ ] isolate Codex-specific quirks such as trust prompts, banners, and redraws inside the tmux runner
+- [ ] define how the runner detects and reports interactive shell takeover or pager takeover triggered by commands such as `vi`, `nano`, `less`, or `git diff`
+- [ ] define the safe operator behavior when a bash command blocks on a nested shell or pager:
+  - detect likely blocked state truthfully
+  - avoid misreporting the run as normal progress
+  - provide a clear recovery path such as quit-sequence guidance or forced interrupt
 - [x] define tmux bootstrap for fresh start versus resume-existing-session flows
 - [x] define tmux runner idle-sunset and eviction behavior without resetting the logical conversation
 - [ ] define explicit session reset policy separate from runner recreation
@@ -67,6 +73,7 @@ That means the tmux runner must expose a normalized view of session progress tha
 - channel code can render default Slack interaction output without directly parsing tmux pane dumps
 - repeated tmux redraws do not force duplicate user-visible Slack updates
 - Codex-specific terminal chrome is recognized within the runner boundary
+- nested shell or pager takeovers from commands like `vi`, `nano`, `less`, or `git diff` are surfaced as an explicit runner state instead of looking like silent normal progress
 - full session visibility is retrievable without changing default interaction streaming behavior
 - killing a tmux session does not by itself force a logical conversation reset when a stored resumable `sessionId` exists
 - idle sunset and reset policy are defined separately instead of being implied by runner recreation

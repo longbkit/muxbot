@@ -62,12 +62,14 @@ Channels is where those surfaces live.
 - [OpenClaw Pairing Implementation](../../research/channels/2026-04-06-openclaw-pairing-implementation.md)
 - [OpenClaw CLI Command Surfaces And Slack Telegram Send Syntax](../../research/channels/2026-04-09-openclaw-cli-command-surfaces-and-slack-telegram-send-syntax.md)
 - [OpenClaw Channel Standardization Vs Clisbot Gaps](../../research/channels/2026-04-10-openclaw-channel-standardization-vs-clisbot-gaps.md)
+- [OpenClaw Structured Channel Rendering Techniques For Slack And Telegram](../../research/channels/2026-04-14-openclaw-structured-channel-rendering-techniques.md)
 
 ## Related Feature Docs
 
 - [Message Actions And Channel Accounts](message-actions-and-channel-accounts.md)
 - [Agent Progress Reply Wrapper And Prompt](agent-progress-reply-wrapper-and-prompt.md)
 - [Prompt Templates](prompt-templates.md)
+- [Structured Channel Rendering And Native Surface Capabilities](structured-channel-rendering-and-native-surface-capabilities.md)
 - [Loop Slash Command](loop-slash-command.md)
 
 ## Dependencies
