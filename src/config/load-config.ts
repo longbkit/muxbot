@@ -47,7 +47,14 @@ export type LoadedConfig = {
   raw: ClisbotConfig;
 };
 
-export async function loadConfig(configPath = getDefaultConfigPath()): Promise<LoadedConfig> {
+export type LoadConfigOptions = {
+  materializeChannels?: Array<"slack" | "telegram">;
+};
+
+export async function loadConfig(
+  configPath = getDefaultConfigPath(),
+  options: LoadConfigOptions = {},
+): Promise<LoadedConfig> {
   const expandedConfigPath = expandHomePath(configPath);
   const text = await readTextFile(expandedConfigPath);
   const parsed = JSON.parse(text);
@@ -58,6 +65,7 @@ export async function loadConfig(configPath = getDefaultConfigPath()): Promise<L
   const validated = clisbotConfigSchema.parse(substituted);
   const materialized = materializeRuntimeChannelCredentials(validated, {
     env: process.env,
+    materializeChannels: options.materializeChannels,
   });
 
   return materializeLoadedConfig(expandedConfigPath, materialized);

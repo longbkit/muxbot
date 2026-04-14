@@ -1,5 +1,9 @@
 import { AgentService, type AgentSessionTarget } from "../agents/agent-service.ts";
-import { loadConfig, type LoadedConfig } from "../config/load-config.ts";
+import {
+  loadConfig,
+  type LoadConfigOptions,
+  type LoadedConfig,
+} from "../config/load-config.ts";
 import { listChannelPlugins } from "../channels/registry.ts";
 import { type ChannelPlugin } from "../channels/channel-plugin.ts";
 import type { ParsedMessageCommand, MessageAction } from "../channels/message-command.ts";
@@ -9,7 +13,7 @@ function getConfigPath() {
 }
 
 type MessageCliDependencies = {
-  loadConfig: (configPath?: string) => Promise<LoadedConfig>;
+  loadConfig: (configPath?: string, options?: LoadConfigOptions) => Promise<LoadedConfig>;
   plugins: ChannelPlugin[];
   print: (text: string) => void;
     recordConversationReply: (params: {
@@ -151,7 +155,9 @@ export async function runMessageCli(
   }
   assertTarget(command);
 
-  const loadedConfig = await dependencies.loadConfig(getConfigPath());
+  const loadedConfig = await dependencies.loadConfig(getConfigPath(), {
+    materializeChannels: [command.channel],
+  });
   const plugin = dependencies.plugins.find((entry) => entry.id === command.channel);
   if (!plugin) {
     throw new Error(`Unsupported message channel: ${command.channel}`);

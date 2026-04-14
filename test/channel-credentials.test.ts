@@ -255,6 +255,32 @@ describe("channel credentials", () => {
     expect(resolved.channels.telegram.accounts.default.botToken).toBe("telegram-file-token");
   });
 
+  test("can materialize only the requested channel credentials", () => {
+    const config = createConfig();
+    config.channels.slack.enabled = true;
+    config.channels.slack.appToken = "${SLACK_APP_TOKEN}";
+    config.channels.slack.botToken = "${SLACK_BOT_TOKEN}";
+    config.channels.slack.accounts.default = {
+      appToken: "${SLACK_APP_TOKEN}",
+      botToken: "${SLACK_BOT_TOKEN}",
+    };
+
+    const resolved = materializeRuntimeChannelCredentials(config, {
+      env: {
+        ...process.env,
+        TELEGRAM_BOT_TOKEN: "telegram-env-token",
+      },
+      materializeChannels: ["telegram"],
+    });
+
+    expect(resolved.channels.telegram.accounts.default.botToken).toBe("telegram-env-token");
+    expect(resolved.channels.telegram.botToken).toBe("telegram-env-token");
+    expect(resolved.channels.slack.accounts.default?.appToken).toBe("${SLACK_APP_TOKEN}");
+    expect(resolved.channels.slack.accounts.default?.botToken).toBe("${SLACK_BOT_TOKEN}");
+    expect(resolved.channels.slack.appToken).toBe("${SLACK_APP_TOKEN}");
+    expect(resolved.channels.slack.botToken).toBe("${SLACK_BOT_TOKEN}");
+  });
+
   test("rejects raw persistent config token literals", () => {
     const config = createConfig();
     config.channels.telegram.botToken = "123456:abc";

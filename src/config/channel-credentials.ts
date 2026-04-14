@@ -710,12 +710,19 @@ export function materializeRuntimeChannelCredentials(
   options: {
     env?: NodeJS.ProcessEnv;
     runtimeCredentialsPath?: string;
+    materializeChannels?: Array<"slack" | "telegram">;
   } = {},
 ) {
   const env = options.env ?? process.env;
   const nextConfig = structuredClone(config) as ClisbotConfig;
+  const materializeChannels = options.materializeChannels ?? [];
+  const materializeAll = materializeChannels.length === 0;
+  const shouldMaterializeTelegram =
+    materializeAll || materializeChannels.includes("telegram");
+  const shouldMaterializeSlack =
+    materializeAll || materializeChannels.includes("slack");
 
-  if (nextConfig.channels.telegram.enabled) {
+  if (shouldMaterializeTelegram && nextConfig.channels.telegram.enabled) {
     const accountIds = Object.keys(getAccountsRecord(nextConfig.channels.telegram.accounts));
     const ids = accountIds.length > 0
       ? accountIds
@@ -764,7 +771,7 @@ export function materializeRuntimeChannelCredentials(
       : "";
   }
 
-  if (nextConfig.channels.slack.enabled) {
+  if (shouldMaterializeSlack && nextConfig.channels.slack.enabled) {
     const accountIds = Object.keys(getAccountsRecord(nextConfig.channels.slack.accounts));
     const ids = accountIds.length > 0
       ? accountIds

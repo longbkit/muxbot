@@ -6,7 +6,7 @@ import { resolveTelegramConversationRoute } from "../src/channels/telegram/route
 import { resolveTelegramConversationTarget } from "../src/channels/telegram/session-routing.ts";
 import type { ChannelPlugin } from "../src/channels/channel-plugin.ts";
 import type { ParsedMessageCommand } from "../src/channels/message-command.ts";
-import type { LoadedConfig } from "../src/config/load-config.ts";
+import type { LoadConfigOptions, LoadedConfig } from "../src/config/load-config.ts";
 
 function createDependencies() {
   const logs: string[] = [];
@@ -188,7 +188,7 @@ function createDependencies() {
   };
 
   const deps = {
-    loadConfig: async () => loadedConfig,
+    loadConfig: async (_configPath?: string, _options?: LoadConfigOptions) => loadedConfig,
     plugins: [
       {
         id: "slack",
@@ -528,6 +528,36 @@ describe("message cli", () => {
     expect(replyTargets).toHaveLength(1);
     expect(replyTargets[0]?.kind).toBe("progress");
     expect(replyTargets[0]?.source).toBe("message-tool");
+  });
+
+  test("loads config with materialization scoped to the requested channel", async () => {
+    const { deps } = createDependencies();
+    const captured: Array<LoadConfigOptions | undefined> = [];
+
+    await runMessageCli(
+      [
+        "send",
+        "--channel",
+        "telegram",
+        "--target",
+        "-1001234567890",
+        "--message",
+        "hello",
+      ],
+      {
+        ...deps,
+        loadConfig: async (_configPath?: string, options?: LoadConfigOptions) => {
+          captured.push(options);
+          return deps.loadConfig();
+        },
+      },
+    );
+
+    expect(captured).toEqual([
+      {
+        materializeChannels: ["telegram"],
+      },
+    ]);
   });
 
   test("rejects conflicting progress and final flags", async () => {
