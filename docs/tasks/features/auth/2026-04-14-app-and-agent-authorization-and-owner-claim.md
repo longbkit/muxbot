@@ -157,5 +157,5 @@ App-level owner or admin checks for config-mutating `clisbot` CLI commands shoul
 
 ## Related Docs
 
-- [App And Agent Authorization And Owner Claim](../../../features/configuration/app-and-agent-authorization-and-owner-claim.md)
+- [App And Agent Authorization And Owner Claim](../../../features/auth/app-and-agent-authorization-and-owner-claim.md)
 - [Auth-Aware CLI Mutation Enforcement And Runner Command Guardrails](../control/2026-04-14-auth-aware-cli-mutation-enforcement-and-runner-command-guardrails.md)

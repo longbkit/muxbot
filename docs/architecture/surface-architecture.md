@@ -12,6 +12,7 @@ This document covers:
 
 - channels
 - control
+- how surfaces consume auth decisions
 - how session output becomes visible at a surface
 
 It does not define runner mechanics or Agents internals.
@@ -24,6 +25,7 @@ That means:
 
 - channels decide what users see
 - control decides what operators see and can do
+- auth decides the permission model surfaces should consume
 - runners only provide normalized execution data
 
 ## Channels
@@ -82,7 +84,7 @@ Control responsibilities:
 - attach to sessions
 - restart or stop sessions
 - surface health and debug information
-- handle operator-facing permission and access-control flows
+- consume auth decisions for operator-facing checks
 
 Control must not behave like a user-facing conversation channel.
 

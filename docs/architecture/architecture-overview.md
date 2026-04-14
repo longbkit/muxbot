@@ -18,9 +18,10 @@ If this overview and a detailed architecture doc diverge, the detailed doc wins.
 
 ## Core Decision
 
-Keep the system split into five explicit product systems:
+Keep the system split into six explicit product systems:
 
 - channels
+- auth
 - control
 - configuration
 - agents
@@ -43,12 +44,12 @@ That boundary is the main architecture rule for the repository.
 | Telegram             |              | status / logs        |
 | future API / Discord |              | channels / agents    |
 |                      |              | pairing / debug      |
-|                      |              | permissions          |
+|                      |              | gated actions        |
 | owns:                |              | owns:                |
 | - inbound messages   |              | - inspect            |
 | - thread / reply UX  |              | - intervene          |
 | - chat-first render  |              | - operator views     |
-| - transcript command |              | - operator permissions |
+| - transcript command |              | - operator intervention |
 +----------+-----------+              +----------+-----------+
            |                                     |
            +------------------+------------------+
@@ -57,12 +58,22 @@ That boundary is the main architecture rule for the repository.
                     +----------------------+
                     |    CONFIGURATION     |
                     |----------------------|
-                    | clisbot.json          |
+                    | clisbot.json         |
                     | env vars             |
                     | route mapping        |
                     | agent defs           |
-                    | policy flags         |
+                    | policy storage       |
                     | workspace defaults   |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    |         AUTH         |
+                    |----------------------|
+                    | roles / permissions  |
+                    | owner claim          |
+                    | resolution order     |
+                    | enforcement contract |
                     +----------+-----------+
                                |
                                v
@@ -122,7 +133,8 @@ That boundary is the main architecture rule for the repository.
 ```text
 user message
   -> channel
-  -> configuration resolves route + policy
+  -> configuration resolves route + persisted policy inputs
+  -> auth resolves effective permissions
   -> agents resolves agent + session key
   -> runner executes native CLI
   -> channel renders clean chat-first output
@@ -153,7 +165,8 @@ Do not treat tmux pane ids, tmux window ids, or other transient runner artifacts
 ## Ownership Rules
 
 - Channels own user-facing interaction and presentation.
-- Control owns operator-facing inspection, intervention, and permission handling.
+- Auth owns permission semantics, owner claim, and the contract between advisory and enforced behavior.
+- Control owns operator-facing inspection and intervention surfaces, and consumes auth rules for operator checks.
 - Configuration is the local control plane that wires the system together and stores the relevant policy config.
 - The agents layer owns backend-agnostic agent, session, and workspace behavior.
 - Runners own backend-specific execution behavior and normalize quirks behind one contract.

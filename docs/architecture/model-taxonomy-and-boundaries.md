@@ -10,7 +10,7 @@ This document defines how repository models should be named, separated, and evol
 
 Its goal is to stop a common early-stage architecture failure:
 
-- mixing agent-layer state, runner contracts, channel payloads, control payloads, persistence records, and transient runtime state into the same object shape
+- mixing auth policy, agent-layer state, runner contracts, channel payloads, control payloads, persistence records, and transient runtime state into the same object shape
 
 When that happens, the codebase becomes ambiguous in ways that are expensive later:
 

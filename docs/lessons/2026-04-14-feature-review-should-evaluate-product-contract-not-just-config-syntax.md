@@ -4,8 +4,8 @@ date: 2026-04-14
 area: product, docs, configuration, control
 summary: When reviewing a feature, do not stop at whether the config shape is implementable or elegant. Review whether the product contract is coherent across users, surfaces, enforcement layers, operator workflow, fallback semantics, and maturity signals.
 related:
-  - docs/features/configuration/app-and-agent-authorization-and-owner-claim.md
-  - docs/tasks/features/configuration/2026-04-14-app-and-agent-authorization-and-owner-claim.md
+  - docs/features/auth/app-and-agent-authorization-and-owner-claim.md
+  - docs/tasks/features/auth/2026-04-14-app-and-agent-authorization-and-owner-claim.md
   - docs/user-guide/auth-and-roles.md
   - docs/lessons/2026-04-14-auth-and-config-design-should-run-a-self-review-checklist-before-converging.md
   - docs/lessons/2026-04-14-user-guide-first-working-backward-can-be-a-kill-criteria-for-features.md

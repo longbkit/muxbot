@@ -6,8 +6,8 @@ summary: For operator-facing and user-facing features, create and review the use
 related:
   - docs/user-guide/README.md
   - docs/user-guide/auth-and-roles.md
-  - docs/features/configuration/app-and-agent-authorization-and-owner-claim.md
-  - docs/tasks/features/configuration/2026-04-14-app-and-agent-authorization-and-owner-claim.md
+  - docs/features/auth/app-and-agent-authorization-and-owner-claim.md
+  - docs/tasks/features/auth/2026-04-14-app-and-agent-authorization-and-owner-claim.md
 ---
 
 ## Context

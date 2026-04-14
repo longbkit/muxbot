@@ -10,7 +10,7 @@ It is not the current runtime contract yet.
 
 For the implementation contract, see:
 
-- [App And Agent Authorization And Owner Claim](../features/configuration/app-and-agent-authorization-and-owner-claim.md)
+- [App And Agent Authorization And Owner Claim](../features/auth/app-and-agent-authorization-and-owner-claim.md)
 
 ## Status
 
@@ -349,5 +349,5 @@ When this slice ships, a clean rollout should look like this:
 
 - [User Guide](README.md)
 - [Channel Operations](channels.md)
-- [App And Agent Authorization And Owner Claim](../features/configuration/app-and-agent-authorization-and-owner-claim.md)
-- [App And Agent Authorization And Owner Claim Task](../tasks/features/configuration/2026-04-14-app-and-agent-authorization-and-owner-claim.md)
+- [App And Agent Authorization And Owner Claim](../features/auth/app-and-agent-authorization-and-owner-claim.md)
+- [App And Agent Authorization And Owner Claim Task](../tasks/features/auth/2026-04-14-app-and-agent-authorization-and-owner-claim.md)

@@ -7,6 +7,7 @@ Use `docs/tasks/features/` to group task docs by product area so the backlog sta
 Examples:
 
 - `channels`
+- `auth`
 - `agents`
 - `runners`
 - `control`

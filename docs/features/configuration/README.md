@@ -4,7 +4,7 @@
 
 Configuration is the local control plane for `clisbot`.
 
-It defines how channels, Agents, runners, and control are wired together.
+It defines how channels, auth, Agents, runners, and control are wired together.
 
 It also defines how runner-owned AI CLI session ids are created, captured, resumed, and persisted.
 
@@ -16,7 +16,7 @@ It also defines whether sensitive chat-surface commands such as transcript inspe
 
 It also defines first-run startup bootstrap behavior for default channel accounts and the first default agent.
 
-It also defines app-level ownership claim and app-or-agent authorization policy for operator and routed actions.
+It also defines persisted auth policy config used by the auth system for operator and routed actions.
 
 ## State
 
@@ -48,6 +48,7 @@ The system needs one explicit place to define:
 - runner session-id strategy such as `runner.sessionId.create`, `runner.sessionId.capture`, and `runner.sessionId.resume`
 - turn execution timers such as `stream.idleTimeoutMs`, `stream.noOutputTimeoutMs`, `stream.maxRuntimeMin`, and `stream.maxRuntimeSec`
 - stale cleanup loop policy such as `control.sessionCleanup.enabled` and `control.sessionCleanup.intervalMinutes`
+- persisted auth policy such as `app.auth`, `agents.<id>.auth`, and route-local privilege shape
 
 Without that, the implementation will drift into hidden defaults and hand-wired behavior.
 
@@ -96,10 +97,10 @@ Current policy meaning:
 ## Supporting Docs
 
 - [Start Bootstrap And Credential Persistence](start-bootstrap-and-credential-persistence.md)
-- [App And Agent Authorization And Owner Claim](app-and-agent-authorization-and-owner-claim.md)
 
 ## Dependencies
 
+- [Auth](../auth/README.md)
 - [Channels](../channels/README.md)
 - [Agents](../agents/README.md)
 - [Runners](../runners/README.md)
@@ -107,7 +108,7 @@ Current policy meaning:
 
 ## Current Focus
 
-Keep the current local JSON model, but expand it so the system can truthfully express routes, policies, runner choice, default chat rendering, explicit transcript request commands, and the new app-or-agent authorization model.
+Keep the current local JSON model, but expand it so the system can truthfully express routes, policies, runner choice, default chat rendering, explicit transcript request commands, and the persisted policy inputs used by the auth system.
 
 Current Slack defaults should favor visibility:
 

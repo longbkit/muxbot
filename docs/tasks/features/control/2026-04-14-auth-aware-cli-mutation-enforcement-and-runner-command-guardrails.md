@@ -19,7 +19,7 @@ After this later task:
 
 ## Why
 
-Phase 1 app or agent auth adds a truthful policy model plus prompt guidance, but prompt guidance alone is not hard enforcement.
+Phase 1 auth adds a truthful policy model plus prompt guidance, but prompt guidance alone is not hard enforcement.
 
 The later control-owned slice should close that gap for:
 
@@ -47,7 +47,7 @@ The later control-owned slice should close that gap for:
 
 ## Suggested Direction
 
-- centralize control auth in one resolver keyed by `app.auth`
+- centralize control-layer permission checks around one auth resolver keyed by `app.auth`
 - treat config-writing control commands as mutating by default
 - keep read-only commands such as `status` or `list` separate from mutation checks
 - explore runner guardrails as a second layer, not the canonical source of truth
@@ -55,5 +55,5 @@ The later control-owned slice should close that gap for:
 
 ## Related Docs
 
-- [App And Agent Authorization And Owner Claim](../../../features/configuration/app-and-agent-authorization-and-owner-claim.md)
-- [App And Agent Authorization And Owner Claim Task](../configuration/2026-04-14-app-and-agent-authorization-and-owner-claim.md)
+- [App And Agent Authorization And Owner Claim](../../../features/auth/app-and-agent-authorization-and-owner-claim.md)
+- [App And Agent Authorization And Owner Claim Task](../auth/2026-04-14-app-and-agent-authorization-and-owner-claim.md)

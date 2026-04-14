@@ -27,13 +27,15 @@ Keep feature docs ordered from generic to detail:
 Suggested structure:
 
 ```text
-docs/features/
-  README.md
-  feature-tables.md
-  channels/
+  docs/features/
     README.md
-  agents/
-    README.md
+    feature-tables.md
+    channels/
+      README.md
+    auth/
+      README.md
+    agents/
+      README.md
   runners/
     README.md
   control/

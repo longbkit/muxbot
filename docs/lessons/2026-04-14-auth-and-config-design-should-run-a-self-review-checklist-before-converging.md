@@ -4,8 +4,8 @@ date: 2026-04-14
 area: configuration, control, prompts, docs
 summary: For auth and config design, do not wait for human pushback to expose gaps. First force a short self-review of current vs target behavior, ownership boundaries, default semantics, enforcement layers, operator workflow, regression risks, and compatibility policy before settling on syntax or docs.
 related:
-  - docs/features/configuration/app-and-agent-authorization-and-owner-claim.md
-  - docs/tasks/features/configuration/2026-04-14-app-and-agent-authorization-and-owner-claim.md
+  - docs/features/auth/app-and-agent-authorization-and-owner-claim.md
+  - docs/tasks/features/auth/2026-04-14-app-and-agent-authorization-and-owner-claim.md
   - docs/tasks/features/control/2026-04-14-auth-aware-cli-mutation-enforcement-and-runner-command-guardrails.md
   - docs/user-guide/auth-and-roles.md
   - src/channels/agent-prompt.ts

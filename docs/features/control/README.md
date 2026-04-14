@@ -2,7 +2,7 @@
 
 ## Summary
 
-Control is the operator-facing system for inspecting, intervening, and handling operator permissions in `clisbot`.
+Control is the operator-facing system for inspecting and intervening in `clisbot`.
 
 ## State
 
@@ -18,6 +18,10 @@ Session-scoped follow-up behavior changes requested by end users do not belong h
 
 Those belong to agents runtime policy, because they are part of the conversation contract rather than operator intervention.
 
+Permission semantics do not belong here either.
+
+Those belong to auth, because control is a surface that consumes auth decisions rather than the owner of the auth model.
+
 ## Scope
 
 - inspect flows
@@ -25,7 +29,6 @@ Those belong to agents runtime policy, because they are part of the conversation
 - restart and stop flows
 - health and debug views
 - inspect and cancel persisted managed loops
-- permission and access-control flows for operator actions
 - operator-safe intervention points
 - config reload watch behavior
 
@@ -34,6 +37,7 @@ Those belong to agents runtime policy, because they are part of the conversation
 - end-user message rendering
 - backend-specific runner details
 - channel routing
+- owning the auth model itself
 
 ## Related Task Folder
 
@@ -49,6 +53,7 @@ Those belong to agents runtime policy, because they are part of the conversation
 
 ## Dependencies
 
+- [Auth](../auth/README.md)
 - [Agents](../agents/README.md)
 - [Runners](../runners/README.md)
 
@@ -60,4 +65,3 @@ Current control-owned config is:
 
 - `control.configReload.watch`
 - `control.configReload.watchDebounceMs`
-- privilege or permission policy that gates operator actions

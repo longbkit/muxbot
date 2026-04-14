@@ -45,6 +45,12 @@ User selectors stay simple for phase 1:
 
 This slice does not need a separate identity registry yet.
 
+## Ownership Split
+
+- auth owns the permission model, role semantics, owner claim, and enforcement contract
+- configuration owns the persisted shape that stores `app.auth`, `agents.<id>.auth`, and route-local privilege policy
+- control, channels, and agents consume auth decisions rather than owning the model itself
+
 ## Product Rules
 
 - `app.auth` owns app-wide control permissions

@@ -1,10 +1,11 @@
-# Architecture Boundary Clarification For Surfaces, Agents, And Runners
+# Architecture Boundary Clarification For Surfaces, Auth, Agents, And Runners
 
 ## Summary
 
 Clarify the main architecture boundaries across:
 
 - channels
+- auth
 - control
 - configuration
 - agents
@@ -14,7 +15,7 @@ The current high-level split is directionally correct, but the docs still leave 
 
 - command lifecycle across layers
 - channel versus control surface ownership
-- permission ownership across control, channels, and configuration
+- permission ownership across auth, control, channels, and configuration
 - follow-up ownership across configuration, channels, and agents
 - canonical continuity state versus derived runtime or debug state
 
@@ -24,7 +25,7 @@ Planned
 
 ## Why
 
-The repository already documents the five-system split, but the current architecture docs still make some flows feel under-specified.
+The repository already documents the top-level system split, but the current architecture docs still make some flows feel under-specified.
 
 That especially affects:
 
@@ -38,11 +39,12 @@ Without one cleanup pass, later feature work will keep patching symptoms instead
 
 ## Scope
 
-- refine the architecture docs so the five-system split reads as one coherent model
+- refine the architecture docs so the six-system split reads as one coherent model
 - define the lifecycle of one inbound message or slash command across layers
 - make channel-first ingress and parsing explicit
 - distinguish clearly between:
   - channel-owned surface replies
+  - auth-owned permission semantics
   - agent-owned command intents and session semantics
   - runner-owned execution primitives
   - control-owned operator actions
@@ -87,9 +89,10 @@ Refine the ownership split to:
 
 Refine the permission split to:
 
-- control owns operator-facing permission semantics and access-control behavior
+- auth owns permission semantics, owner claim, and cross-system resolution rules
 - configuration owns the persisted policy config that drives those rules
-- channels may enforce route-local privilege gates for in-chat commands before handoff, but they do not become the canonical owner of operator permission semantics
+- control consumes auth for operator-facing enforcement
+- channels may enforce route-local privilege gates for in-chat commands before handoff, but they do not become the canonical owner of permission semantics
 
 This should make it easier to explain:
 
@@ -119,9 +122,9 @@ Make it explicit which persisted fields are:
 
 ## Exit Criteria
 
-- `docs/architecture/` describes the five-system split without major boundary ambiguity
+- `docs/architecture/` describes the six-system split without major boundary ambiguity
 - command lifecycle across channels, agents, runners, and control is documented explicitly
-- permission ownership across control, channels, and configuration is documented explicitly
+- permission ownership across auth, control, channels, and configuration is documented explicitly
 - follow-up ownership no longer reads as if one layer owns all of it
 - persisted session continuity docs distinguish canonical state from derived runtime state
 - later feature and task docs can link to one clarified architecture baseline instead of restating these rules ad hoc
@@ -133,6 +136,7 @@ Make it explicit which persisted fields are:
 - [Runtime Architecture](../architecture/runtime-architecture.md)
 - [Model Taxonomy And Boundaries](../architecture/model-taxonomy-and-boundaries.md)
 - [Agents Feature](../features/agents/README.md)
+- [Auth Feature](../features/auth/README.md)
 - [Channels Feature](../features/channels/README.md)
 - [Control Feature](../features/control/README.md)
 - [Configuration Feature](../features/configuration/README.md)
