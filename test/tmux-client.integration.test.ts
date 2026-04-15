@@ -41,6 +41,25 @@ describe("TmuxClient", () => {
     await client.killSession(sessionName);
   }, 10000);
 
+  test("cold socket path reports no running server before the first session exists", async () => {
+    socketDir = mkdtempSync(join(tmpdir(), "clisbot-socket-"));
+    const socketPath = join(socketDir, "clisbot.sock");
+    const client = new TmuxClient(socketPath);
+
+    expect(await client.isServerRunning()).toBe(false);
+
+    await client.newSession({
+      sessionName: "cold-start-test",
+      cwd: socketDir,
+      command: "cat",
+    });
+
+    expect(await client.isServerRunning()).toBe(true);
+    expect(await client.hasSession("cold-start-test")).toBe(true);
+
+    await client.killSession("cold-start-test");
+  }, 10000);
+
   test("creates a transient window and captures its pane output", async () => {
     socketDir = mkdtempSync(join(tmpdir(), "clisbot-socket-"));
     const socketPath = join(socketDir, "clisbot.sock");

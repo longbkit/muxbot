@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { commandExists, runCommand } from "../../shared/process.ts";
+import { commandExists, runCommand, sleep } from "../../shared/process.ts";
 
 const MAIN_WINDOW_NAME = "main";
 const TMUX_NOT_FOUND_CODE = "ENOENT";
+const TMUX_SERVER_BOOTSTRAP_TIMEOUT_MS = 1_000;
+const TMUX_SERVER_BOOTSTRAP_POLL_MS = 25;
 const TMUX_SERVER_DEFAULTS = [
   ["exit-empty", "off"],
   ["destroy-unattached", "off"],
@@ -22,6 +24,12 @@ export type TmuxPaneState = {
 
 export class TmuxClient {
   constructor(private readonly socketPath: string) {}
+
+  private isServerUnavailableOutput(output: string) {
+    return /no server running|No such file or directory|failed to connect to server|error connecting to/i.test(
+      output,
+    );
+  }
 
   private async exec(args: string[], options: { cwd?: string } = {}): Promise<TmuxExecResult> {
     if (!commandExists("tmux")) {
@@ -95,7 +103,11 @@ export class TmuxClient {
     }
 
     const output = `${result.stderr}\n${result.stdout}`.trim();
-    return !output.includes("no server running");
+    if (this.isServerUnavailableOutput(output)) {
+      return false;
+    }
+
+    return false;
   }
 
   async ensureServerDefaults() {
@@ -105,6 +117,44 @@ export class TmuxClient {
 
     for (const [name, value] of TMUX_SERVER_DEFAULTS) {
       await this.execOrThrow(["set-option", "-g", name, value]);
+    }
+  }
+
+  private isBootstrapRetryableError(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return this.isServerUnavailableOutput(message);
+  }
+
+  private async withServerBootstrapRetry<T>(task: () => Promise<T>) {
+    const deadline = Date.now() + TMUX_SERVER_BOOTSTRAP_TIMEOUT_MS;
+
+    while (true) {
+      try {
+        return await task();
+      } catch (error) {
+        if (!this.isBootstrapRetryableError(error) || Date.now() >= deadline) {
+          throw error;
+        }
+        await sleep(TMUX_SERVER_BOOTSTRAP_POLL_MS);
+      }
+    }
+  }
+
+  private async waitForSessionBootstrap(sessionName: string) {
+    const deadline = Date.now() + TMUX_SERVER_BOOTSTRAP_TIMEOUT_MS;
+
+    while (true) {
+      if (await this.hasSession(sessionName)) {
+        return;
+      }
+
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `tmux session "${sessionName}" did not become reachable on socket ${this.socketPath} within ${TMUX_SERVER_BOOTSTRAP_TIMEOUT_MS}ms.`,
+        );
+      }
+
+      await sleep(TMUX_SERVER_BOOTSTRAP_POLL_MS);
     }
   }
 
@@ -124,8 +174,13 @@ export class TmuxClient {
       params.cwd,
       params.command,
     ]);
-    await this.ensureServerDefaults();
-    await this.freezeWindowName(`${params.sessionName}:${MAIN_WINDOW_NAME}`);
+    await this.waitForSessionBootstrap(params.sessionName);
+    await this.withServerBootstrapRetry(async () => {
+      await this.ensureServerDefaults();
+    });
+    await this.withServerBootstrapRetry(async () => {
+      await this.freezeWindowName(`${params.sessionName}:${MAIN_WINDOW_NAME}`);
+    });
   }
 
   async newWindow(params: {
