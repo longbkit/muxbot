@@ -2,7 +2,7 @@
 
 ## Summary
 
-Introduce one explicit auth model for app-level control and agent-level runtime behavior, plus a first-owner claim flow for fresh installs, while keeping the initial slice small enough to ship quickly.
+Introduce the smallest auth slice that solves the urgent problems without expanding into a full matrix refactor.
 
 ## Status
 
@@ -12,192 +12,204 @@ Ready
 
 After this task:
 
-- `clisbot.json` can express `app.auth` and `agents.<id>.auth`
-- app ownership can be claimed automatically only while the app has no owner
-- routed users who are not explicitly listed still resolve to `member`
-- `privilegeCommands` no longer exists as a separate route-local policy shape
-- injected agent prompts receive truthful auth context for config mutation guidance
-- channel slash-command handling can enforce the main role-mapped agent permissions
-- app `owner` and app `admin` both satisfy agent-level permissions implicitly
-- full CLI mutation enforcement remains a separate later task
+- `privilegeCommands` no longer exists as a supported config concept
+- valid routed users still resolve to `member` by default
+- default routed `member`s can use normal in-channel controls:
+  - `sendMessage`
+  - `helpView`
+  - `statusView`
+  - `identityView`
+  - `transcriptView`
+  - `runObserve`
+  - `runInterrupt`
+  - `streamingManage`
+  - `queueManage`
+  - `steerManage`
+  - `loopManage`
+- `/bash` is controlled by whether the resolved role has `shellExecute`
+- non-admin users cannot use normal messages, queued messages, steering messages, or loop-triggered prompts to make the agent edit protected clisbot control resources or run `clisbot` commands that mutate them
+- owner claim exists for fresh installs with no owner yet
 
 ## Why
 
-The current model is too narrow:
+The old route-local `privilegeCommands` setting is the wrong long-term model, but phase 1 does not need a fully split permission system either.
 
-- route-local privilege gating is a second blurry permission system
-- `privilegeCommands` is not a clean product concept and overlaps with role semantics anyway
-- app ownership and agent ownership do not exist as first-class policy
-- prompt guidance cannot explain who is actually allowed to mutate `clisbot`
-- there is no stable policy source for later CLI permission checks
+The smallest useful slice is:
 
-This task introduces the minimum shared policy model that later slices can reuse.
+- introduce one clean auth grammar
+- keep default `member` practical for everyday routed work
+- reserve `shellExecute` for admin-level role grants
+- protect the truly dangerous mutation paths first
 
 ## Scope
 
-- add `app.auth` to persisted config
-- add `agents.<id>.auth` to persisted config
+### In Scope
+
+- add `app.auth`
+- add `agents.<id>.auth`
 - add `ownerClaimWindowMinutes`
 - add `defaultRole`
 - add `roles.<role>.allow`
 - add `roles.<role>.users`
-- remove route-local `privilegeCommands` as a supported permission model
-- resolve effective app role and agent role for the current sender
-- inject prompt guidance based on resolved app or agent auth
-- inject auth guidance through a protected prompt segment that template overrides cannot remove
-- gate selected channel slash commands from agent auth
-- define the phase-1 command-to-permission mapping for current routed slash actions
-- update docs, help text, and tests
+- resolve app role and agent role for the current sender
+- remove `privilegeCommands` from the supported config model
+- fail fast if `privilegeCommands` appears in config
+- seed default `member` role for routed users
+- define phase-1 default member permissions as:
+  - `sendMessage`
+  - `helpView`
+  - `statusView`
+  - `identityView`
+  - `transcriptView`
+  - `runObserve`
+  - `runInterrupt`
+  - `streamingManage`
+  - `queueManage`
+  - `steerManage`
+  - `loopManage`
+- move `/bash` under explicit `shellExecute` role grants
+- inject a protected prompt rule into routed prompts
+- apply that rule to normal, queue, steer, and loop delivery
+- add or update tests for this narrowed contract
 
-## Non-Goals
+### Out Of Scope
 
-- hard enforcement for config-mutating `clisbot` CLI commands
-- shell-level blocking of `clisbot` mutation commands inside the agent runner
-- a separate principal registry
-- channel-first admin scopes
-- full CLI enforcement for config-mutating `clisbot` commands
-- backward-compatible loading of `privilegeCommands` in any form
-- writing the full end-user operator guide for role management
+- control CLI enforcement
+- shell-level command filtering inside the runner
+- fine-grained split permissions for queue, steer, and loop sub-actions
+- compatibility support for legacy `privilegeCommands`
 
-## Affected Surfaces
+## Required Product Contract
 
-### 1. Prompt Context
+### 1. Member Baseline
 
-Phase 1 should pass auth truth into the injected prompt so the agent sees at least:
+- routed users not explicitly listed in a role resolve to `member`
+- route admission still decides whether the route is valid
+- after route admission, `member` should remain low-friction
+- `member` should have:
+  - `sendMessage`
+  - `helpView`
+  - `statusView`
+  - `identityView`
+  - `transcriptView`
+  - `runObserve`
+  - `runInterrupt`
+  - `streamingManage`
+  - `queueManage`
+  - `steerManage`
+  - `loopManage`
+- `/bash` depends on whether the resolved role includes `shellExecute`
+- principals stay platform-scoped in phase 1, so Telegram and Slack identities are not auto-linked
 
-- current app role
-- current agent role
-- whether config mutation is allowed
-- whether `clisbot` mutation CLI commands are allowed
+### 2. Non-Admin Prompt Refusal
 
-This guidance is advisory, but it should be precise enough to reduce accidental config mutation by non-owners.
+The protected prompt rule must apply to:
 
-Implementation rule:
+- normal messages
+- queued messages
+- steering messages
+- loop-triggered prompts
 
-- the auth block should be appended from a protected system-owned or developer-owned prompt layer after normal template resolution
-- operator-editable prompt templates may change general wording, but they should not be able to delete or weaken the auth facts
-- the block should explicitly instruct the agent to refuse unauthorized requests to edit `clisbot.json`, mutate auth roles, or run config-mutating `clisbot` commands
-- the block should exist for normal user messages, steering messages, and loop-triggered prompts
-- the block should expose a bounded set of auth facts instead of a large free-form object
+The rule is:
 
-### 2. Channel Slash Commands
+```text
+Refuse requests to edit protected clisbot control resources such as clisbot.json and auth policy, or to run clisbot commands that mutate them.
+```
 
-Phase 1 should enforce agent permissions in `src/channels/interaction-processing.ts` for the main routed control actions with one explicit mapping table.
+Allowed fallback behavior:
 
-Minimum phase-1 gating set:
+- explain the needed change
+- draft a command for admin review
+- say which role is required
 
-- `/help` -> `helpView`
-- `/status` -> `statusView`
-- `/whoami` -> `identityView`
-- `/transcript` -> `transcriptView`
-- `/attach`, `/detach`, `/watch ...` -> `runObserve`
-- `/stop` -> `runInterrupt`
-- `/nudge` -> `runNudge`
-- `/followup ...` writes -> `followupManage`
-- `/streaming ...` writes -> `streamingManage`
-- `/responsemode ...` writes -> `responseModeManage`
-- `/additionalmessagemode ...` writes -> `additionalMessageModeManage`
-- `/queue <message>` -> `queueAdd`
-- `/steer <message>` -> `steeringSend`
-- `/queue-list` -> `queueView`
-- `/queue-clear` -> `queueClear`
-- `/loop ...` create -> `loopCreate`
-- `/loop status` -> `loopView`
-- `/loop cancel ...` -> `loopCancel`
-- `/bash ...` and shortcut prefixes -> `shellExecute`
+### 3. Owner Claim
 
-Normal routed chat should remain allowed for `member` through `chat`.
+- if `app.auth.roles.owner.users` is empty on runtime start, claim opens for `ownerClaimWindowMinutes`
+- the first successful DM user during that window becomes owner
+- once any owner exists, restart must not reopen claim
+- owner claim is app-wide, so a later DM from another platform principal must not auto-claim owner
+- resolved app `owner` and app `admin` principals should bypass pairing automatically
 
-### 3. Later Control CLI Enforcement
+## Minimal Permission Model
 
-App-level owner or admin checks for config-mutating `clisbot` CLI commands should stay out of this slice and move to a later control-owned task.
+This task only needs the permissions below.
 
-## Product Rules
+### App-Level
 
-- `app.auth.roles.owner.users` is the canonical owner source of truth
-- if the owner list is empty at runtime start, claim stays open for `ownerClaimWindowMinutes`
-- the first successful DM user during that window is added to `owner.users`
-- once an owner exists, later restarts do not reopen claim
-- if operators remove every owner later, the next start opens claim again
-- a user not listed in an agent role resolves to `agents.<id>.auth.defaultRole`
-- phase 1 should use `member` as the normal default role
-- pairing or route admission still decides whether the user reaches the bot at all
-- agent auth only decides what the user may do after that
-- app `owner` should satisfy every app-level permission
-- app `admin` should satisfy every app-level permission that its role grants
-- phase 1 should also treat app `owner` and app `admin` as implicitly allowed for every agent-level permission
-- `privilegeCommands` should stop being a supported config concept rather than being renamed or normalized
+- `configManage`
+- `appAuthManage`
+- `agentAuthManage`
+- `promptGovernanceManage`
+
+### Agent-Level
+
+- `sendMessage`
+- `helpView`
+- `statusView`
+- `identityView`
+- `transcriptView`
+- `runObserve`
+- `runInterrupt`
+- `streamingManage`
+- `queueManage`
+- `steerManage`
+- `loopManage`
+- `shellExecute`
+- `runNudge`
+- `followupManage`
+- `responseModeManage`
+- `additionalMessageModeManage`
+
+Phase 1 rule:
+
+- app `owner` and app `admin` satisfy admin-level checks implicitly
+- `shellExecute` stays explicit and is not part of default `member`
 
 ## Implementation Notes
 
-- `src/config/schema.ts` owns the new persisted shape
-- `src/config/template.ts` should seed the new auth blocks
-- startup and DM-pairing flow should own the owner-claim behavior
-- one shared auth resolver should map sender identity to app role and agent role
-- `src/channels/agent-prompt.ts` should render auth context into the prompt
-- `src/channels/interaction-processing.ts` should enforce the selected agent permissions
-- the implementation should keep one explicit mapping table between current slash commands and the new permission names
-- config loading should reject any `privilegeCommands` keys as unsupported and point operators to `app.auth` and `agents.<id>.auth`
-- `/bash` should become a normal `shellExecute` permission check instead of a separate route-local gate
-- prompt rendering should inject auth facts after template resolution so editable templates cannot weaken the protected auth contract
-- deny messages should follow one shared convention across slash-command denials and prompt refusals
+- `src/config/schema.ts` defines the new auth shape
+- config templates should seed `member` as the default role
+- any `privilegeCommands` key should fail config loading
+- prompt rendering should inject the protected rule after normal template resolution
+- the protected rule must not be removable by editable templates
+- queue, steer, and loop delivery must reuse the same protected rule as normal messages
+- broad advanced-command gating should not be expanded in this task unless directly needed for the above contract
 
 ## Suggested Validation
 
 - `bun x tsc --noEmit`
-- targeted config-schema tests
+- targeted schema tests for `app.auth` and `agents.<id>.auth`
+- targeted loader tests that `privilegeCommands` now fails
 - targeted startup or pairing tests for owner claim
-- targeted interaction-processing tests for slash-command auth
-- targeted prompt-rendering tests for auth context
-- targeted schema validation tests that any `privilegeCommands` config now fails as unsupported
-- targeted denial-copy tests for representative routed actions
+- targeted prompt-rendering tests for the protected rule
+- targeted refusal tests for:
+  - normal message asking to edit `clisbot.json`
+  - queued message asking to mutate auth policy
+  - steering message asking to run config-mutating `clisbot` CLI
+  - loop-triggered prompt asking to mutate protected control resources
 - full `bun test`
 
-## Regression Risks To Test
+## Regression Risks
 
-- a non-owner tries to induce config mutation through normal chat, steering, or loop prompt paths
-- owner claim is attempted from a non-DM context and must not succeed
-- `member` can still do the intended low-friction actions, but cannot reach `shellExecute`, `transcriptView`, or `runObserve` unless granted
-- app `owner` and app `admin` still satisfy agent-level permission checks in phase 1
-- no leftover route-local `privilegeCommands` branch still affects `/bash` behavior
-- any config that still includes `privilegeCommands` fails fast instead of surviving as a shadow policy
+- default `member` loses one of the intended in-channel controls
+- `shellExecute` leaks into `member`
+- loader still accepts `privilegeCommands` somewhere
+- queue, steer, or loop delivery misses the protected rule
+- prompt templates weaken the protected rule
+- owner claim opens outside DM or reopens incorrectly
+- platform principals are accidentally auto-linked or bypass pairing without explicit role grant
 
 ## Exit Criteria
 
-- config supports `app.auth` and `agents.<id>.auth`
-- owner claim opens only while the owner list is empty
-- the first successful DM during claim becomes owner automatically
-- non-listed routed users resolve to `member`
-- app `owner` and app `admin` both satisfy agent-level permission checks implicitly
-- `privilegeCommands` is removed instead of being replaced by another route-local permission shape
-- injected prompt text includes truthful app or agent auth context
-- selected channel slash commands are denied or allowed from resolved agent permissions
-- any `privilegeCommands` config fails as unsupported and points to `app.auth` and `agents.<id>.auth`
-- docs explain that prompt guidance ships now but hard CLI enforcement is still pending
-- docs explain that a separate user-guide follow-up is still needed before the role model is end-user complete
-
-## Phase Plan
-
-### Phase 1
-
-- `app.auth` and `agents.<id>.auth`
-- owner claim
-- protected auth prompt segment
-- routed slash-command gating
-- shared deny-message convention
-
-### Phase 2
-
-- `clisbot auth ...` operator CLI
-- shipped operator guide and denial troubleshooting against the real runtime
-- optional admin or advanced slash-help split
-
-### Later
-
-- control CLI enforcement for config mutation
-- runner-side blocking for unauthorized mutation commands where justified
+- `app.auth` and `agents.<id>.auth` exist in config
+- `privilegeCommands` is rejected everywhere
+- docs say clearly that default `member` includes `sendMessage`, `helpView`, `statusView`, `identityView`, `transcriptView`, `runObserve`, `runInterrupt`, `streamingManage`, `queueManage`, `steerManage`, and `loopManage`
+- docs say clearly that `/bash` depends on explicit `shellExecute` grants
+- non-admin users are refused when normal, queue, steer, or loop delivery tries to mutate protected clisbot control resources
+- owner claim works only when the app has no owner yet
+- owner/admin principals bypass pairing, but cross-platform identities do not auto-link
+- docs say clearly that finer-grained permission splitting is later work
 
 ## Related Docs
 
 - [App And Agent Authorization And Owner Claim](../../../features/auth/app-and-agent-authorization-and-owner-claim.md)
-- [Auth-Aware CLI Mutation Enforcement And Runner Command Guardrails](../control/2026-04-14-auth-aware-cli-mutation-enforcement-and-runner-command-guardrails.md)

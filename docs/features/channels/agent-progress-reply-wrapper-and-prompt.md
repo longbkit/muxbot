@@ -30,6 +30,7 @@ The feature combines three pieces:
 ## Invariants
 
 - channels own the prompt-envelope text because the envelope is surface context
+- delayed queued work and looped work must reapply current channel delivery policy instead of relying on stale wrapped prompt text
 - channels still observe runner state even when `responseMode` is `message-tool`
 - channels may render one disposable live draft preview while `message-tool` owns canonical replies
 - channels still monitor pane state even when additional human messages are handled as steering input

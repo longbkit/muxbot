@@ -19,6 +19,7 @@ When `responseMode: "message-tool"` is active, `clisbot` may still show one disp
 
 - `responseMode` decides who owns canonical user-facing reply delivery
 - `streaming` decides whether the channel shows live preview while a run is active
+- delayed work such as queued turns and loop ticks must follow the same `streaming` rule as immediate turns
 - `message-tool` still allows one live draft preview when `streaming` is enabled
 - draft preview is never a second canonical final reply
 - if a tool-owned message lands in the thread during streaming, the current draft freezes
