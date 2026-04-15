@@ -1,7 +1,7 @@
 {
   "meta": {
     "schemaVersion": 1,
-    "lastTouchedAt": "2026-04-07T00:00:00.000Z"
+    "lastTouchedAt": "2026-04-15T00:00:00.000Z"
   },
   "tmux": {
     "socketPath": "~/.clisbot/state/clisbot.sock"
@@ -12,9 +12,81 @@
     "identityLinks": {},
     "storePath": "~/.clisbot/state/sessions.json"
   },
+  "app": {
+    "auth": {
+      "ownerClaimWindowMinutes": 30,
+      "defaultRole": "member",
+      "roles": {
+        "owner": {
+          "allow": [
+            "configManage",
+            "appAuthManage",
+            "agentAuthManage",
+            "promptGovernanceManage"
+          ],
+          "users": []
+        },
+        "admin": {
+          "allow": [
+            "configManage",
+            "appAuthManage",
+            "agentAuthManage",
+            "promptGovernanceManage"
+          ],
+          "users": []
+        },
+        "member": {
+          "allow": [],
+          "users": []
+        }
+      }
+    }
+  },
   "agents": {
     "defaults": {
       "workspace": "~/.clisbot/workspaces/{agentId}",
+      "auth": {
+        "defaultRole": "member",
+        "roles": {
+          "admin": {
+            "allow": [
+              "sendMessage",
+              "helpView",
+              "statusView",
+              "identityView",
+              "transcriptView",
+              "runObserve",
+              "runInterrupt",
+              "streamingManage",
+              "queueManage",
+              "steerManage",
+              "loopManage",
+              "shellExecute",
+              "runNudge",
+              "followupManage",
+              "responseModeManage",
+              "additionalMessageModeManage"
+            ],
+            "users": []
+          },
+          "member": {
+            "allow": [
+              "sendMessage",
+              "helpView",
+              "statusView",
+              "identityView",
+              "transcriptView",
+              "runObserve",
+              "runInterrupt",
+              "streamingManage",
+              "queueManage",
+              "steerManage",
+              "loopManage"
+            ],
+            "users": []
+          }
+        }
+      },
       "runner": {
         "command": "codex",
         "args": [
@@ -72,11 +144,20 @@
     "configReload": {
       "watch": true,
       "watchDebounceMs": 250
+    },
+    "sessionCleanup": {
+      "enabled": true,
+      "intervalMinutes": 5
+    },
+    "loop": {
+      "maxRunsPerLoop": 20,
+      "maxActiveLoops": 10,
+      "defaultTimezone": "UTC"
     }
   },
   "channels": {
     "slack": {
-      "enabled": true,
+      "enabled": false,
       "mode": "socket",
       "appToken": "${SLACK_APP_TOKEN}",
       "botToken": "${SLACK_BOT_TOKEN}",
@@ -104,10 +185,6 @@
       "channelPolicy": "allowlist",
       "groupPolicy": "allowlist",
       "defaultAgentId": "default",
-      "privilegeCommands": {
-        "enabled": false,
-        "allowUsers": []
-      },
       "commandPrefixes": {
         "slash": [
           "::",
@@ -121,6 +198,7 @@
       "response": "final",
       "responseMode": "message-tool",
       "additionalMessageMode": "steer",
+      "verbose": "minimal",
       "followUp": {
         "mode": "auto",
         "participationTtlMin": 5
@@ -132,15 +210,11 @@
         "policy": "pairing",
         "allowFrom": [],
         "requireMention": false,
-        "agentId": "default",
-        "privilegeCommands": {
-          "enabled": false,
-          "allowUsers": []
-        }
+        "agentId": "default"
       }
     },
     "telegram": {
-      "enabled": true,
+      "enabled": false,
       "mode": "polling",
       "botToken": "${TELEGRAM_BOT_TOKEN}",
       "defaultAccount": "default",
@@ -157,10 +231,6 @@
       "allowBots": false,
       "groupPolicy": "allowlist",
       "defaultAgentId": "default",
-      "privilegeCommands": {
-        "enabled": false,
-        "allowUsers": []
-      },
       "commandPrefixes": {
         "slash": [
           "::",
@@ -174,6 +244,7 @@
       "response": "final",
       "responseMode": "message-tool",
       "additionalMessageMode": "steer",
+      "verbose": "minimal",
       "followUp": {
         "mode": "auto",
         "participationTtlMin": 5
@@ -189,11 +260,7 @@
         "allowFrom": [],
         "requireMention": false,
         "allowBots": false,
-        "agentId": "default",
-        "privilegeCommands": {
-          "enabled": false,
-          "allowUsers": []
-        }
+        "agentId": "default"
       }
     }
   }

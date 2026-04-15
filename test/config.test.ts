@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadConfig } from "../src/config/load-config.ts";
-import { readEditableConfig } from "../src/config/config-file.ts";
+import { readEditableConfig, writeEditableConfig } from "../src/config/config-file.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 describe("loadConfig", () => {
@@ -576,6 +576,35 @@ describe("loadConfig", () => {
       join(clisbotHome, "workspaces", "{agentId}"),
     );
   });
+
+  test("writeEditableConfig preserves legacy keys instead of silently stripping them", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+
+    await Bun.write(
+      configPath,
+      JSON.stringify({
+        channels: {
+          slack: {
+            enabled: false,
+            privilegeCommands: {
+              enabled: true,
+              allowUsers: ["U123"],
+            },
+          },
+          telegram: {
+            enabled: false,
+          },
+        },
+      }),
+    );
+
+    const editable = await readEditableConfig(configPath);
+    await writeEditableConfig(configPath, editable.config);
+
+    const written = await Bun.file(configPath).text();
+    expect(written).toContain("\"privilegeCommands\"");
+  });
 });
 
 describe("renderDefaultConfigTemplate", () => {
@@ -593,5 +622,28 @@ describe("renderDefaultConfigTemplate", () => {
     expect(template.tmux.socketPath).toBe("~/.clisbot-dev/state/clisbot.sock");
     expect(template.session.storePath).toBe("~/.clisbot-dev/state/sessions.json");
     expect(template.agents.defaults.workspace).toBe("~/.clisbot-dev/workspaces/{agentId}");
+  });
+
+  test("matches config/clisbot.json.template after normalizing dynamic fields", () => {
+    const generated = JSON.parse(
+      renderDefaultConfigTemplate({
+        slackEnabled: false,
+        telegramEnabled: false,
+      }),
+    ) as Record<string, unknown>;
+    const staticTemplate = JSON.parse(
+      readFileSync(new URL("../config/clisbot.json.template", import.meta.url), "utf8"),
+    ) as Record<string, unknown>;
+
+    (generated.meta as { lastTouchedAt: string }).lastTouchedAt =
+      "2026-04-15T00:00:00.000Z";
+    (staticTemplate.meta as { lastTouchedAt: string }).lastTouchedAt =
+      "2026-04-15T00:00:00.000Z";
+    ((generated.control as { loop: { defaultTimezone: string } }).loop).defaultTimezone =
+      "UTC";
+    ((staticTemplate.control as { loop: { defaultTimezone: string } }).loop).defaultTimezone =
+      "UTC";
+
+    expect(staticTemplate).toEqual(generated);
   });
 });
