@@ -167,12 +167,14 @@ describe("runtime summaries", () => {
     );
     expect(startText).toContain("Auth onboarding:");
     expect(startText).toContain("Telegram groups or topics can use `/whoami` before routing, while DMs with pairing must pair first");
-    expect(startText).toContain("clisbot auth add-user app --role owner --user <principal>");
+    expect(startText).toContain("the first DM user during the first 30 minutes becomes app owner automatically");
+    expect(startText).toContain("clisbot auth add-user app --role <owner|admin> --user <principal>");
     expect(startText).toContain("clisbot auth add-permission ...");
     expect(startText).toContain("clisbot auth --help");
     expect(startText).toContain("clisbot pairing approve telegram <code>");
     expect(startText).toContain("clisbot pairing approve slack <code>");
     expect(startText).toContain("Configured app owner/admin principals bypass pairing in DMs.");
+    expect(startText).toContain("If no owner is configured yet, the first DM user during the first 30 minutes becomes app owner automatically.");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock list-sessions");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>");
   });

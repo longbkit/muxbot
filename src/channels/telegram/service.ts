@@ -47,6 +47,10 @@ import type { TelegramAccountConfig } from "../../config/channel-accounts.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
 import { resolveChannelAuth } from "../../auth/resolve.ts";
+import {
+  claimFirstOwnerFromDirectMessage,
+  renderFirstOwnerClaimMessage,
+} from "../../auth/owner-claim.ts";
 import { logLatencyDebug } from "../../control/latency-debug.ts";
 import { renderTelegramRouteChoiceMessage } from "./route-guidance.ts";
 import { beginTelegramTypingHeartbeat } from "./typing.ts";
@@ -430,20 +434,54 @@ export class TelegramPollingService {
       const directMessages = this.loadedConfig.raw.channels.telegram.directMessages;
       const senderId = message.from?.id != null ? String(message.from.id) : "";
       const senderUsername = message.from?.username;
-      const auth = resolveChannelAuth({
-        config: this.loadedConfig.raw,
-        agentId: routeInfo.route.agentId,
-        identity: {
-          platform: "telegram",
-          conversationKind: routeInfo.conversationKind,
-          senderId: senderId || undefined,
-          chatId: String(message.chat.id),
-        },
-      });
+      const dmIdentity = {
+        platform: "telegram" as const,
+        conversationKind: routeInfo.conversationKind,
+        senderId: senderId || undefined,
+        chatId: String(message.chat.id),
+      };
       if (!senderId || directMessages.policy === "disabled") {
         await this.processedEventsStore.markCompleted(eventId);
         return;
       }
+
+      let ownerClaimed = false;
+      let ownerPrincipal: string | undefined;
+      try {
+        const claimResult = await claimFirstOwnerFromDirectMessage({
+          config: this.loadedConfig.raw,
+          configPath: this.loadedConfig.configPath,
+          identity: dmIdentity,
+        });
+        ownerClaimed = claimResult.claimed;
+        ownerPrincipal = claimResult.principal;
+      } catch (error) {
+        console.error("telegram first-owner claim failed", error);
+      }
+
+      if (ownerClaimed && ownerPrincipal) {
+        try {
+          await callTelegramApi(
+            this.accountConfig.botToken,
+            "sendMessage",
+            {
+              chat_id: message.chat.id,
+              text: renderFirstOwnerClaimMessage({
+                principal: ownerPrincipal,
+                ownerClaimWindowMinutes: this.loadedConfig.raw.app.auth.ownerClaimWindowMinutes,
+              }),
+            },
+          );
+        } catch (error) {
+          console.error("telegram first-owner claim reply failed", error);
+        }
+      }
+
+      const auth = resolveChannelAuth({
+        config: this.loadedConfig.raw,
+        agentId: routeInfo.route.agentId,
+        identity: dmIdentity,
+      });
 
       if (directMessages.policy !== "open" && !auth.mayBypassPairing) {
         const storedAllowFrom = await readChannelAllowFromStore("telegram");

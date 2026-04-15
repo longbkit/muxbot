@@ -37,6 +37,7 @@ type ActiveRun = {
   observerFailures: Map<string, number>;
   initialResult: Deferred<AgentExecutionResult>;
   latestUpdate: RunUpdate;
+  steeringReady: boolean;
 };
 
 const OBSERVER_RETRYABLE_FAILURE_LIMIT = 3;
@@ -183,6 +184,7 @@ export class ActiveRunManager {
         observerFailures: new Map(),
         initialResult,
         latestUpdate: update,
+        steeringReady: true,
       });
       this.startRunMonitor(resolved.sessionKey, {
         prompt: undefined,
@@ -243,6 +245,7 @@ export class ActiveRunManager {
         initialSnapshot: "",
         note: "Starting runner session...",
       }),
+      steeringReady: false,
     });
     try {
       const { resolved, initialSnapshot } = await this.runnerSessions.preparePromptSession(
@@ -350,6 +353,10 @@ export class ActiveRunManager {
 
   hasActiveRun(target: AgentSessionTarget) {
     return this.activeRuns.has(target.sessionKey);
+  }
+
+  canSteerActiveRun(target: AgentSessionTarget) {
+    return this.activeRuns.get(target.sessionKey)?.steeringReady ?? false;
   }
 
   async stop() {
@@ -499,6 +506,9 @@ export class ActiveRunManager {
 
     void (async () => {
       try {
+        if (!params.prompt) {
+          run.steeringReady = true;
+        }
         await monitorTmuxRun({
           tmux: this.tmux,
           sessionName: run.resolved.sessionName,
@@ -513,6 +523,13 @@ export class ActiveRunManager {
           initialSnapshot: params.initialSnapshot,
           detachedAlready: params.detachedAlready,
           timingContext: params.timingContext,
+          onPromptSubmitted: async () => {
+            const currentRun = this.activeRuns.get(sessionKey);
+            if (!currentRun) {
+              return;
+            }
+            currentRun.steeringReady = true;
+          },
           onRunning: async (update) => {
             const currentRun = this.activeRuns.get(sessionKey);
             if (!currentRun) {

@@ -101,6 +101,32 @@ function renderTranscriptDisabledMessage() {
   ].join("\n");
 }
 
+function renderStartupSteeringUnavailableMessage() {
+  return [
+    "The active run is still starting and cannot accept steering input yet.",
+    "Send a normal follow-up message to keep it ordered behind the first prompt, or wait until startup finishes before using `/steer`.",
+  ].join("\n");
+}
+
+function renderPrincipalFormat(identity: ChannelInteractionIdentity) {
+  if (identity.platform === "slack") {
+    return "slack:<nativeUserId>";
+  }
+  return "telegram:<nativeUserId>";
+}
+
+function renderPrincipalExample(identity: ChannelInteractionIdentity) {
+  if (identity.senderId) {
+    return `${identity.platform}:${identity.senderId}`;
+  }
+
+  if (identity.platform === "slack") {
+    return "slack:U123ABC456";
+  }
+
+  return "telegram:1276408333";
+}
+
 function renderWhoAmIMessage(params: {
   identity: ChannelInteractionIdentity;
   route: ChannelInteractionRoute;
@@ -138,6 +164,8 @@ function renderWhoAmIMessage(params: {
 
   lines.push(
     `principal: \`${params.auth.principal ?? "(none)"}\``,
+    `principalFormat: \`${renderPrincipalFormat(params.identity)}\``,
+    `principalExample: \`${renderPrincipalExample(params.identity)}\``,
     `appRole: \`${params.auth.appRole}\``,
     `agentRole: \`${params.auth.agentRole}\``,
     `mayBypassPairing: \`${params.auth.mayBypassPairing}\``,
@@ -194,6 +222,9 @@ function renderRouteStatusMessage(params: {
   }
 
   lines.push(
+    `principal: \`${params.auth.principal ?? "(none)"}\``,
+    `principalFormat: \`${renderPrincipalFormat(params.identity)}\``,
+    `principalExample: \`${renderPrincipalExample(params.identity)}\``,
     `streaming: \`${params.route.streaming}\``,
     `response: \`${params.route.response}\``,
     `responseMode: \`${params.route.responseMode}\``,
@@ -201,7 +232,6 @@ function renderRouteStatusMessage(params: {
     `surfaceNotifications.queueStart: \`${params.route.surfaceNotifications.queueStart}\``,
     `surfaceNotifications.loopStart: \`${params.route.surfaceNotifications.loopStart}\``,
     `verbose: \`${params.route.verbose}\``,
-    `principal: \`${params.auth.principal ?? "(none)"}\``,
     `appRole: \`${params.auth.appRole}\``,
     `agentRole: \`${params.auth.agentRole}\``,
     `mayManageProtectedResources: \`${params.auth.mayManageProtectedResources}\``,
@@ -1160,6 +1190,9 @@ export async function processChannelInteraction<TChunk>(params: {
     params.agentService.isSessionBusy?.(params.sessionTarget) ??
     false
   );
+  const canSteerActiveRun =
+    params.agentService.canSteerActiveRun?.(params.sessionTarget) ??
+    !sessionBusy;
   const queueByMode = !explicitQueueMessage && params.route.additionalMessageMode === "queue" && sessionBusy;
   const forceQueuedDelivery = typeof explicitQueueMessage === "string" || queueByMode;
   const delayedPromptText =
@@ -1714,6 +1747,12 @@ export async function processChannelInteraction<TChunk>(params: {
       return interactionResult;
     }
 
+    if (!canSteerActiveRun) {
+      await params.postText(renderStartupSteeringUnavailableMessage());
+      await params.agentService.recordConversationReply(params.sessionTarget);
+      return interactionResult;
+    }
+
       await params.agentService.submitSessionInput(
         params.sessionTarget,
         buildSteeringMessage(explicitSteerMessage, params.protectedControlMutationRule),
@@ -1726,7 +1765,7 @@ export async function processChannelInteraction<TChunk>(params: {
   }
 
   if (!forceQueuedDelivery && params.route.additionalMessageMode === "steer") {
-    if (sessionBusy) {
+    if (sessionBusy && canSteerActiveRun) {
       await params.agentService.submitSessionInput(
         params.sessionTarget,
         buildSteeringMessage(params.text, params.protectedControlMutationRule),

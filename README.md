@@ -64,8 +64,11 @@ If you want to try first without persisting the token yet, just remove `--persis
 Current auth note:
 
 - DMs currently start in pairing mode by default.
-- The config shape already includes `ownerClaimWindowMinutes`, but automatic first-owner claim from the first DM is not implemented in the runtime yet.
-- Today, if you want an owner or app admin, grant that principal explicitly with `clisbot auth add-user app --role owner --user <principal>` or `clisbot auth add-user app --role admin --user <principal>`.
+- If no app owner is configured yet, the first DM user during the first `ownerClaimWindowMinutes` becomes app `owner` automatically and does not need pairing approval.
+- Today, if you want an owner or app admin, grant that principal explicitly with the platform prefix plus the channel-native user id, for example `telegram:1276408333` or `slack:U123ABC456`.
+- Example commands:
+  - `clisbot auth add-user app --role owner --user telegram:1276408333`
+  - `clisbot auth add-user app --role admin --user slack:U123ABC456`
 - `clisbot auth --help` now covers role scopes, permission sets, and add/remove flows for users and permissions.
 - App-level auth and owner-claim semantics in [Authorization And Roles](docs/user-guide/auth-and-roles.md) describe both the current runtime reality and the remaining target-model gaps.
 

@@ -25,6 +25,7 @@ export type TmuxRunMonitorParams = {
   initialSnapshot: string;
   detachedAlready: boolean;
   timingContext?: LatencyDebugContext;
+  onPromptSubmitted?: () => Promise<void>;
   onRunning: (params: {
     snapshot: string;
     fullSnapshot: string;
@@ -67,6 +68,7 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       promptSubmitDelayMs: params.promptSubmitDelayMs,
       timingContext: params.timingContext,
     });
+    await params.onPromptSubmitted?.();
     logLatencyDebug("tmux-submit-complete", params.timingContext, {
       sessionName: params.sessionName,
       promptSubmitDelayMs: params.promptSubmitDelayMs,

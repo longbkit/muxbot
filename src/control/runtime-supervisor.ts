@@ -7,6 +7,7 @@ import {
   MissingEnvVarError,
 } from "../config/env-substitution.ts";
 import { ActivityStore } from "./activity-store.ts";
+import { primeOwnerClaimRuntime } from "../auth/owner-claim.ts";
 import {
   renderOperatorErrorWithHelpLines,
   renderRuntimeErrorLines,
@@ -203,6 +204,7 @@ export class RuntimeSupervisor {
     loadedConfig: LoadedConfig,
   ): Promise<ActiveRuntime> {
     const runtimeId = this.nextRuntimeId++;
+    primeOwnerClaimRuntime(loadedConfig.raw);
     const agentService = this.dependencies.createAgentService(loadedConfig);
     const processedEventsStore = this.dependencies.createProcessedEventsStore(
       loadedConfig.processedEventsPath,

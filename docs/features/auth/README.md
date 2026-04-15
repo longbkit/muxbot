@@ -74,5 +74,5 @@ Keep the auth feature area truthful as active work:
 - `app.auth` and `agents.<id>.auth` are now live in config and runtime resolution
 - `clisbot auth ...` exists for operator auth inspection and mutation
 - channels already consume resolved auth for pairing bypass, `/whoami`, `/status`, and `/bash`
-- automatic first-owner claim is still pending and remains the main unfinished auth slice
+- automatic first-owner claim is now live for the first DM within the configured claim window
 - advisory versus enforced boundaries still need to stay explicit across channels, control, and prompt rules

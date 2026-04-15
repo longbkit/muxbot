@@ -261,6 +261,10 @@ export class AgentService {
     return this.activeRuns.hasActiveRun(target);
   }
 
+  canSteerActiveRun(target: AgentSessionTarget) {
+    return this.activeRuns.canSteerActiveRun(target);
+  }
+
   async submitSessionInput(target: AgentSessionTarget, text: string) {
     return this.runnerSessions.submitSessionInput(target, text);
   }

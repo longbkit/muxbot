@@ -138,8 +138,8 @@ Allowed fallback behavior:
 Current implementation note:
 
 - the pairing bypass behavior is implemented
-- automatic first-owner claim is still pending
-- first owner currently needs manual grant through `clisbot auth add-user app --role owner --user <principal>`
+- automatic first-owner claim is implemented for the first DM during the configured claim window
+- after the first owner exists, later owner or admin grants still go through `clisbot auth add-user ...`
 
 ## Minimal Permission Model
 
@@ -222,7 +222,7 @@ Phase 1 rule:
 - docs say clearly that default `member` includes `sendMessage`, `helpView`, `statusView`, `identityView`, `transcriptView`, `runObserve`, `runInterrupt`, `streamingManage`, `queueManage`, `steerManage`, and `loopManage`
 - docs say clearly that `/bash` depends on explicit `shellExecute` grants
 - non-admin users are refused when normal, queue, steer, or loop delivery tries to mutate protected clisbot control resources
-- owner claim remains called out as unfinished until the runtime actually auto-claims the first owner
+- owner claim docs reflect the live runtime behavior truthfully
 - owner/admin principals bypass pairing, but cross-platform identities do not auto-link
 - docs say clearly that finer-grained permission splitting is later work
 

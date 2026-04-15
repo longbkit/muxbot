@@ -29,7 +29,7 @@ Today:
 - `app.auth` and `agents.<id>.auth` exist in config shape
 - explicit app `owner` and app `admin` principals do bypass pairing
 - operators can add and remove users and permissions through `clisbot auth ...`
-- automatic first-owner claim from the first DM is not implemented yet
+- automatic first-owner claim from the first DM is implemented
 - config remains the source of truth, and `clisbot auth ...` is the mutation surface for it
 
 Use this page to understand what is live now, what remains planned, and how operators should manage auth safely.
@@ -149,10 +149,11 @@ Target rule for the planned model:
 - if every owner is removed later, the next runtime start opens claim again
 - once any owner exists, claim is closed app-wide; a later DM from another platform principal does not auto-claim owner
 
-Current runtime fallback:
+Current runtime behavior:
 
-- add the first owner manually in `app.auth.roles.owner.users`
-- restart or reload the runtime after changing config so the new principal is resolved
+- if no owner exists yet, the first DM user inside the open claim window is added to `app.auth.roles.owner.users`
+- that DM user receives an explicit owner-claim reply explaining why they became owner and that pairing is no longer required for them
+- after the first owner exists, use `clisbot auth add-user ...` for later owner or admin grants
 
 ## Phase-1 Default Agent Permissions
 

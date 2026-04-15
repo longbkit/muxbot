@@ -26,9 +26,9 @@ Today:
 - `/bash` is gated by resolved agent auth through `shellExecute`
 - the protected prompt rule is injected for routed prompts, including queued, steering, and loop-triggered delivery
 - `clisbot auth ...` exists for `list`, `show`, `add-user`, `remove-user`, `add-permission`, and `remove-permission`
-- automatic first-owner claim from the first DM is not implemented yet
+- automatic first-owner claim from the first DM is implemented in runtime
 
-Use this page as the feature contract for both what is already live and what remains unfinished.
+Use this page as the feature contract for both what is already live and what still needs refinement later.
 
 ## Why
 
@@ -328,7 +328,7 @@ It is not yet the full long-term command-authorization system.
 - docs say clearly that default `member` includes `sendMessage`, `helpView`, `statusView`, `identityView`, `transcriptView`, `runObserve`, `runInterrupt`, `streamingManage`, `queueManage`, `steerManage`, and `loopManage`
 - prompt injection uses the protected clisbot control-resource rule
 - prompt injection applies that rule to normal, queue, steer, and loop delivery
-- docs say clearly that automatic first-owner claim is still pending
+- docs say clearly that automatic first-owner claim is live in runtime
 - docs say clearly that broader enforcement can be refined later
 
 ## Related Docs

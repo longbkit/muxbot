@@ -456,7 +456,10 @@ function appendAuthOnboardingLines(
       `${prefix}  - get the principal from a surface the bot can already see; Telegram groups or topics can use \`/whoami\` before routing, while DMs with pairing must pair first`,
     );
     lines.push(
-      `${prefix}  - set the first owner with: \`clisbot auth add-user app --role owner --user <principal>\``,
+      `${prefix}  - if no owner exists yet, the first DM user during the first ${summary.ownerSummary.ownerClaimWindowMinutes} minutes becomes app owner automatically`,
+    );
+    lines.push(
+      `${prefix}  - after the first owner exists, add more principals with: \`clisbot auth add-user app --role <owner|admin> --user <principal>\``,
     );
   } else {
     lines.push(`${prefix}  - inspect current app roles with: \`clisbot auth show app\``);
@@ -619,6 +622,8 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
         telegramEnabled: summary.channelSummaries.some((channel) =>
           channel.channel === "telegram" && channel.enabled
         ),
+        ownerConfigured: hasConfiguredPrivilegedPrincipal(summary),
+        ownerClaimWindowMinutes: summary.ownerSummary.ownerClaimWindowMinutes,
         slackDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "slack")
           ?.directMessagesPolicy,
         telegramDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "telegram")
@@ -647,6 +652,8 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
     ...renderPairingSetupHelpLines("", {
       slackEnabled: summary.channelSummaries.some((channel) => channel.channel === "slack" && channel.enabled),
       telegramEnabled: summary.channelSummaries.some((channel) => channel.channel === "telegram" && channel.enabled),
+      ownerConfigured: hasConfiguredPrivilegedPrincipal(summary),
+      ownerClaimWindowMinutes: summary.ownerSummary.ownerClaimWindowMinutes,
       slackDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "slack")
         ?.directMessagesPolicy,
       telegramDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "telegram")

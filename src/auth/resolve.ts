@@ -42,7 +42,7 @@ function mergeRoleRecord(
   return merged;
 }
 
-function normalizePrincipal(principal: string) {
+export function normalizeAuthPrincipal(principal: string) {
   const trimmed = principal.trim();
   if (!trimmed) {
     return "";
@@ -65,20 +65,20 @@ function normalizePrincipal(principal: string) {
 }
 
 function normalizeRoleUsers(users: string[] | undefined) {
-  return (users ?? []).map(normalizePrincipal).filter(Boolean);
+  return (users ?? []).map(normalizeAuthPrincipal).filter(Boolean);
 }
 
-function resolvePrincipal(identity: ChannelIdentity) {
+export function resolveAuthPrincipal(identity: ChannelIdentity) {
   const senderId = identity.senderId?.trim();
   if (!senderId) {
     return undefined;
   }
 
   if (identity.platform === "slack") {
-    return normalizePrincipal(`slack:${senderId}`);
+    return normalizeAuthPrincipal(`slack:${senderId}`);
   }
 
-  return normalizePrincipal(`telegram:${senderId}`);
+  return normalizeAuthPrincipal(`telegram:${senderId}`);
 }
 
 function findExplicitRole(
@@ -128,7 +128,7 @@ export function resolveChannelAuth(params: {
   agentId: string;
   identity: ChannelIdentity;
 }): ResolvedChannelAuth {
-  const principal = resolvePrincipal(params.identity);
+  const principal = resolveAuthPrincipal(params.identity);
   const appAuth = params.config.app.auth;
   const explicitAppRole = findExplicitRole(appAuth.roles, principal);
   const appRole = explicitAppRole ?? appAuth.defaultRole;

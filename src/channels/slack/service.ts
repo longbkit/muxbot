@@ -19,6 +19,10 @@ import { buildAgentPromptText } from "../agent-prompt.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
 import { resolveChannelAuth } from "../../auth/resolve.ts";
 import {
+  claimFirstOwnerFromDirectMessage,
+  renderFirstOwnerClaimMessage,
+} from "../../auth/owner-claim.ts";
+import {
   type SlackConversationKind,
   resolveSlackConversationTarget,
 } from "./session-routing.ts";
@@ -285,21 +289,51 @@ export class SlackSocketService {
       const directUserId =
         typeof event.user === "string" ? event.user.trim() : "";
       const dmConfig = this.loadedConfig.raw.channels.slack.directMessages;
-      const auth = resolveChannelAuth({
-        config: this.loadedConfig.raw,
-        agentId: params.route.agentId,
-        identity: {
-          platform: "slack",
-          conversationKind: params.conversationKind,
-          senderId: directUserId || undefined,
-          channelId,
-        },
-      });
+      const dmIdentity = {
+        platform: "slack" as const,
+        conversationKind: params.conversationKind,
+        senderId: directUserId || undefined,
+        channelId,
+      };
       if (!directUserId || dmConfig.policy === "disabled") {
         debugSlackEvent("drop-dm-disabled", { eventId, directUserId });
         await this.processedEventsStore.markCompleted(eventId);
         return;
       }
+
+      let ownerClaimed = false;
+      let ownerPrincipal: string | undefined;
+      try {
+        const claimResult = await claimFirstOwnerFromDirectMessage({
+          config: this.loadedConfig.raw,
+          configPath: this.loadedConfig.configPath,
+          identity: dmIdentity,
+        });
+        ownerClaimed = claimResult.claimed;
+        ownerPrincipal = claimResult.principal;
+      } catch (error) {
+        console.error("slack first-owner claim failed", error);
+      }
+
+      if (ownerClaimed && ownerPrincipal) {
+        try {
+          await postSlackText(this.app.client, {
+            channel: channelId,
+            text: renderFirstOwnerClaimMessage({
+              principal: ownerPrincipal,
+              ownerClaimWindowMinutes: this.loadedConfig.raw.app.auth.ownerClaimWindowMinutes,
+            }),
+          });
+        } catch (error) {
+          console.error("slack first-owner claim reply failed", error);
+        }
+      }
+
+      const auth = resolveChannelAuth({
+        config: this.loadedConfig.raw,
+        agentId: params.route.agentId,
+        identity: dmIdentity,
+      });
 
       if (dmConfig.policy !== "open" && !auth.mayBypassPairing) {
         const storedAllowFrom = await readChannelAllowFromStore("slack");

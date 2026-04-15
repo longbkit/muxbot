@@ -56,7 +56,12 @@ After your first successful `clisbot start`:
 
 1. Get your principal from a surface the bot can already see:
    Telegram groups or topics can use `/whoami` even before routing, while DMs with `pairing` policy need pairing first.
-2. Grant the first app owner with `clisbot auth add-user app --role owner --user <principal>`.
+   `/whoami` and routed `/start` show:
+   - `principal`
+   - `principalFormat`
+   - `principalExample`
+   Typical values look like `telegram:1276408333` or `slack:U123ABC456`.
+2. Grant the first app owner with `clisbot auth add-user app --role owner --user <principal>`, for example `clisbot auth add-user app --role owner --user telegram:1276408333`.
 3. Inspect and tune role permissions with `clisbot auth --help`.
 4. Continue with route setup in [Channel Operations](channels.md) and auth details in [Authorization And Roles](auth-and-roles.md).
 

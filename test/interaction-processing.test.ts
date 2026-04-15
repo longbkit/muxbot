@@ -358,6 +358,9 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("senderId: `U123`");
     expect(posted[0]).toContain("channelId: `C123`");
     expect(posted[0]).toContain("threadTs: `1.2`");
+    expect(posted[0]).toContain("principal: `slack:U123`");
+    expect(posted[0]).toContain("principalFormat: `slack:<nativeUserId>`");
+    expect(posted[0]).toContain("principalExample: `slack:U123`");
     expect(posted[0]).toContain("appRole: `member`");
     expect(posted[0]).toContain("agentRole: `member`");
     expect(posted[0]).toContain("canUseShell: `false`");
@@ -398,6 +401,9 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("conversationKind: `topic`");
     expect(posted[0]).toContain("chatId: `-1001`");
     expect(posted[0]).toContain("topicId: `4`");
+    expect(posted[0]).toContain("principal: `telegram:123`");
+    expect(posted[0]).toContain("principalFormat: `telegram:<nativeUserId>`");
+    expect(posted[0]).toContain("principalExample: `telegram:123`");
     expect(posted[0]).toContain("appRole: `member`");
     expect(posted[0]).toContain("agentRole: `member`");
     expect(posted[0]).toContain("verbose: `minimal`");
@@ -438,6 +444,9 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("responseMode: `capture-pane`");
     expect(posted[0]).toContain("additionalMessageMode: `steer`");
     expect(posted[0]).toContain("verbose: `minimal`");
+    expect(posted[0]).toContain("principal: `slack:U123`");
+    expect(posted[0]).toContain("principalFormat: `slack:<nativeUserId>`");
+    expect(posted[0]).toContain("principalExample: `slack:U123`");
     expect(posted[0]).toContain("run.state: `detached`");
     expect(posted[0]).toContain(`run.startedAt: \`${new Date(startedAt).toISOString()}\``);
     expect(posted[0]).toContain(`run.detachedAt: \`${new Date(detachedAt).toISOString()}\``);
@@ -447,6 +456,37 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("/attach`, `/detach`, `/watch every 30s`");
     expect(posted[0]).toContain("/transcript` enabled on this route (`verbose: minimal`)");
     expect(posted[0]).toContain("/bash` requires `shellExecute`");
+  });
+
+  test("renders start with principal details for routed conversations", async () => {
+    const posted: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        getConversationFollowUpState: async () => ({}),
+        getSessionRuntime: async () => ({
+          state: "idle",
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/start",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("clisbot status");
+    expect(posted[0]).toContain("principal: `slack:U123`");
+    expect(posted[0]).toContain("principalFormat: `slack:<nativeUserId>`");
+    expect(posted[0]).toContain("principalExample: `slack:U123`");
   });
 
   test("shows persisted response mode for the current route", async () => {
@@ -1462,6 +1502,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         hasActiveRun: () => true,
+        canSteerActiveRun: () => true,
         submitSessionInput: async (_target: AgentSessionTarget, text: string) => {
           submitted.push(text);
         },
@@ -1496,6 +1537,63 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(posted).toEqual([]);
     expect(replyCalls).toBe(0);
     expect(result.processingIndicatorLifecycle).toBe("active-run");
+  });
+
+  test("does not auto-steer follow-up messages while the first run is still starting", async () => {
+    const posted: string[] = [];
+    let observedPrompt = "";
+    let submitCalls = 0;
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => true,
+        hasActiveRun: () => true,
+        canSteerActiveRun: () => false,
+        submitSessionInput: async () => {
+          submitCalls += 1;
+        },
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = prompt;
+          return {
+            positionAhead: 1,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "second message stayed queued",
+              fullSnapshot: "second message stayed queued",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "please check one more thing",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+        surfaceNotifications: {
+          queueStart: "none",
+          loopStart: "brief",
+        },
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(submitCalls).toBe(0);
+    expect(observedPrompt).toBe("please check one more thing");
+    expect(posted).toEqual([]);
   });
 
   test("queue command forces clisbot-managed delivery even in message-tool mode", async () => {
@@ -1775,6 +1873,7 @@ describe("processChannelInteraction agent prompt text", () => {
     const result = await processChannelInteraction({
       agentService: {
         hasActiveRun: () => true,
+        canSteerActiveRun: () => true,
         submitSessionInput: async (_target: AgentSessionTarget, text: string) => {
           submitted.push(text);
         },
@@ -1804,6 +1903,41 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(submitted[0]).toContain("</user>");
     expect(posted[0]).toBe("Steered.");
     expect(result.processingIndicatorLifecycle).toBe("active-run");
+  });
+
+  test("explicit steer is blocked while the active run is still starting", async () => {
+    const posted: string[] = [];
+    let submitCalls = 0;
+
+    await processChannelInteraction({
+      agentService: {
+        hasActiveRun: () => true,
+        canSteerActiveRun: () => false,
+        submitSessionInput: async () => {
+          submitCalls += 1;
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/steer check one more thing",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(submitCalls).toBe(0);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("still starting");
+    expect(posted[0]).toContain("ordered behind the first prompt");
   });
 
   test("does not auto-steer after a final reply was already delivered", async () => {

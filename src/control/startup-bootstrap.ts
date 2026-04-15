@@ -253,6 +253,8 @@ export function renderPairingSetupHelpLines(
     telegramEnabled?: boolean;
     slackDirectMessagesPolicy?: string;
     telegramDirectMessagesPolicy?: string;
+    ownerConfigured?: boolean;
+    ownerClaimWindowMinutes?: number;
     conditionalOnly?: boolean;
   } = {},
 ) {
@@ -303,6 +305,12 @@ export function renderPairingSetupHelpLines(
   lines.push(
     `${prefix}  - Configured app owner/admin principals bypass pairing in DMs.`,
   );
+
+  if (options.ownerConfigured === false) {
+    lines.push(
+      `${prefix}  - If no owner is configured yet, the first DM user during the first ${options.ownerClaimWindowMinutes ?? 30} minutes becomes app owner automatically.`,
+    );
+  }
 
   return lines;
 }
