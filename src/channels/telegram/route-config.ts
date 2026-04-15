@@ -1,8 +1,5 @@
 import { type LoadedConfig } from "../../config/load-config.ts";
 import {
-  type PrivilegeCommandsConfig,
-} from "../privilege-commands.ts";
-import {
   buildSharedChannelRoute,
   type SharedChannelRoute,
   type SharedChannelRouteOverride,
@@ -17,10 +14,6 @@ export type TelegramResolvedRoute = {
 };
 
 type TelegramRouteOverride = SharedChannelRouteOverride;
-
-function normalizeTelegramPrivilegeUsers(userIds: string[]) {
-  return userIds.map((userId) => userId.trim()).filter(Boolean);
-}
 
 function buildRoute(
   loadedConfig: LoadedConfig,
@@ -37,7 +30,6 @@ function buildRoute(
     channelConfig: telegramConfig,
     route: params.route,
     requireMention: params.requireMention,
-    normalizePrivilegeUsers: normalizeTelegramPrivilegeUsers,
     accountId: params.accountId,
   });
 }

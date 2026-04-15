@@ -9,7 +9,7 @@ import type { AgentSessionTarget, ResolvedAgentTarget } from "./resolved-target.
 import { deriveInteractionText, normalizePaneText } from "../shared/transcript.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
 import { monitorTmuxRun } from "../runners/tmux/run-monitor.ts";
-import { RunnerSessionService } from "./runner-session.ts";
+import { RunnerService } from "./runner-service.ts";
 import { logLatencyDebug } from "../control/latency-debug.ts";
 
 export type AgentExecutionResult = {
@@ -134,18 +134,18 @@ function createDeferred<T>(): Deferred<T> {
   return deferred;
 }
 
-export class ActiveRunManager {
+export class SessionService {
   private readonly activeRuns = new Map<string, ActiveRun>();
   private stopping = false;
 
   constructor(
     private readonly tmux: TmuxClient,
     private readonly sessionState: AgentSessionState,
-    private readonly runnerSessions: RunnerSessionService,
+    private readonly runnerSessions: RunnerService,
     private readonly resolveTarget: (target: AgentSessionTarget) => ResolvedAgentTarget,
   ) {}
 
-  async reconcileActiveRuns() {
+  async recoverPersistedRuns() {
     const entries = await this.sessionState.listEntries();
 
     for (const entry of entries) {
@@ -248,7 +248,7 @@ export class ActiveRunManager {
       steeringReady: false,
     });
     try {
-      const { resolved, initialSnapshot } = await this.runnerSessions.preparePromptSession(
+      const { resolved, initialSnapshot } = await this.runnerSessions.ensureRunnerReady(
         target,
         {
           ...options,

@@ -14,7 +14,7 @@ After this task:
 
 - `/transcript` is enabled by default through `verbose: "minimal"`
 - routes can disable transcript inspection explicitly with `verbose: "off"`
-- `/bash` remains privilege-gated
+- `/bash` remains auth-gated through `shellExecute`
 - Slack and Telegram route status surfaces show the active `verbose` state
 - detached-run fallback copy no longer assumes `/transcript` is always available
 
@@ -27,7 +27,7 @@ Users who simply want to monitor an active run should not need the same escalati
 This feature keeps the architecture cleaner:
 
 - monitoring visibility is a channel policy
-- privileged execution remains a privilege policy
+- shell execution remains an auth decision
 
 ## Scope
 
@@ -35,7 +35,7 @@ This feature keeps the architecture cleaner:
 - support `off` and `minimal`
 - default top-level Slack and Telegram config to `minimal`
 - gate `/transcript` from `verbose`
-- keep `/bash` under `privilegeCommands`
+- keep `/bash` under resolved agent auth through `shellExecute`
 - update help, status, whoami, and transcript-adjacent copy
 - add regression coverage for route inheritance and slash-command behavior
 
@@ -43,7 +43,7 @@ This feature keeps the architecture cleaner:
 
 - adding richer verbose levels beyond `minimal`
 - introducing a new CLI subcommand for editing `verbose`
-- changing the existing `privilege` CLI semantics for bash access
+- changing broader auth semantics beyond wiring `/bash` to `shellExecute`
 - implementing `customer-support` bot type in this slice
 
 ## Implementation Notes
@@ -64,6 +64,6 @@ This feature keeps the architecture cleaner:
 
 - `/transcript` works on the default route without enabling privilege commands
 - `/transcript` is denied when `verbose: "off"`
-- `/bash` still requires privilege commands
+- `/bash` still requires `shellExecute`
 - Slack and Telegram route inheritance reflect `verbose` correctly
-- docs explain the split between `verbose` and `privilegeCommands`
+- docs explain the split between `verbose` and auth-gated shell execution

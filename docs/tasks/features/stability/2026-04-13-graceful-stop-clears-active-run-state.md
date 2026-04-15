@@ -34,13 +34,13 @@ That is misleading. Active-run state only makes sense while a live runtime still
 
 ## Root Cause
 
-`ActiveRunManager` persisted `runtime.state = running|detached` into session storage, but graceful shutdown only cleared timers and loop state. It never marked those persisted runtimes back to `idle`.
+`SessionService` persisted `runtime.state = running|detached` into session storage, but graceful shutdown only cleared timers and loop state. It never marked those persisted runtimes back to `idle`.
 
 So after a normal stop, the control surface read old active-run records from the session store and rendered them as if supervision still existed.
 
 ## Implementation
 
-- added graceful shutdown cleanup in `ActiveRunManager`
+- added graceful shutdown cleanup in `SessionService`
 - on shutdown, every in-memory active run is marked `idle` in session state before the manager is cleared
 - `AgentService.stop()` now delegates to that shutdown path
 - operator status becomes truthful again without special-case rendering hacks

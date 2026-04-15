@@ -16,4 +16,4 @@ When clisbot exposes a user-facing busy-session policy:
 
 `additionalMessageMode: "steer"` initially checked only `hasActiveRun`, which missed the startup window.
 
-The fix moved the active-run registration earlier in `ActiveRunManager.executePrompt(...)`, so follow-up steering now works while the first turn is still preparing the tmux session.
+The fix moved the active-run registration earlier in `SessionService.executePrompt(...)`, so follow-up steering now works while the first turn is still preparing the tmux session.

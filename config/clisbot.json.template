@@ -159,8 +159,8 @@
     "slack": {
       "enabled": false,
       "mode": "socket",
-      "appToken": "${SLACK_APP_TOKEN}",
-      "botToken": "${SLACK_BOT_TOKEN}",
+      "appToken": "",
+      "botToken": "",
       "defaultAccount": "default",
       "accounts": {
         "default": {
@@ -220,7 +220,7 @@
     "telegram": {
       "enabled": false,
       "mode": "polling",
-      "botToken": "${TELEGRAM_BOT_TOKEN}",
+      "botToken": "",
       "defaultAccount": "default",
       "accounts": {
         "default": {

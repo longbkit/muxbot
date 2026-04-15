@@ -111,10 +111,6 @@ function createLoadedConfig(): LoadedConfig {
           channelPolicy: "allowlist",
           groupPolicy: "allowlist",
           defaultAgentId: "default",
-          privilegeCommands: {
-            enabled: false,
-            allowUsers: [],
-          },
           commandPrefixes: {
             slash: ["::", "\\"],
             bash: ["!"],
@@ -151,10 +147,6 @@ function createLoadedConfig(): LoadedConfig {
           allowBots: false,
           groupPolicy: "allowlist",
           defaultAgentId: "default",
-          privilegeCommands: {
-            enabled: false,
-            allowUsers: [],
-          },
           commandPrefixes: {
             slash: ["::", "\\"],
             bash: ["!"],

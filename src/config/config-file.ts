@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { ensureDir, expandHomePath, getDefaultConfigPath } from "../shared/paths.ts";
 import { readTextFile, writeTextFile } from "../shared/fs.ts";
 import { clisbotConfigSchema, type ClisbotConfig } from "./schema.ts";
-import { applyDynamicPathDefaults } from "./load-config.ts";
+import { applyDynamicPathDefaults, assertNoLegacyPrivilegeCommands } from "./load-config.ts";
 import { renderDefaultConfigTemplate } from "./template.ts";
 
 export async function ensureEditableConfigFile(configPath = getDefaultConfigPath()) {
@@ -32,6 +32,7 @@ export async function readEditableConfig(configPath = getDefaultConfigPath()): P
   const expandedConfigPath = await ensureEditableConfigFile(configPath);
   const text = await readTextFile(expandedConfigPath);
   const parsed = JSON.parse(text);
+  assertNoLegacyPrivilegeCommands(parsed);
   return {
     configPath: expandedConfigPath,
     config: clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),

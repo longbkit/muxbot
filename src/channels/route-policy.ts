@@ -4,17 +4,11 @@ import { resolveTopLevelBoundAgentId } from "../config/bindings.ts";
 import { resolveConfigDurationMs } from "../config/duration.ts";
 import { getAgentEntry, type LoadedConfig } from "../config/load-config.ts";
 import type { SurfaceNotificationsConfig } from "./surface-notifications.ts";
-import {
-  resolvePrivilegeCommands,
-  type PrivilegeCommandsConfig,
-  type PrivilegeCommandsOverride,
-} from "./privilege-commands.ts";
 
 export type SharedChannelRoute = {
   agentId: string;
   requireMention: boolean;
   allowBots: boolean;
-  privilegeCommands: PrivilegeCommandsConfig;
   commandPrefixes: CommandPrefixes;
   streaming: "off" | "latest" | "all";
   response: "all" | "final";
@@ -30,7 +24,6 @@ export type SharedChannelRouteOverride = {
   agentId?: string;
   requireMention?: boolean;
   allowBots?: boolean;
-  privilegeCommands?: PrivilegeCommandsOverride;
   commandPrefixes?: Partial<CommandPrefixes>;
   streaming?: "off" | "latest" | "all";
   response?: "all" | "final";
@@ -49,7 +42,6 @@ export type SharedChannelRouteOverride = {
 type SharedChannelConfig = {
   defaultAgentId: string;
   allowBots: boolean;
-  privilegeCommands?: PrivilegeCommandsConfig;
   commandPrefixes: CommandPrefixes;
   streaming: "off" | "latest" | "all";
   response: "all" | "final";
@@ -71,18 +63,10 @@ type BuildSharedChannelRouteParams = {
   channelConfig: SharedChannelConfig;
   route?: SharedChannelRouteOverride | null;
   requireMention: boolean;
-  normalizePrivilegeUsers(userIds: string[]): string[];
   accountId?: string;
 };
 
 export function buildSharedChannelRoute(params: BuildSharedChannelRouteParams): SharedChannelRoute {
-  const privilegeCommands = resolvePrivilegeCommands(
-    params.channelConfig.privilegeCommands ?? {
-      enabled: false,
-      allowUsers: [],
-    },
-    params.route?.privilegeCommands,
-  );
   const agentId =
     params.route?.agentId ??
     resolveTopLevelBoundAgentId(params.loadedConfig, {
@@ -96,10 +80,6 @@ export function buildSharedChannelRoute(params: BuildSharedChannelRouteParams): 
     agentId,
     requireMention: params.route?.requireMention ?? params.requireMention,
     allowBots: params.route?.allowBots ?? params.channelConfig.allowBots,
-    privilegeCommands: {
-      enabled: privilegeCommands.enabled,
-      allowUsers: params.normalizePrivilegeUsers(privilegeCommands.allowUsers),
-    },
     commandPrefixes: {
       slash: params.route?.commandPrefixes?.slash ?? params.channelConfig.commandPrefixes.slash,
       bash: params.route?.commandPrefixes?.bash ?? params.channelConfig.commandPrefixes.bash,

@@ -347,7 +347,7 @@ Result:
 
 - default `additionalMessageMode=steer` is working live on Slack
 - the startup window needed to count as "busy", not only post-submit active-run state
-- that gap was fixed by registering the active run earlier in `ActiveRunManager.executePrompt(...)`
+- that gap was fixed by registering the active run earlier in `SessionService.executePrompt(...)`
 
 ### Test 7: Explicit `/queue` Follow-Up
 

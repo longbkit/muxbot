@@ -93,6 +93,36 @@ describe("channels cli", () => {
     });
   });
 
+  test("adds slack channel routes with requireMention disabled by default", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-channels-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    console.log = (() => {}) as typeof console.log;
+
+    await runChannelsCli([
+      "add",
+      "slack-channel",
+      "C1234567890",
+      "--agent",
+      "default",
+    ]);
+
+    const rawConfig = JSON.parse(
+      readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"),
+    ) as {
+      channels: {
+        slack: {
+          channels: Record<string, { agentId?: string; requireMention?: boolean }>;
+        };
+      };
+    };
+
+    expect(rawConfig.channels.slack.channels.C1234567890).toEqual({
+      agentId: "default",
+      requireMention: false,
+    });
+  });
+
   test("prints policy guidance after adding a telegram route", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-channels-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
@@ -136,11 +166,17 @@ describe("channels cli", () => {
       channels: {
         telegram: {
           botToken: string;
+          accounts: {
+            default: {
+              botToken: string;
+            };
+          };
         };
       };
     };
 
-    expect(rawConfig.channels.telegram.botToken).toBe("${CUSTOM_TELEGRAM_BOT_TOKEN}");
+    expect(rawConfig.channels.telegram.botToken).toBe("");
+    expect(rawConfig.channels.telegram.accounts.default.botToken).toBe("${CUSTOM_TELEGRAM_BOT_TOKEN}");
   });
 
   test("prints help when no channels subcommand is provided", async () => {

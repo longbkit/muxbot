@@ -15,7 +15,7 @@ Owner claim stays in this slice because it is the cleanest bootstrap path for th
 
 ## Status
 
-Partially implemented
+Implemented for phase 1
 
 ## Current Runtime Reality
 
@@ -29,6 +29,11 @@ Today:
 - automatic first-owner claim from the first DM is implemented in runtime
 
 Use this page as the feature contract for both what is already live and what still needs refinement later.
+
+Historical note:
+
+- any references to legacy `privilegeCommands` below describe removal constraints for this auth rollout
+- they do not describe a supported current-state config model
 
 ## Why
 
@@ -71,7 +76,7 @@ So phase 1 should optimize for:
 - shell-level filtering inside the runner
 - fine-grained split permissions for queue or loop sub-actions
 - full slash-command gating for every advanced mode command
-- backward compatibility for `privilegeCommands`
+- backward compatibility for legacy `privilegeCommands`
 
 ## Core Model
 
@@ -240,11 +245,6 @@ Behavior:
 - once `owner.users` is non-empty, later restarts do not reopen claim
 - if operators remove every owner later, the next start opens claim again
 - once any owner exists on one platform principal, claim is closed app-wide; a later Slack or Telegram DM from another principal does not claim owner automatically
-
-Current gap:
-
-- the runtime does not yet auto-claim the first owner
-- operators currently need to grant the first owner explicitly through `clisbot auth add-user app --role owner --user <principal>`
 
 ## Resolution Order
 

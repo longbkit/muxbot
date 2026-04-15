@@ -12,7 +12,7 @@ It also defines default conversation follow-up policy and follow-up participatio
 
 It also defines stale tmux cleanup policy so runner residency does not grow forever.
 
-It also defines whether sensitive chat-surface commands such as transcript inspection and bash execution are enabled on a given route.
+It also defines route transcript visibility policy and auth-relevant shell execution policy inputs.
 
 It also defines first-run startup bootstrap behavior for default channel accounts and the first default agent.
 
@@ -35,7 +35,7 @@ The system needs one explicit place to define:
 - direct-message access policy and allowlists
 - chat-first rendering policy
 - transcript request command configuration
-- sensitive command gating for transcript and bash access
+- transcript visibility policy and shell execution policy inputs
 - `streaming: off | latest | all`
 - `response: all | final`
 - default follow-up policy such as auto-follow or mention-only

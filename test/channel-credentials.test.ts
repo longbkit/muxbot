@@ -10,7 +10,10 @@ import {
   setTelegramRuntimeCredential,
   validatePersistentChannelCredentials,
 } from "../src/config/channel-credentials.ts";
-import { deactivateExpiredMemAccounts } from "../src/config/channel-account-management.ts";
+import {
+  applyBootstrapAccountsToConfig,
+  deactivateExpiredMemAccounts,
+} from "../src/config/channel-account-management.ts";
 import type { ClisbotConfig } from "../src/config/schema.ts";
 
 function createConfig(): ClisbotConfig {
@@ -105,7 +108,6 @@ function createConfig(): ClisbotConfig {
         channelPolicy: "allowlist",
         groupPolicy: "allowlist",
         defaultAgentId: "default",
-        privilegeCommands: { enabled: false, allowUsers: [] },
         commandPrefixes: { slash: ["::"], bash: ["!"] },
         streaming: "all",
         response: "final",
@@ -135,7 +137,6 @@ function createConfig(): ClisbotConfig {
         allowBots: false,
         groupPolicy: "allowlist",
         defaultAgentId: "default",
-        privilegeCommands: { enabled: false, allowUsers: [] },
         commandPrefixes: { slash: ["::"], bash: ["!"] },
         streaming: "all",
         response: "final",
@@ -253,6 +254,50 @@ describe("channel credentials", () => {
     ]);
     expect(config.channels.telegram.accounts.default.enabled).toBe(false);
     expect(config.channels.telegram.enabled).toBe(false);
+    expect(config.channels.telegram.botToken).toBe("");
+  });
+
+  test("bootstrap account application keeps channel root tokens empty", () => {
+    const config = createConfig();
+
+    applyBootstrapAccountsToConfig(
+      config,
+      {
+        slackAccounts: [
+          {
+            accountId: "default",
+            appToken: {
+              kind: "env",
+              envName: "SLACK_APP_TOKEN",
+              placeholder: "${SLACK_APP_TOKEN}",
+            },
+            botToken: {
+              kind: "env",
+              envName: "SLACK_BOT_TOKEN",
+              placeholder: "${SLACK_BOT_TOKEN}",
+            },
+          },
+        ],
+        telegramAccounts: [
+          {
+            accountId: "default",
+            botToken: {
+              kind: "env",
+              envName: "TELEGRAM_BOT_TOKEN",
+              placeholder: "${TELEGRAM_BOT_TOKEN}",
+            },
+          },
+        ],
+      },
+      { firstRun: true },
+    );
+
+    expect(config.channels.slack.appToken).toBe("");
+    expect(config.channels.slack.botToken).toBe("");
+    expect(config.channels.telegram.botToken).toBe("");
+    expect(config.channels.slack.accounts.default?.appToken).toBe("${SLACK_APP_TOKEN}");
+    expect(config.channels.slack.accounts.default?.botToken).toBe("${SLACK_BOT_TOKEN}");
+    expect(config.channels.telegram.accounts.default?.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
   });
 
   test("prefers the canonical credential file before env-backed fallback", () => {

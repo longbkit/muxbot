@@ -128,10 +128,6 @@ function createLoadedConfig(): LoadedConfig {
           channelPolicy: "allowlist",
           groupPolicy: "allowlist",
           defaultAgentId: "default",
-          privilegeCommands: {
-            enabled: false,
-            allowUsers: [],
-          },
           commandPrefixes: {
             slash: ["::", "\\"],
             bash: ["!"],
@@ -172,10 +168,6 @@ function createLoadedConfig(): LoadedConfig {
           allowBots: false,
           groupPolicy: "allowlist",
           defaultAgentId: "default",
-          privilegeCommands: {
-            enabled: false,
-            allowUsers: [],
-          },
           commandPrefixes: {
             slash: ["::", "\\"],
             bash: ["!"],
@@ -205,10 +197,6 @@ function createLoadedConfig(): LoadedConfig {
                   agentId: "claude",
                   verbose: "off",
                   timezone: "Asia/Ho_Chi_Minh",
-                  privilegeCommands: {
-                    enabled: true,
-                    allowUsers: ["123"],
-                  },
                 },
               },
             },
@@ -242,10 +230,7 @@ describe("Telegram route resolution", () => {
     expect(resolved.route?.requireMention).toBe(false);
     expect(resolved.route?.verbose).toBe("off");
     expect(resolved.route?.timezone).toBe("Asia/Ho_Chi_Minh");
-    expect(resolved.route?.privilegeCommands).toEqual({
-      enabled: true,
-      allowUsers: ["123"],
-    });
+    expect("privilegeCommands" in (resolved.route ?? {})).toBe(false);
   });
 
   test("uses agent additionalMessageMode when the route does not override it", () => {
@@ -303,7 +288,7 @@ describe("Telegram route resolution", () => {
     expect(target.sessionKey).toBe("agent:default:main");
   });
 
-  test("keeps privilege commands disabled when no route override enables them", () => {
+  test("does not expose route-local privilege commands anymore", () => {
     const resolved = resolveTelegramConversationRoute({
       loadedConfig: createLoadedConfig(),
       chatType: "private",
@@ -311,10 +296,7 @@ describe("Telegram route resolution", () => {
       isForum: false,
     });
 
-    expect(resolved.route?.privilegeCommands).toEqual({
-      enabled: false,
-      allowUsers: [],
-    });
+    expect("privilegeCommands" in (resolved.route ?? {})).toBe(false);
   });
 
   test("uses top-level telegram binding when route agent is not overridden", () => {

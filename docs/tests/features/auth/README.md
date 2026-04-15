@@ -42,21 +42,23 @@ They should prove the permission model itself, not only the storage shape and no
 - the user can use the intended member actions
 - the privileged action is denied clearly
 
-## Test Case 3: Route-Local Privilege Rule Still Narrows Bash
+## Test Case 3: `shellExecute` Gates Bash
 
 ### Preconditions
 
-- one user has an agent role that allows `bash`
-- the route-local `privilegeCommands.mode` is narrower than the role grant
+- one user resolves to agent `member`
+- another user resolves to agent `admin` or another role with `shellExecute`
 
 ### Steps
 
-1. Attempt `/bash ...` from that route.
+1. Attempt `/bash ...` as the `member`.
+2. Attempt `/bash ...` as the stronger role.
 
 ### Expected Results
 
-- route-local restriction still wins
-- the denial is clear and does not imply the role itself is missing
+- the `member` request is denied clearly
+- the stronger role is allowed
+- the denial explains that `shellExecute` is missing rather than referencing legacy route-local privilege config
 
 ## Test Case 4: Prompt Auth Context Matches Runtime Permission Truth
 

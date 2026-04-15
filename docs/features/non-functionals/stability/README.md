@@ -67,4 +67,16 @@ Current priority themes:
 - keep busy or idle state truthful across channel and runner layers
 - prevent silent session drift when tmux state is changed outside clisbot’s routed path
 - keep follow-up, queue, and final-settlement behavior deterministic under concurrent human messages
-- keep channel delivery failures contained so Slack or Telegram transport outages degrade one observer instead of terminating run supervision
+- keep channel delivery failures contained and recoverable so Slack or Telegram transport outages self-heal when possible and only degrade the affected observer or surface when recovery is exhausted
+
+## Resilience Rule
+
+For this feature area, resilience is the actual goal.
+
+- `fail soft` is not a success condition by itself
+- graceful degradation is only acceptable as a bounded intermediate state or a final truthful fallback after recovery has been attempted
+- preferred order is:
+  1. detect the fault
+  2. recover automatically when the state is still trustworthy
+  3. quarantine or degrade only the affected run, observer, session, or surface
+  4. surface an explicit failure only when bounded recovery is exhausted

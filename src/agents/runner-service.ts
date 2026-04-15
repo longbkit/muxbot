@@ -92,7 +92,7 @@ function isRecoverableStartupSessionLoss(error: unknown) {
   );
 }
 
-export class RunnerSessionService {
+export class RunnerService {
   private cleanupInFlight = false;
 
   constructor(
@@ -491,7 +491,7 @@ export class RunnerSessionService {
     );
   }
 
-  async preparePromptSession(
+  async ensureRunnerReady(
     target: AgentSessionTarget,
     options: {
       allowFreshRetryBeforePrompt?: boolean;

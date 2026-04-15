@@ -23,7 +23,7 @@ This audit covers current output text and response patterns coming from:
 - `src/channels/interaction-processing.ts`
 - `src/agents/loop-command.ts`
 - `src/shared/transcript-rendering.ts`
-- `src/agents/active-run-manager.ts`
+- `src/agents/session-service.ts`
 - `src/channels/telegram/route-guidance.ts`
 
 It includes:

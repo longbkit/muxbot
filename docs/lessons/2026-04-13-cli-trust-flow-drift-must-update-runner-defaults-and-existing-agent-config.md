@@ -7,7 +7,7 @@ related:
   - docs/architecture/runtime-architecture.md
   - docs/features/runners/gemini-cli.md
   - src/config/agent-tool-presets.ts
-  - src/agents/runner-session.ts
+  - src/agents/runner-service.ts
   - src/runners/tmux/session-handshake.ts
   - test/agent-service.test.ts
   - test/tmux-runner-latency.test.ts

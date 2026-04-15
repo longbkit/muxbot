@@ -165,16 +165,8 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
         slack: {
           enabled: slackEnabled,
           mode: "socket",
-          appToken: renderEnvReference(
-            "SLACK_APP_TOKEN",
-            slackEnabled,
-            options.slackAppTokenRef,
-          ),
-          botToken: renderEnvReference(
-            "SLACK_BOT_TOKEN",
-            slackEnabled,
-            options.slackBotTokenRef,
-          ),
+          appToken: "",
+          botToken: "",
           defaultAccount: "default",
           accounts: {
             default: {
@@ -237,11 +229,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
         telegram: {
           enabled: telegramEnabled,
           mode: "polling",
-          botToken: renderEnvReference(
-            "TELEGRAM_BOT_TOKEN",
-            telegramEnabled,
-            options.telegramBotTokenRef,
-          ),
+          botToken: "",
           defaultAccount: "default",
           accounts: {
             default: {

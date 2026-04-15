@@ -86,8 +86,8 @@ function createConfig(): ClisbotConfig {
       slack: {
         enabled: false,
         mode: "socket",
-        appToken: "${SLACK_APP_TOKEN}",
-        botToken: "${SLACK_BOT_TOKEN}",
+        appToken: "",
+        botToken: "",
         defaultAccount: "default",
         accounts: {
           default: {
@@ -107,10 +107,6 @@ function createConfig(): ClisbotConfig {
         channelPolicy: "allowlist",
         groupPolicy: "allowlist",
         defaultAgentId: "default",
-        privilegeCommands: {
-          enabled: false,
-          allowUsers: [],
-        },
         commandPrefixes: {
           slash: ["::", "\\"],
           bash: ["!"],
@@ -135,7 +131,7 @@ function createConfig(): ClisbotConfig {
       telegram: {
         enabled: false,
         mode: "polling",
-        botToken: "${TELEGRAM_BOT_TOKEN}",
+        botToken: "",
         defaultAccount: "default",
         accounts: {
           default: {
@@ -145,10 +141,6 @@ function createConfig(): ClisbotConfig {
         allowBots: false,
         groupPolicy: "allowlist",
         defaultAgentId: "default",
-        privilegeCommands: {
-          enabled: false,
-          allowUsers: [],
-        },
         commandPrefixes: {
           slash: ["::", "\\"],
           bash: ["!"],
@@ -317,12 +309,9 @@ describe("startup bootstrap helpers", () => {
   test("reports missing env vars for enabled configured channels before runtime start", () => {
     const config = createConfig();
     config.channels.slack.enabled = true;
-    config.channels.slack.appToken = "${CUSTOM_SLACK_APP_TOKEN}";
-    config.channels.slack.botToken = "${CUSTOM_SLACK_BOT_TOKEN}";
     config.channels.slack.accounts.default.appToken = "${CUSTOM_SLACK_APP_TOKEN}";
     config.channels.slack.accounts.default.botToken = "${CUSTOM_SLACK_BOT_TOKEN}";
     config.channels.telegram.enabled = true;
-    config.channels.telegram.botToken = "${CUSTOM_TELEGRAM_BOT_TOKEN}";
     config.channels.telegram.accounts.default.botToken = "${CUSTOM_TELEGRAM_BOT_TOKEN}";
 
     const lines = renderConfiguredChannelTokenIssueLines(config, {
@@ -338,12 +327,9 @@ describe("startup bootstrap helpers", () => {
   test("blocks start when any enabled channel still has missing token env refs", () => {
     const config = createConfig();
     config.channels.slack.enabled = true;
-    config.channels.slack.appToken = "${SLACK_APP_TOKEN}";
-    config.channels.slack.botToken = "${SLACK_BOT_TOKEN}";
     config.channels.slack.accounts.default.appToken = "${SLACK_APP_TOKEN}";
     config.channels.slack.accounts.default.botToken = "${SLACK_BOT_TOKEN}";
     config.channels.telegram.enabled = true;
-    config.channels.telegram.botToken = "${TELEGRAM_BOT_TOKEN}";
     config.channels.telegram.accounts.default.botToken = "${TELEGRAM_BOT_TOKEN}";
 
     const lines = renderConfiguredChannelTokenIssueLines(config, {
@@ -357,12 +343,9 @@ describe("startup bootstrap helpers", () => {
   test("reports whether configured tokens come from env refs or missing env values", () => {
     const config = createConfig();
     config.channels.slack.enabled = true;
-    config.channels.slack.appToken = "${CUSTOM_SLACK_APP_TOKEN}";
-    config.channels.slack.botToken = "${CUSTOM_SLACK_BOT_TOKEN}";
     config.channels.slack.accounts.default.appToken = "${CUSTOM_SLACK_APP_TOKEN}";
     config.channels.slack.accounts.default.botToken = "${CUSTOM_SLACK_BOT_TOKEN}";
     config.channels.telegram.enabled = true;
-    config.channels.telegram.botToken = "${CUSTOM_TELEGRAM_BOT_TOKEN}";
     config.channels.telegram.accounts.default.botToken = "${CUSTOM_TELEGRAM_BOT_TOKEN}";
 
     const lines = renderConfiguredChannelTokenStatusLines(config, {

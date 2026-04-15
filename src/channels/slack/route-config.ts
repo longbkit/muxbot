@@ -1,8 +1,5 @@
 import { type LoadedConfig } from "../../config/load-config.ts";
 import {
-  type PrivilegeCommandsConfig,
-} from "../privilege-commands.ts";
-import {
   buildSharedChannelRoute,
   type SharedChannelRoute,
   type SharedChannelRouteOverride,
@@ -20,12 +17,6 @@ export type SlackResolvedRoute = {
 
 type SlackRouteOverride = SharedChannelRouteOverride;
 
-function normalizeSlackPrivilegeUsers(userIds: string[]) {
-  return userIds
-    .map((userId) => userId.trim().toUpperCase())
-    .filter(Boolean);
-}
-
 function buildRoute(loadedConfig: LoadedConfig, params: {
   route?: SlackRouteOverride | null;
   requireMention: boolean;
@@ -39,7 +30,6 @@ function buildRoute(loadedConfig: LoadedConfig, params: {
       channelConfig: slackConfig,
       route: params.route,
       requireMention: params.requireMention,
-      normalizePrivilegeUsers: normalizeSlackPrivilegeUsers,
       accountId: params.accountId,
     }),
     replyToMode: slackConfig.replyToMode,
@@ -56,7 +46,7 @@ function resolveChannelRoute(
   if (route) {
     return buildRoute(loadedConfig, {
       route,
-      requireMention: true,
+      requireMention: false,
       accountId,
     });
   }
@@ -81,7 +71,7 @@ function resolveGroupRoute(
   if (route) {
     return buildRoute(loadedConfig, {
       route,
-      requireMention: true,
+      requireMention: false,
       accountId,
     });
   }

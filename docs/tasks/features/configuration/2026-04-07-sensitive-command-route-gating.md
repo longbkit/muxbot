@@ -8,6 +8,18 @@ Require explicit route opt-in before transcript inspection or bash execution is 
 
 Done
 
+## Historical Note
+
+This task describes the pre-auth model that originally introduced `privilegeCommands`.
+
+Current runtime has moved on:
+
+- `/transcript` is controlled by route `verbose`
+- `/bash` is controlled by resolved auth through `shellExecute`
+- config loading now rejects legacy `privilegeCommands`
+
+Read this page as migration history only, not as current operator guidance.
+
 ## Why
 
 `/transcript`, `::transcript`, `/bash`, and `!<command>` expose terminal state and workspace execution.
@@ -30,7 +42,7 @@ Those capabilities are useful, but they are not safe to leave open by default on
 - role-based auth beyond route policy and explicit user-id allowlists
 - Telegram scoped command menus
 
-## Implemented Rule
+## Historical Model
 
 - `privilegeCommands.enabled: false` is the default at the Slack and Telegram channel roots
 - `privilegeCommands.allowUsers: []` means any user on an enabled route may use the commands
@@ -48,7 +60,7 @@ Those capabilities are useful, but they are not safe to leave open by default on
   - `!<command>`
 - when `allowUsers` is non-empty, only listed user ids may run those commands on the route
 
-## Validation
+## Historical Validation
 
 - schema defaults and route overrides covered by config and route tests
 - command denial and allow paths covered by interaction-processing tests

@@ -43,13 +43,13 @@ import { TmuxClient } from "../runners/tmux/client.ts";
 import { AgentJobQueue } from "./job-queue.ts";
 import type { PendingQueueItem } from "./job-queue.ts";
 import {
-  RunnerSessionService,
+  RunnerService,
   type ShellCommandResult,
-} from "./runner-session.ts";
+} from "./runner-service.ts";
 import {
   ActiveRunInProgressError,
-  ActiveRunManager,
-} from "./active-run-manager.ts";
+  SessionService,
+} from "./session-service.ts";
 export { ActiveRunInProgressError };
 import type { LatencyDebugContext } from "../control/latency-debug.ts";
 import type { ChannelIdentity } from "../channels/channel-identity.ts";
@@ -89,8 +89,8 @@ export class AgentService {
   private tmuxClient: TmuxClient;
   private readonly queue = new AgentJobQueue();
   private readonly sessionState: AgentSessionState;
-  private runnerSessions: RunnerSessionService;
-  private activeRuns: ActiveRunManager;
+  private runnerSessions: RunnerService;
+  private activeRuns: SessionService;
   private stopping = false;
   private cleanupTimer?: ReturnType<typeof setInterval>;
   private loopTimers = new Set<ReturnType<typeof setTimeout>>();
@@ -104,13 +104,13 @@ export class AgentService {
     this.tmuxClient = deps.tmux ?? new TmuxClient(this.loadedConfig.raw.tmux.socketPath);
     const sessionStore = deps.sessionStore ?? new SessionStore(resolveSessionStorePath(this.loadedConfig));
     this.sessionState = new AgentSessionState(sessionStore);
-    this.runnerSessions = new RunnerSessionService(
+    this.runnerSessions = new RunnerService(
       this.loadedConfig,
       this.tmuxClient,
       this.sessionState,
       (target) => this.resolveTarget(target),
     );
-    this.activeRuns = this.createActiveRunManager();
+    this.activeRuns = this.createSessionService();
   }
 
   get tmux() {
@@ -119,17 +119,17 @@ export class AgentService {
 
   set tmux(value: TmuxClient) {
     this.tmuxClient = value;
-    this.runnerSessions = new RunnerSessionService(
+    this.runnerSessions = new RunnerService(
       this.loadedConfig,
       this.tmuxClient,
       this.sessionState,
       (target) => this.resolveTarget(target),
     );
-    this.activeRuns = this.createActiveRunManager();
+    this.activeRuns = this.createSessionService();
   }
 
-  private createActiveRunManager() {
-    return new ActiveRunManager(
+  private createSessionService() {
+    return new SessionService(
       this.tmuxClient,
       this.sessionState,
       this.runnerSessions,
@@ -138,7 +138,7 @@ export class AgentService {
   }
 
   async start() {
-    await this.activeRuns.reconcileActiveRuns();
+    await this.activeRuns.recoverPersistedRuns();
     await this.restoreIntervalLoops();
     const cleanup = this.loadedConfig.raw.control.sessionCleanup;
     if (!cleanup.enabled) {

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { ActiveRunManager } from "../src/agents/active-run-manager.ts";
+import { SessionService } from "../src/agents/session-service.ts";
 import type { AgentSessionState } from "../src/agents/session-state.ts";
 import type { ResolvedAgentTarget } from "../src/agents/resolved-target.ts";
-import type { RunnerSessionService } from "../src/agents/runner-session.ts";
+import type { RunnerService } from "../src/agents/runner-service.ts";
 import type { RunUpdate } from "../src/agents/run-observation.ts";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
 
@@ -69,10 +69,10 @@ function createUpdate(
 }
 
 function createManager(resolved: ResolvedAgentTarget) {
-  return new ActiveRunManager(
+  return new SessionService(
     {} as TmuxClient,
     {} as AgentSessionState,
-    {} as RunnerSessionService,
+    {} as RunnerService,
     () => resolved,
   );
 }
@@ -93,7 +93,7 @@ function createRun(resolved: ResolvedAgentTarget, observers: Map<string, any>) {
   };
 }
 
-describe("ActiveRunManager observer delivery", () => {
+describe("SessionService observer delivery", () => {
   afterEach(() => {
     mock.restore();
   });

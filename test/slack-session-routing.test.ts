@@ -128,10 +128,6 @@ function createLoadedConfig(): LoadedConfig {
           channelPolicy: "allowlist",
           groupPolicy: "allowlist",
           defaultAgentId: "default",
-          privilegeCommands: {
-            enabled: false,
-            allowUsers: [],
-          },
           commandPrefixes: {
             slash: ["::", "\\"],
             bash: ["!"],
@@ -174,10 +170,6 @@ function createLoadedConfig(): LoadedConfig {
           allowBots: false,
           groupPolicy: "allowlist",
           defaultAgentId: "default",
-          privilegeCommands: {
-            enabled: false,
-            allowUsers: [],
-          },
           commandPrefixes: {
             slash: ["::", "\\"],
             bash: ["!"],
@@ -265,6 +257,21 @@ describe("Slack conversation target routing", () => {
     expect(overridden.route?.verbose).toBe("off");
   });
 
+  test("defaults explicit slack channel routes to no mention requirement", () => {
+    const config = createLoadedConfig();
+    config.raw.channels.slack.channels.C123 = {
+      requireMention: false,
+      allowBots: false,
+    };
+
+    const resolved = resolveSlackConversationRoute(
+      config,
+      { channel_type: "channel", channel: "C123" },
+    );
+
+    expect(resolved.route?.requireMention).toBe(false);
+  });
+
   test("isolates Slack channel conversations by root thread id", () => {
     const target = resolveSlackConversationTarget({
       loadedConfig: createLoadedConfig(),
@@ -317,15 +324,11 @@ describe("Slack conversation target routing", () => {
     expect(target.parentSessionKey).toBeUndefined();
   });
 
-  test("inherits privilege command defaults and route overrides", () => {
+  test("no longer exposes route-local privilege command config", () => {
     const loadedConfig = createLoadedConfig();
     loadedConfig.raw.channels.slack.channels.C123 = {
       requireMention: true,
       allowBots: false,
-      privilegeCommands: {
-        enabled: true,
-        allowUsers: ["u123"],
-      },
     };
 
     const channelRoute = resolveSlackConversationRoute(loadedConfig, {
@@ -337,14 +340,9 @@ describe("Slack conversation target routing", () => {
       channel: "D123",
     });
 
-    expect(channelRoute.route?.privilegeCommands).toEqual({
-      enabled: true,
-      allowUsers: ["U123"],
-    });
-    expect(dmRoute.route?.privilegeCommands).toEqual({
-      enabled: false,
-      allowUsers: [],
-    });
+    expect(channelRoute.route).toBeTruthy();
+    expect("privilegeCommands" in (channelRoute.route ?? {})).toBe(false);
+    expect("privilegeCommands" in (dmRoute.route ?? {})).toBe(false);
   });
 
   test("uses top-level slack binding when route agent is not overridden", () => {

@@ -6,7 +6,7 @@ Introduce the smallest auth slice that solves the urgent problems without expand
 
 ## Status
 
-In Progress
+Done
 
 ## Outcome
 
@@ -30,9 +30,12 @@ Implemented so far:
 - non-admin users cannot use normal messages, queued messages, steering messages, or loop-triggered prompts to make the agent edit protected clisbot control resources or run `clisbot` commands that mutate them
 - operators can inspect and mutate auth through `clisbot auth list|show|add-user|remove-user|add-permission|remove-permission`
 
-Still missing for this task:
+This task's phase-1 scope is now complete.
 
-- automatic first-owner claim for fresh installs with no owner yet
+Historical note:
+
+- legacy `privilegeCommands` references below are retained only to document what this task removed
+- they are not a supported runtime model anymore
 
 ## Why
 
@@ -225,6 +228,16 @@ Phase 1 rule:
 - owner claim docs reflect the live runtime behavior truthfully
 - owner/admin principals bypass pairing, but cross-platform identities do not auto-link
 - docs say clearly that finer-grained permission splitting is later work
+
+## Follow-Up
+
+Later auth refinement can continue in separate tasks without reopening this phase-1 slice.
+
+Likely future areas:
+
+- finer permission granularity beyond the broad phase-1 agent controls
+- control-side CLI enforcement for config-mutating `clisbot` commands
+- broader deny-copy and operator UX refinement
 
 ## Related Docs
 

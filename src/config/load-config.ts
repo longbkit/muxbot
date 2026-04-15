@@ -161,7 +161,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function assertNoLegacyPrivilegeCommands(value: unknown, path = "root"): void {
+export function assertNoLegacyPrivilegeCommands(value: unknown, path = "root"): void {
   if (Array.isArray(value)) {
     value.forEach((entry, index) => assertNoLegacyPrivilegeCommands(entry, `${path}[${index}]`));
     return;

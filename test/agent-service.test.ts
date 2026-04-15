@@ -7,7 +7,7 @@ import { resolveAgentTarget } from "../src/agents/resolved-target.ts";
 import { loadConfig, resolveSessionStorePath } from "../src/config/load-config.ts";
 import { AgentSessionState } from "../src/agents/session-state.ts";
 import { SessionStore } from "../src/agents/session-store.ts";
-import { RunnerSessionService } from "../src/agents/runner-session.ts";
+import { RunnerService } from "../src/agents/runner-service.ts";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
 
 const RUNNER_GENERATED_ID = "11111111-1111-1111-1111-111111111111";
@@ -1214,7 +1214,7 @@ describe("AgentService session identity", () => {
         }
       };
 
-      const runnerSessions = new RunnerSessionService(
+      const runnerSessions = new RunnerService(
         loaded,
         tmux as unknown as TmuxClient,
         new AgentSessionState(new SessionStore(resolveSessionStorePath(loaded))),
@@ -1281,7 +1281,7 @@ describe("AgentService session identity", () => {
         }
       };
 
-      const runnerSessions = new RunnerSessionService(
+      const runnerSessions = new RunnerService(
         loaded,
         tmux as unknown as TmuxClient,
         new AgentSessionState(new SessionStore(resolveSessionStorePath(loaded))),

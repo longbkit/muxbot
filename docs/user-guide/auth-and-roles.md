@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use this page as the operator quickstart for the current auth model and the near-term target design.
+Use this page as the operator quickstart for the current auth model.
 
 It explains:
 
@@ -18,11 +18,9 @@ For the product and implementation contract, see:
 
 ## Status
 
-Partially implemented
+Current runtime guide
 
 ## Current Runtime Reality
-
-This page mixes current operator reality with the target auth contract.
 
 Today:
 
@@ -32,7 +30,7 @@ Today:
 - automatic first-owner claim from the first DM is implemented
 - config remains the source of truth, and `clisbot auth ...` is the mutation surface for it
 
-Use this page to understand what is live now, what remains planned, and how operators should manage auth safely.
+Use this page to understand what is live now and how operators should manage auth safely.
 
 ## Current CLI Support
 
@@ -61,22 +59,26 @@ Mutation rule:
 
 Recommended operator flow right after bootstrap:
 
-1. Get your principal from a surface the bot can already see.
-   Telegram groups or topics can use `/whoami` even before routing, while DMs under `pairing` policy must pair first.
-2. Copy the returned principal such as `telegram:1276408333` or `slack:U123`.
-3. Grant the first app owner with `clisbot auth add-user app --role owner --user <principal>`.
-4. Inspect current auth with `clisbot auth show app` and `clisbot auth show agent-defaults`.
+1. If no owner exists yet, send the first valid DM during the claim window.
+2. That DM principal becomes app `owner` automatically and is auto-paired.
+3. Inspect current auth with `clisbot auth show app` and `clisbot auth show agent-defaults`.
+4. Add more app or agent principals with `clisbot auth add-user ...`.
 5. Tune role permissions with `clisbot auth add-permission ...` or `clisbot auth remove-permission ...`.
-6. Continue route setup and test `/status`, `/whoami`, and `/bash` from the granted account.
+6. Test `/status`, `/whoami`, `/transcript`, and `/bash` from the intended principals.
 
-## Target Model
+If an owner already exists:
+
+1. Get your principal with `/whoami`.
+2. Ask an existing app owner or admin to grant your role through `clisbot auth add-user ...`.
+
+## Current Model
 
 The new model has one permission source:
 
 - `app.auth`
 - `agents.<id>.auth`
 
-The old route-local `privilegeCommands` model is not part of the target design.
+The old route-local `privilegeCommands` model is not part of the current design.
 
 The mental model is:
 
@@ -110,7 +112,7 @@ Users not listed explicitly still fall back to `member`.
 
 ### 3. App Admin Implicit Agent Rights
 
-Phase 1 should treat both:
+Phase 1 treats both:
 
 - app `owner`
 - app `admin`
@@ -134,13 +136,13 @@ If the same human uses both Telegram and Slack, operators must grant both princi
 
 ### 5. Pairing Bypass
 
-Resolved app `owner` and app `admin` principals should bypass pairing automatically.
+Resolved app `owner` and app `admin` principals bypass pairing automatically.
 
 That bypass does not auto-extend to another platform principal unless that principal also has a granted role.
 
 ## First Owner Claim
 
-Target rule for the planned model:
+Runtime rule:
 
 - if `app.auth.roles.owner.users` is empty when the runtime starts, owner claim opens for `ownerClaimWindowMinutes`
 - the first successful DM user during that window becomes the first owner
@@ -202,7 +204,7 @@ Admin should additionally own the remaining advanced controls such as:
 | `helpView` | use in-chat help surfaces | medium |
 | `statusView` | inspect current route or session status | critical |
 | `identityView` | inspect sender and route identity with `/whoami` | high |
-| `transcriptView` | inspect transcript output where route policy allows it | high |
+| `transcriptView` | inspect transcript output where route `verbose` policy allows it | high |
 | `runObserve` | watch or attach to active runs | high |
 | `runInterrupt` | stop the active run | critical |
 | `streamingManage` | change streaming delivery mode | medium |
@@ -424,15 +426,16 @@ Operator rule:
 Current rollout checklist:
 
 1. Start the runtime.
-2. Send `/whoami` from the account that should become the first operator.
-3. Run `clisbot auth add-user app --role owner --user <principal>`.
-4. Add any extra app admins or agent admins.
-5. Confirm owner/admin principals bypass pairing.
-6. Confirm unlisted routed users still fall back to agent `member`.
-7. Confirm `member` has the intended default controls.
-8. Confirm `/bash` is denied until `shellExecute` is granted.
-9. Confirm permission changes through `add-permission` and `remove-permission` change the expected routed behavior.
-10. Confirm the protected prompt rule applies to normal, queue, steer, and loop delivery.
+2. If no owner exists yet, send the first valid DM from the account that should become the first operator.
+3. Confirm that first DM principal is auto-added as app `owner` and auto-paired.
+4. If an owner already exists, use `/whoami` and `clisbot auth add-user ...` instead.
+5. Add any extra app admins or agent admins.
+6. Confirm owner/admin principals bypass pairing.
+7. Confirm unlisted routed users still fall back to agent `member`.
+8. Confirm `member` has the intended default controls.
+9. Confirm `/bash` is denied until `shellExecute` is granted.
+10. Confirm permission changes through `add-permission` and `remove-permission` change the expected routed behavior.
+11. Confirm the protected prompt rule applies to normal, queue, steer, and loop delivery.
 
 ## Related Pages
 

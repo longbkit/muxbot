@@ -67,26 +67,17 @@ function applyTelegramAccountConfig(
       };
 }
 
-function syncSlackCompatibilityRoot(
+function clearSlackRootTokens(
   config: ClisbotConfig["channels"]["slack"],
 ) {
-  const defaultAccountId = config.defaultAccount || "default";
-  const defaultAccount = config.accounts[defaultAccountId];
-  if (!defaultAccount) {
-    config.appToken = "";
-    config.botToken = "";
-    return;
-  }
-  config.appToken = defaultAccount.appToken ?? "";
-  config.botToken = defaultAccount.botToken ?? "";
+  config.appToken = "";
+  config.botToken = "";
 }
 
-function syncTelegramCompatibilityRoot(
+function clearTelegramRootToken(
   config: ClisbotConfig["channels"]["telegram"],
 ) {
-  const defaultAccountId = config.defaultAccount || "default";
-  const defaultAccount = config.accounts[defaultAccountId];
-  config.botToken = defaultAccount?.botToken ?? "";
+  config.botToken = "";
 }
 
 function getEnabledAccountIds(accounts: Record<string, { enabled?: boolean }>) {
@@ -101,13 +92,13 @@ function reconcileSlackConfiguredAccounts(
   const enabledAccountIds = getEnabledAccountIds(config.accounts);
   if (enabledAccountIds.length === 0) {
     config.enabled = false;
-    syncSlackCompatibilityRoot(config);
+    clearSlackRootTokens(config);
     return;
   }
   if (!config.defaultAccount || !enabledAccountIds.includes(config.defaultAccount)) {
     config.defaultAccount = enabledAccountIds[0];
   }
-  syncSlackCompatibilityRoot(config);
+  clearSlackRootTokens(config);
 }
 
 function reconcileTelegramConfiguredAccounts(
@@ -116,13 +107,13 @@ function reconcileTelegramConfiguredAccounts(
   const enabledAccountIds = getEnabledAccountIds(config.accounts);
   if (enabledAccountIds.length === 0) {
     config.enabled = false;
-    syncTelegramCompatibilityRoot(config);
+    clearTelegramRootToken(config);
     return;
   }
   if (!config.defaultAccount || !enabledAccountIds.includes(config.defaultAccount)) {
     config.defaultAccount = enabledAccountIds[0];
   }
-  syncTelegramCompatibilityRoot(config);
+  clearTelegramRootToken(config);
 }
 
 export function buildBootstrapRuntimeMemEnv(
@@ -313,8 +304,8 @@ export function persistBootstrapMemCredentials(
     summaries.push(`Persisted telegram/${account.accountId} to ${path}.`);
   }
 
-  syncSlackCompatibilityRoot(config.channels.slack);
-  syncTelegramCompatibilityRoot(config.channels.telegram);
+  clearSlackRootTokens(config.channels.slack);
+  clearTelegramRootToken(config.channels.telegram);
 
   return summaries;
 }

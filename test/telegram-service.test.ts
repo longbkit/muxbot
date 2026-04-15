@@ -43,10 +43,6 @@ function createTelegramConfig(): LoadedConfig["raw"]["channels"]["telegram"] {
     allowBots: false,
     groupPolicy: "allowlist",
     defaultAgentId: "default",
-    privilegeCommands: {
-      enabled: false,
-      allowUsers: [],
-    },
     commandPrefixes: {
       slash: ["::", "\\"],
       bash: ["!"],

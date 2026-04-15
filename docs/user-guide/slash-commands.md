@@ -26,7 +26,7 @@ If this page and runtime ever disagree, runtime wins.
 - `/status`: show route status and suggested operator next steps
 - `/help`: show available control slash commands
 - `/whoami`: show current platform, route, and sender identity details
-- `/transcript`: show the current session transcript when route policy allows it
+- `/transcript`: show the current session transcript when route `verbose` policy allows it
 
 ## Run Control
 
@@ -75,8 +75,8 @@ If this page and runtime ever disagree, runtime wins.
 
 ## Shell
 
-- `/bash <command>`: run a shell command when the current route policy allows it
-- `!<command>`: bash shortcut when the current route policy allows it
+- `/bash <command>`: run a shell command when the resolved role allows `shellExecute`
+- `!<command>`: bash shortcut when the resolved role allows `shellExecute`
 
 ## Notes
 

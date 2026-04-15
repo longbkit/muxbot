@@ -120,10 +120,6 @@ function createDependencies() {
           channelPolicy: "allowlist",
           groupPolicy: "allowlist",
           defaultAgentId: "default",
-          privilegeCommands: {
-            enabled: false,
-            allowUsers: [],
-          },
           commandPrefixes: {
             slash: ["::", "\\"],
             bash: ["!"],
@@ -165,10 +161,6 @@ function createDependencies() {
           allowBots: false,
           groupPolicy: "allowlist",
           defaultAgentId: "default",
-          privilegeCommands: {
-            enabled: false,
-            allowUsers: [],
-          },
           commandPrefixes: {
             slash: ["::", "\\"],
             bash: ["!"],

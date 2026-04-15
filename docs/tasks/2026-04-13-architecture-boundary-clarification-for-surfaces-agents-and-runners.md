@@ -92,7 +92,7 @@ Refine the permission split to:
 - auth owns permission semantics, owner claim, and cross-system resolution rules
 - configuration owns the persisted policy config that drives those rules
 - control consumes auth for operator-facing enforcement
-- channels may enforce route-local privilege gates for in-chat commands before handoff, but they do not become the canonical owner of permission semantics
+- channels may enforce route-local surface policy such as transcript visibility before handoff, but they do not become the canonical owner of permission semantics
 
 This should make it easier to explain:
 
