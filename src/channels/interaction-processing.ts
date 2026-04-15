@@ -750,10 +750,6 @@ async function executePromptDelivery<TChunk>(params: {
               return;
             }
 
-            if (messageToolPreview) {
-              return;
-            }
-
             const nextState = buildRenderedMessageState({
               platform: params.identity.platform,
               status: update.status,

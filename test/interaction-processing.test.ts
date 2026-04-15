@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -53,6 +53,26 @@ function createIdentity(
     channelId: "C123",
     threadTs: "1.2",
     ...overrides,
+  };
+}
+
+function createTelegramTopicIdentity(
+  overrides: Partial<ChannelInteractionIdentity> = {},
+): ChannelInteractionIdentity {
+  return {
+    platform: "telegram",
+    conversationKind: "topic",
+    senderId: "123",
+    chatId: "-1001",
+    topicId: "4",
+    ...overrides,
+  };
+}
+
+function createTelegramTopicTarget(): AgentSessionTarget {
+  return {
+    agentId: "default",
+    sessionKey: "agent:default:telegram:group:-1001:topic:4",
   };
 }
 
@@ -593,6 +613,121 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("persists as `all`");
   });
 
+  test("shows persisted streaming mode for a telegram topic that inherits from its group route", async () => {
+    const posted: string[] = [];
+    const originalConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    const configDir = mkdtempSync(join(tmpdir(), "clisbot-interaction-config-"));
+    const configPath = join(configDir, "clisbot.json");
+    const template = JSON.parse(renderDefaultConfigTemplate());
+
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          ...template,
+          channels: {
+            ...template.channels,
+            telegram: {
+              ...template.channels.telegram,
+              groups: {
+                "-1001": {
+                  requireMention: true,
+                  streaming: "all",
+                  topics: {},
+                },
+              },
+            },
+          },
+        }, null, 2),
+      );
+      process.env.CLISBOT_CONFIG_PATH = configPath;
+
+      await processChannelInteraction({
+        agentService: {
+          recordConversationReply: async () => undefined,
+        } as any,
+        sessionTarget: createTelegramTopicTarget(),
+        identity: createTelegramTopicIdentity(),
+        senderId: "123",
+        text: "/streaming status",
+        route: createRoute({
+          streaming: "all",
+        }),
+        maxChars: 4000,
+        postText: async (text) => {
+          posted.push(text);
+          return [text];
+        },
+        reconcileText: async (_chunks, text) => [text],
+      });
+    } finally {
+      process.env.CLISBOT_CONFIG_PATH = originalConfigPath;
+      rmSync(configDir, { recursive: true, force: true });
+    }
+
+    expect(posted[0]).toContain("clisbot streaming mode: `all`");
+    expect(posted[0]).toContain("config.target: `telegram topic -1001/4`");
+  });
+
+  test("updates persisted streaming mode for a telegram topic by materializing a topic override", async () => {
+    const posted: string[] = [];
+    const originalConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    const configDir = mkdtempSync(join(tmpdir(), "clisbot-interaction-config-"));
+    const configPath = join(configDir, "clisbot.json");
+    const template = JSON.parse(renderDefaultConfigTemplate());
+
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          ...template,
+          channels: {
+            ...template.channels,
+            telegram: {
+              ...template.channels.telegram,
+              groups: {
+                "-1001": {
+                  requireMention: true,
+                  streaming: "all",
+                  topics: {},
+                },
+              },
+            },
+          },
+        }, null, 2),
+      );
+      process.env.CLISBOT_CONFIG_PATH = configPath;
+
+      await processChannelInteraction({
+        agentService: {
+          recordConversationReply: async () => undefined,
+        } as any,
+        sessionTarget: createTelegramTopicTarget(),
+        identity: createTelegramTopicIdentity(),
+        senderId: "123",
+        text: "/streaming off",
+        route: createRoute({
+          streaming: "all",
+        }),
+        maxChars: 4000,
+        postText: async (text) => {
+          posted.push(text);
+          return [text];
+        },
+        reconcileText: async (_chunks, text) => [text],
+      });
+
+      const updated = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(updated.channels.telegram.groups["-1001"].topics["4"].streaming).toBe("off");
+    } finally {
+      process.env.CLISBOT_CONFIG_PATH = originalConfigPath;
+      rmSync(configDir, { recursive: true, force: true });
+    }
+
+    expect(posted[0]).toContain("Updated streaming mode");
+    expect(posted[0]).toContain("`telegram topic -1001/4`");
+  });
+
   test("updates persisted response mode for the current route", async () => {
     const posted: string[] = [];
     const originalConfigPath = process.env.CLISBOT_CONFIG_PATH;
@@ -1080,7 +1215,8 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Working");
-    expect(reconciled).toEqual([]);
+    expect(reconciled).toContain("working draft");
+    expect(reconciled.at(-1)).toContain("working draft");
   });
 
   test("hands off the live draft after a message-tool reply boundary", async () => {
@@ -1153,6 +1289,7 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(1);
+    expect(reconciled).toContain("draft one");
     expect(reconciled.at(-1)).toBe("");
     expect(posted.join("\n")).not.toContain("draft two");
     expect(reconciled.join("\n")).not.toContain("draft two");
@@ -1223,6 +1360,7 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(1);
+    expect(reconciled).toContain("draft before final");
     expect(reconciled.at(-1)).toBe("");
   });
 

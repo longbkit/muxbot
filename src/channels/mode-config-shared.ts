@@ -1,6 +1,5 @@
 import type { ClisbotConfig } from "../config/schema.ts";
 import type { ChannelIdentity } from "./channel-identity.ts";
-import { renderTelegramRouteChoiceMessage } from "./telegram/route-guidance.ts";
 
 export type ResponseMode = "capture-pane" | "message-tool";
 export type AdditionalMessageMode = "queue" | "steer";
@@ -30,6 +29,40 @@ type SurfaceModeTargetBinding<TField extends SurfaceModeField> = {
   label: string;
 };
 
+type TelegramGroupRoute = ClisbotConfig["channels"]["telegram"]["groups"][string];
+type TelegramTopicRoute = TelegramGroupRoute["topics"][string];
+
+function createTelegramGroupRoute(): TelegramGroupRoute {
+  return {
+    requireMention: true,
+    allowBots: false,
+    topics: {},
+  };
+}
+
+function ensureTelegramGroupRoute(config: ClisbotConfig, chatId: string) {
+  const existing = config.channels.telegram.groups[chatId];
+  if (existing) {
+    return existing;
+  }
+
+  const created = createTelegramGroupRoute();
+  config.channels.telegram.groups[chatId] = created;
+  return created;
+}
+
+function ensureTelegramTopicRoute(config: ClisbotConfig, chatId: string, topicId: string) {
+  const group = ensureTelegramGroupRoute(config, chatId);
+  const existing = group.topics[topicId];
+  if (existing) {
+    return existing;
+  }
+
+  const created: TelegramTopicRoute = {};
+  group.topics[topicId] = created;
+  return created;
+}
+
 function getModeValue<TField extends SurfaceModeField>(
   source: SurfaceModeSource,
   field: TField,
@@ -44,6 +77,8 @@ function setModeValue<TField extends SurfaceModeField>(
 ) {
   source[field] = value;
 }
+
+const EMPTY_MODE_SOURCE: SurfaceModeSource = {};
 
 function resolveSlackConfigTarget<TField extends SurfaceModeField>(
   config: ClisbotConfig,
@@ -155,24 +190,27 @@ function resolveTelegramConfigTarget<TField extends SurfaceModeField>(
   }
 
   const group = config.channels.telegram.groups[chatId];
-  if (!group) {
-    throw new Error(renderTelegramRouteChoiceMessage({ chatId }));
-  }
-
   if (topicId) {
-    const topic = group.topics?.[topicId];
-    if (!topic) {
-      throw new Error(renderTelegramRouteChoiceMessage({ chatId, topicId }));
-    }
+    const topic = group?.topics?.[topicId];
     return {
       get: () =>
-        getModeValue(topic, field) ??
-        getModeValue(group, field) ??
+        getModeValue(topic ?? EMPTY_MODE_SOURCE, field) ??
+        getModeValue(group ?? EMPTY_MODE_SOURCE, field) ??
         getModeValue(config.channels.telegram, field),
       set: (value) => {
-        setModeValue(topic, field, value);
+        setModeValue(ensureTelegramTopicRoute(config, chatId, topicId), field, value);
       },
       label: `telegram topic ${chatId}/${topicId}`,
+    };
+  }
+
+  if (!group) {
+    return {
+      get: () => getModeValue(config.channels.telegram, field),
+      set: (value) => {
+        setModeValue(ensureTelegramGroupRoute(config, chatId), field, value);
+      },
+      label: `telegram group ${chatId}`,
     };
   }
 
