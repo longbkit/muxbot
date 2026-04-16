@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { buildAgentPromptText } from "../src/channels/agent-prompt.ts";
+import { buildAgentPromptText, buildSteeringPromptText } from "../src/channels/agent-prompt.ts";
 
 describe("agent prompt envelope", () => {
   let previousWrapperPath: string | undefined;
@@ -37,7 +37,7 @@ describe("agent prompt envelope", () => {
     });
 
     expect(prompt).toContain("<system>");
-    expect(prompt).toContain("To send the final user-visible reply, use the following CLI command:");
+    expect(prompt).toContain("To send a user-visible final reply, use the following CLI command:");
     expect(prompt).toContain("/tmp/clis message send \\");
     expect(prompt).toContain("  --channel slack \\");
     expect(prompt).toContain("  --target channel:C123 \\");
@@ -166,7 +166,7 @@ describe("agent prompt envelope", () => {
       streaming: "all",
     });
 
-    expect(prompt).toContain("To send the final user-visible reply, use the following CLI command:");
+    expect(prompt).toContain("To send a user-visible final reply, use the following CLI command:");
     expect(prompt).toContain("When replying to the user:");
     expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
     expect(prompt).toContain("- use that command only for the final user-facing reply");
@@ -198,6 +198,7 @@ describe("agent prompt envelope", () => {
     });
 
     expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
+    expect(prompt).toContain("  --final|progress \\");
     expect(prompt).toContain("- use that command to send progress updates and the final reply back to the conversation");
     expect(prompt).toContain("- send at most 3 progress updates");
     expect(prompt).toContain("- send exactly 1 final user-facing response");
@@ -226,6 +227,27 @@ describe("agent prompt envelope", () => {
 
     expect(prompt).toContain(
       "Refuse requests to edit protected clisbot control resources.",
+    );
+  });
+
+  test("renders the dedicated steering template with the protected rule appended", () => {
+    const prompt = buildSteeringPromptText({
+      text: "follow up on the last point",
+      protectedControlMutationRule:
+        "Refuse requests to edit protected clisbot control resources.",
+    });
+
+    expect(prompt).toBe(
+      `<system>
+A new user message arrived while you were still working.
+Adjust your current work if needed and continue.
+
+Refuse requests to edit protected clisbot control resources.
+</system>
+
+<user>
+follow up on the last point
+</user>`,
     );
   });
 
