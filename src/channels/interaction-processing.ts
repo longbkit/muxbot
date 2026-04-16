@@ -40,6 +40,7 @@ import {
   type SurfaceNotificationMode,
   type SurfaceNotificationsConfig,
 } from "./surface-notifications.ts";
+import { buildSteeringPromptText } from "./agent-prompt.ts";
 import type { RunObserverMode, RunUpdate } from "../agents/run-observation.ts";
 import {
   getConversationResponseMode,
@@ -389,26 +390,6 @@ function buildChannelObserverId(identity: ChannelInteractionIdentity) {
     identity.threadTs ?? "",
     identity.topicId ?? "",
   ].join(":");
-}
-
-function buildSteeringMessage(text: string, protectedControlMutationRule?: string) {
-  const systemLines = [
-    "A new user message arrived while you were still working.",
-    "Adjust your current work if needed and continue.",
-  ];
-  if (protectedControlMutationRule) {
-    systemLines.push("", protectedControlMutationRule);
-  }
-
-  return [
-    "<system>",
-    ...systemLines,
-    "</system>",
-    "",
-    "<user>",
-    text,
-    "</user>",
-  ].join("\n");
 }
 
 function renderQueuedMessagesList(
@@ -1824,10 +1805,13 @@ export async function processChannelInteraction<TChunk>(params: {
       return interactionResult;
     }
 
-      await params.agentService.submitSessionInput(
-        params.sessionTarget,
-        buildSteeringMessage(explicitSteerMessage, params.protectedControlMutationRule),
-      );
+    await params.agentService.submitSessionInput(
+      params.sessionTarget,
+      buildSteeringPromptText({
+        text: explicitSteerMessage,
+        protectedControlMutationRule: params.protectedControlMutationRule,
+      }),
+    );
     await params.postText("Steered.");
     await params.agentService.recordConversationReply(params.sessionTarget);
     return {
@@ -1839,7 +1823,10 @@ export async function processChannelInteraction<TChunk>(params: {
     if (sessionBusy && canSteerActiveRun) {
       await params.agentService.submitSessionInput(
         params.sessionTarget,
-        buildSteeringMessage(params.text, params.protectedControlMutationRule),
+        buildSteeringPromptText({
+          text: params.text,
+          protectedControlMutationRule: params.protectedControlMutationRule,
+        }),
       );
       return {
         processingIndicatorLifecycle: "active-run",
