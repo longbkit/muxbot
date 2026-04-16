@@ -44,6 +44,7 @@ import {
   isBotOriginatedSlackEvent,
   isImplicitBotThreadReply,
   normalizeSlackMessageEvent,
+  resolveSlackDirectReplyThreadTs,
   stripBotMention,
 } from "./message.ts";
 import {
@@ -306,7 +307,10 @@ export class SlackSocketService {
         await this.processedEventsStore.markCompleted(eventId);
         return;
       }
-      const ownerClaimThreadTs = await this.resolveThreadTs(event);
+      const directReplyThreadTs = resolveSlackDirectReplyThreadTs({
+        messageTs,
+        resolvedThreadTs: await this.resolveThreadTs(event),
+      });
 
       let ownerClaimed = false;
       let ownerPrincipal: string | undefined;
@@ -326,7 +330,7 @@ export class SlackSocketService {
         try {
           await postSlackText(this.app.client, {
             channel: channelId,
-            threadTs: ownerClaimThreadTs ?? messageTs,
+            threadTs: directReplyThreadTs,
             text: renderFirstOwnerClaimMessage({
               principal: ownerPrincipal,
               ownerClaimWindowMinutes: this.loadedConfig.raw.app.auth.ownerClaimWindowMinutes,
@@ -359,6 +363,7 @@ export class SlackSocketService {
               try {
                 await postSlackText(this.app.client, {
                   channel: channelId,
+                  threadTs: directReplyThreadTs,
                   text: buildPairingReply({
                     channel: "slack",
                     idLine: `Your Slack user id: ${directUserId}`,

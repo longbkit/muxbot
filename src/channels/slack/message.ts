@@ -120,3 +120,16 @@ export function stripBotMention(text: string, botUserId?: string) {
 
   return text.replaceAll(`<@${botUserId}>`, "").replaceAll(/<@[^>]+>/g, "").trim();
 }
+
+export function resolveSlackDirectReplyThreadTs(params: {
+  messageTs?: string | null;
+  resolvedThreadTs?: string | null;
+}) {
+  const resolvedThreadTs = (params.resolvedThreadTs ?? "").trim();
+  if (resolvedThreadTs) {
+    return resolvedThreadTs;
+  }
+
+  const messageTs = (params.messageTs ?? "").trim();
+  return messageTs || undefined;
+}

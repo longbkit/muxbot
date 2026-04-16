@@ -6,6 +6,7 @@ import {
   isBotOriginatedSlackEvent,
   isImplicitBotThreadReply,
   normalizeSlackMessageEvent,
+  resolveSlackDirectReplyThreadTs,
   stripBotMention,
 } from "../src/channels/slack/message.ts";
 
@@ -115,5 +116,26 @@ describe("slack message helpers", () => {
     expect(hasBotMention("<@U_BOT> reply with pong", "U_BOT")).toBe(true);
     expect(stripBotMention("<@U_BOT> reply with pong", "U_BOT")).toBe("reply with pong");
     expect(stripBotMention("reply with pong", "U_BOT")).toBe("reply with pong");
+  });
+
+  test("uses the resolved Slack thread ts for DM replies and falls back to message ts", () => {
+    expect(
+      resolveSlackDirectReplyThreadTs({
+        messageTs: "111.222",
+        resolvedThreadTs: "100.200",
+      }),
+    ).toBe("100.200");
+    expect(
+      resolveSlackDirectReplyThreadTs({
+        messageTs: "111.222",
+        resolvedThreadTs: "",
+      }),
+    ).toBe("111.222");
+    expect(
+      resolveSlackDirectReplyThreadTs({
+        messageTs: "",
+        resolvedThreadTs: "",
+      }),
+    ).toBeUndefined();
   });
 });
