@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>clisbot Runner Ownership, Flow, and State Visualization</title>
+  <style>
+    :root {
+      --bg: #f3efe5;
+      --panel: #fffaf1;
+      --panel-strong: #fff4db;
+      --ink: #1f1d19;
+      --muted: #665f52;
+      --line: #d7cdb8;
+      --accent: #1d5f5a;
+      --accent-soft: #d8ece8;
+      --warn: #9b5c00;
+      --warn-soft: #ffefcc;
+      --danger: #8a2f2f;
+      --danger-soft: #f7dede;
+      --shadow: 0 16px 40px rgba(35, 30, 20, 0.08);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --mono: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+      --sans: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(29, 95, 90, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(155, 92, 0, 0.12), transparent 24%),
+        linear-gradient(180deg, #f7f2e8 0%, var(--bg) 45%, #eee6d8 100%);
+      line-height: 1.48;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    .page {
+      width: min(1380px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 64px;
+    }
+
+    .hero,
+    .panel {
+      background: rgba(255, 250, 241, 0.88);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(215, 205, 184, 0.9);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+    }
+
+    h1 {
+      font-size: clamp(32px, 4vw, 56px);
+      margin-top: 14px;
+    }
+
+    h2 {
+      font-size: clamp(24px, 2.5vw, 34px);
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .hero-copy {
+      margin-top: 16px;
+      max-width: 900px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .hero-grid,
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .hero-grid {
+      margin-top: 22px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .metric {
+      padding: 16px 18px;
+      border-radius: var(--radius-sm);
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .metric span {
+      display: block;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .sticky-nav {
+      position: sticky;
+      top: 10px;
+      z-index: 10;
+      margin-bottom: 20px;
+      padding: 12px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: rgba(255, 250, 241, 0.92);
+      border: 1px solid rgba(215, 205, 184, 0.92);
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+    }
+
+    .sticky-nav a {
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .sticky-nav a:hover {
+      border-color: var(--line);
+      color: var(--ink);
+      background: var(--panel);
+    }
+
+    .section {
+      margin-top: 18px;
+    }
+
+    .panel {
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+
+    .summary {
+      color: var(--muted);
+      max-width: 920px;
+      margin-bottom: 18px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    }
+
+    .card {
+      padding: 18px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .card strong.label {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .card ul,
+    .card ol {
+      margin: 10px 0 0 18px;
+      padding: 0;
+      color: var(--muted);
+    }
+
+    .card li + li {
+      margin-top: 6px;
+    }
+
+    .code {
+      font-family: var(--mono);
+      font-size: 13px;
+      background: #f6efe0;
+      border: 1px solid #e8dcc4;
+      padding: 2px 5px;
+      border-radius: 6px;
+    }
+
+    .flow-strip {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(160px, 1fr));
+      gap: 14px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+
+    .lane {
+      min-width: 160px;
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(255, 247, 234, 0.9));
+    }
+
+    .lane h3 {
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    .step {
+      position: relative;
+      padding: 12px 12px 12px 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(215, 205, 184, 0.92);
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .step strong {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .state {
+      padding: 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .state-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .pill {
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .pill.warn {
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+
+    .pill.danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .diagram {
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #fffdf8, #fbf4e6);
+      padding: 18px;
+      overflow: hidden;
+    }
+
+    .diagram-flow {
+      display: grid;
+      gap: 18px;
+    }
+
+    .diagram-row {
+      display: grid;
+      gap: 14px;
+    }
+
+    .diagram-row.top {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      align-items: stretch;
+    }
+
+    .diagram-row.middle {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: stretch;
+    }
+
+    .diagram-row.bottom {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+    }
+
+    .diagram-box {
+      min-height: 134px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.84);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 8px;
+      box-shadow: 0 10px 24px rgba(35, 30, 20, 0.06);
+    }
+
+    .diagram-box.owner {
+      background: linear-gradient(180deg, #ebfaf7, #d8ece8);
+      border-color: #8dbcb6;
+    }
+
+    .diagram-box.surface {
+      background: linear-gradient(180deg, #fff9eb, #fff0cc);
+      border-color: #d9bb72;
+    }
+
+    .diagram-box.risk {
+      background: linear-gradient(180deg, #fdeeee, #f7dede);
+      border-color: #d39595;
+    }
+
+    .diagram-box h3 {
+      margin: 0;
+      font-size: clamp(18px, 2vw, 22px);
+      line-height: 1.12;
+      letter-spacing: -0.04em;
+    }
+
+    .diagram-box p {
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.5;
+      max-width: none;
+    }
+
+    .diagram-kicker {
+      display: inline-flex;
+      width: fit-content;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .diagram-arrow {
+      display: none;
+    }
+
+    .diagram-arrow.down {
+      display: none;
+    }
+
+    .diagram-note {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px dashed rgba(102, 95, 82, 0.25);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .diagram-rail {
+      margin: 10px 0 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-family: var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .diagram-rail::before,
+    .diagram-rail::after {
+      content: "";
+      flex: 1 1 auto;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(102, 95, 82, 0.1), rgba(102, 95, 82, 0.35));
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      display: inline-block;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .details {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .details + .details {
+      margin-top: 12px;
+    }
+
+    .details summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 16px 18px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .details[open] summary {
+      border-bottom: 1px solid var(--line);
+      background: #fff8ea;
+    }
+
+    .details-body {
+      padding: 18px;
+    }
+
+    .callout {
+      padding: 16px 18px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+    }
+
+    .callout.warn {
+      background: var(--warn-soft);
+      border-color: #f0d693;
+    }
+
+    .callout.danger {
+      background: var(--danger-soft);
+      border-color: #e8b6b6;
+    }
+
+    .footnote {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .source-list {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      columns: 2 280px;
+      column-gap: 24px;
+    }
+
+    .source-list li {
+      break-inside: avoid;
+      margin-bottom: 6px;
+    }
+
+    @media (max-width: 1260px) {
+      .diagram-row.top {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .diagram-row.middle {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 900px) {
+      .page {
+        width: min(100% - 20px, 1380px);
+      }
+
+      .panel,
+      .hero {
+        padding: 18px;
+      }
+
+      .sticky-nav {
+        border-radius: 18px;
+      }
+
+      .diagram-row.top,
+      .diagram-row.middle,
+      .diagram-row.bottom {
+        grid-template-columns: 1fr;
+      }
+
+      .diagram-box {
+        min-height: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="eyebrow">Current Code Map - 2026-04-16</div>
+      <h1>Runner Ownership, Channel Progress, Tmux Capture, and Run-State Truth</h1>
+      <p class="hero-copy">
+        This page is a visual guide for the current <span class="code">clisbot</span> architecture around
+        session-owned run lifecycle, runner-owned tmux behavior, channel-owned rendering, and the failure modes
+        created when those boundaries blur. It starts with the shortest mental model first, then opens up the full flow.
+      </p>
+      <div class="hero-grid">
+        <div class="metric">
+          <strong>Main Rule</strong>
+          <span>Output observation is not run-lifecycle truth.</span>
+        </div>
+        <div class="metric">
+          <strong>Lifecycle Owner</strong>
+          <span><span class="code">SessionService</span> owns active-run truth.</span>
+        </div>
+        <div class="metric">
+          <strong>Runner Owner</strong>
+          <span><span class="code">RunnerService</span> owns backend readiness and liveness probes.</span>
+        </div>
+        <div class="metric">
+          <strong>Channel Owner</strong>
+          <span>Channels own rendering, preview, attach/watch UX, and message-tool handoff.</span>
+        </div>
+      </div>
+    </section>
+
+    <nav class="sticky-nav">
+      <a href="#quick-model">Quick Model</a>
+      <a href="#owner-map">Owner Map</a>
+      <a href="#full-flow">Full Flow</a>
+      <a href="#state-machines">State Machines</a>
+      <a href="#problem-zones">Problem Zones</a>
+      <a href="#fix-shape">Low-Side-Effect Fix Shape</a>
+      <a href="#sources">Sources</a>
+    </nav>
+
+    <section id="quick-model" class="section panel">
+      <h2>Quick Model</h2>
+      <p class="summary">
+        If you only need one picture in your head, use this:
+        a user message comes in from a channel, the channel resolves route and surface policy,
+        <span class="code">AgentService</span> forwards to <span class="code">SessionService</span>,
+        <span class="code">SessionService</span> owns whether a run exists and whether a new prompt is allowed,
+        <span class="code">RunnerService</span> makes tmux or the backend ready,
+        and <span class="code">monitorTmuxRun()</span> is only supposed to observe pane facts.
+      </p>
+      <div class="grid three">
+        <div class="card">
+          <strong class="label">1. Admission</strong>
+          <p><span class="code">SessionService</span> decides whether this <span class="code">sessionKey</span> can accept a new prompt or must reject with active-run guidance.</p>
+        </div>
+        <div class="card">
+          <strong class="label">2. Backend</strong>
+          <p><span class="code">RunnerService</span> owns bootstrap, resume, tmux capture, submit, and backend-specific recovery.</p>
+        </div>
+        <div class="card">
+          <strong class="label">3. Surface</strong>
+          <p>Channels own previews, message-tool handoff, attach or watch commands, and how progress becomes a Slack or Telegram message.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="owner-map" class="section panel">
+      <h2>Owner Map</h2>
+      <div class="grid two">
+        <div class="card">
+          <strong class="label">AgentService</strong>
+          <ul>
+            <li>Thin facade at runtime entrypoints.</li>
+            <li>Wires channels and control into session-owned behavior.</li>
+            <li>Should not become a second orchestration owner.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong class="label">SessionService</strong>
+          <ul>
+            <li>Owns <span class="code">sessionKey</span>-scoped active run truth.</li>
+            <li>Owns admission control, observer attachment, queue semantics, and final settlement.</li>
+            <li>Only this layer should transition a run back to idle.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong class="label">RunnerService</strong>
+          <ul>
+            <li>Owns backend readiness, resume, tmux session bootstrap, capture, submit, and runner-specific recovery.</li>
+            <li>Should answer: is the backend alive, blocked, resumable, or dead?</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong class="label">monitorTmuxRun()</strong>
+          <ul>
+            <li>Observes pane snapshots and meaningful deltas.</li>
+            <li>Detects idle-after-output and max-runtime detach.</li>
+            <li>Should report facts, not own lifecycle consequences.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong class="label">Channel Interaction Processing</strong>
+          <ul>
+            <li>Owns placeholder rendering, streaming preview, <span class="code">message-tool</span> preview handoff, and slash-command UX.</li>
+            <li>Reads run updates; should not redefine the run state machine.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong class="label">Session State Store</strong>
+          <ul>
+            <li>Persists <span class="code">runtime.state</span>, <span class="code">startedAt</span>, <span class="code">detachedAt</span>, message-tool reply timestamps, and continuity metadata.</li>
+            <li>Read model for status and follow-up decisions, not its own owner boundary.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="full-flow" class="section panel">
+      <h2>Full Flow</h2>
+      <p class="summary">
+        This is the end-to-end path for a normal routed prompt. Read left to right. Each column owns a different kind of truth.
+      </p>
+      <div class="flow-strip">
+        <div class="lane">
+          <h3>1. Channel</h3>
+          <div class="step">
+            <strong>Inbound event</strong>
+            Slack or Telegram parses text, thread or topic identity, slash command, attachments, and route config.
+          </div>
+          <div class="step">
+            <strong>Policy choice</strong>
+            Chooses <span class="code">responseMode</span>, <span class="code">streaming</span>, queue behavior, and observer commands such as <span class="code">/attach</span>.
+          </div>
+        </div>
+        <div class="lane">
+          <h3>2. AgentService</h3>
+          <div class="step">
+            <strong>Facade entry</strong>
+            Resolves the target and forwards work to session-owned or runner-owned boundaries.
+          </div>
+          <div class="step">
+            <strong>No canonical state</strong>
+            It should stay as wiring, not become a second place that decides run truth.
+          </div>
+        </div>
+        <div class="lane">
+          <h3>3. SessionService</h3>
+          <div class="step">
+            <strong>Admission control</strong>
+            Rejects or accepts a new prompt based on active-run truth for this <span class="code">sessionKey</span>.
+          </div>
+          <div class="step">
+            <strong>Active-run model</strong>
+            Creates in-memory active run, persists <span class="code">runtime.state = running</span>, owns observers.
+          </div>
+        </div>
+        <div class="lane">
+          <h3>4. RunnerService</h3>
+          <div class="step">
+            <strong>ensureRunnerReady()</strong>
+            Reuses or creates tmux session, handles startup blocker patterns, trust prompts, and session-id resume rules.
+          </div>
+          <div class="step">
+            <strong>Backend truth</strong>
+            Knows whether the backend is actually ready, blocked, or recoverable.
+          </div>
+        </div>
+        <div class="lane">
+          <h3>5. monitorTmuxRun()</h3>
+          <div class="step">
+            <strong>Pane observer</strong>
+            Submits prompt, polls pane snapshots, derives meaningful deltas, and emits running, detached, completed, or timeout callbacks.
+          </div>
+          <div class="step">
+            <strong>Current risk</strong>
+            Today it still emits a terminal timeout from <span class="code">noOutputTimeoutMs</span>, even though that only proves lack of visible output.
+          </div>
+        </div>
+        <div class="lane">
+          <h3>6. Channel Render</h3>
+          <div class="step">
+            <strong>Preview or tool handoff</strong>
+            In <span class="code">capture-pane</span>, pane settlement becomes the surface reply. In <span class="code">message-tool</span>, the channel only previews and waits for tool reply boundaries.
+          </div>
+          <div class="step">
+            <strong>User-visible outcome</strong>
+            Thread gets previews, final reply, detached note, or active-run guidance.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section panel">
+      <h2>Architecture Diagram</h2>
+      <div class="diagram">
+        <div class="diagram-flow" role="img" aria-label="clisbot runtime ownership and flow diagram">
+          <div class="diagram-rail">Main execution chain</div>
+          <div class="diagram-row top">
+            <article class="diagram-box owner">
+              <span class="diagram-kicker">Surface entry</span>
+              <h3>Slack / Telegram</h3>
+              <p>Inbound event, route context, slash command, attachments, and initial surface policy.</p>
+            </article>
+            <div class="diagram-arrow">→</div>
+            <article class="diagram-box surface">
+              <span class="diagram-kicker">Channel-owned UX</span>
+              <h3>Interaction Processing</h3>
+              <p>Renders progress, handles <span class="code">/attach</span>, <span class="code">/watch</span>, preview handoff, and message-tool behavior.</p>
+            </article>
+            <div class="diagram-arrow">→</div>
+            <article class="diagram-box surface">
+              <span class="diagram-kicker">Facade</span>
+              <h3>AgentService</h3>
+              <p>Thin entrypoint that forwards to the real session-owned and runner-owned boundaries.</p>
+            </article>
+            <div class="diagram-arrow">→</div>
+            <article class="diagram-box owner">
+              <span class="diagram-kicker">Canonical owner</span>
+              <h3>SessionService</h3>
+              <p>Owns active-run truth, admission control, observers, queue semantics, and final settlement.</p>
+            </article>
+            <div class="diagram-arrow">→</div>
+            <article class="diagram-box owner">
+              <span class="diagram-kicker">Backend owner</span>
+              <h3>RunnerService</h3>
+              <p>Owns bootstrap, resume, readiness, tmux session handling, and backend-specific recovery.</p>
+            </article>
+            <div class="diagram-arrow">→</div>
+            <article class="diagram-box surface">
+              <span class="diagram-kicker">Execution</span>
+              <h3>Tmux + Native CLI</h3>
+              <p>Real runner process: Codex, Claude, Gemini, and the terminal state they produce.</p>
+            </article>
+          </div>
+
+          <div class="diagram-rail">Observation and control interpretation</div>
+
+          <div class="diagram-row middle">
+            <article class="diagram-box risk">
+              <span class="diagram-kicker">Known risk</span>
+              <h3>Current Gap</h3>
+              <p>No visible output can still get treated too much like a terminal timeout, which can clear active-run truth too early.</p>
+            </article>
+            <div class="diagram-arrow">←</div>
+            <article class="diagram-box surface">
+              <span class="diagram-kicker">Observer only</span>
+              <h3>monitorTmuxRun()</h3>
+              <p>Polls pane snapshots, derives meaningful deltas, and emits callbacks for running, detach, idle-after-output, and timeout-like observation events.</p>
+            </article>
+            <div class="diagram-arrow">↓</div>
+            <article class="diagram-box owner">
+              <span class="diagram-kicker">Desired contract</span>
+              <h3>SessionService consumes facts</h3>
+              <p>Lifecycle should move only after stronger evidence than “pane stayed quiet”.</p>
+            </article>
+          </div>
+
+          <div class="diagram-rail">Most visible mismatch today</div>
+
+          <div class="diagram-row bottom">
+            <article class="diagram-box surface">
+              <span class="diagram-kicker">Surface mismatch</span>
+              <h3>message-tool Mode</h3>
+              <p>Chat final reply can appear before backend run truly settles, creating the classic “looks done, still active” problem.</p>
+            </article>
+            <div class="diagram-arrow">→</div>
+            <article class="diagram-box owner">
+              <span class="diagram-kicker">Safer shape</span>
+              <h3>Low-Side-Effect Contract</h3>
+              <p>Observer reports facts only. SessionService owns lifecycle. RunnerService probes silent-but-alive vs blocked vs dead.</p>
+            </article>
+          </div>
+        </div>
+        <div class="diagram-note">
+          Read this as three stacked layers:
+          surface UX on top, runtime ownership in the middle, and the mismatch or fix shape at the bottom.
+          The important point is that <span class="code">message-tool final</span> and <span class="code">no visible output</span> are not enough by themselves to rewrite canonical run lifecycle.
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#d8ece8"></i> Canonical owner boundary</span>
+        <span><i class="swatch" style="background:#fff4db"></i> Surface or observer boundary</span>
+        <span><i class="swatch" style="background:#f7dede"></i> Known mismatch or risk zone</span>
+      </div>
+    </section>
+
+    <section id="state-machines" class="section panel">
+      <h2>State Machines</h2>
+      <div class="state-grid">
+        <div class="state">
+          <div class="state-head">
+            <span class="pill">Run State</span>
+            <h3>Canonical Session Runtime</h3>
+          </div>
+          <ul>
+            <li><span class="code">idle</span>: no active run admitted.</li>
+            <li><span class="code">running</span>: run is live, admission closed.</li>
+            <li><span class="code">detached</span>: run is still live, observation window ended, admission still closed.</li>
+          </ul>
+        </div>
+        <div class="state">
+          <div class="state-head">
+            <span class="pill warn">Observer State</span>
+            <h3>Channel Observation</h3>
+          </div>
+          <ul>
+            <li><span class="code">live</span>: post every running update.</li>
+            <li><span class="code">poll</span>: post every interval.</li>
+            <li><span class="code">passive-final</span>: stop live updates but keep final settlement.</li>
+          </ul>
+        </div>
+        <div class="state">
+          <div class="state-head">
+            <span class="pill warn">Surface State</span>
+            <h3>Channel Message Rendering</h3>
+          </div>
+          <ul>
+            <li><span class="code">capture-pane</span>: pane owns final user-visible settlement.</li>
+            <li><span class="code">message-tool</span>: tool reply owns canonical final message.</li>
+            <li><span class="code">streaming off</span>: may suppress preview while run still exists.</li>
+          </ul>
+        </div>
+        <div class="state">
+          <div class="state-head">
+            <span class="pill danger">Mismatch Risk</span>
+            <h3>Silent-But-Alive Runner</h3>
+          </div>
+          <ul>
+            <li>Pane changes are filtered out as non-meaningful.</li>
+            <li><span class="code">noOutputTimeoutMs</span> fires.</li>
+            <li>Current code may clear active-run truth too early.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="details" open>
+        <summary>Run lifecycle transitions</summary>
+        <div class="details-body">
+          <div class="grid two">
+            <div class="card">
+              <strong class="label">Happy Path</strong>
+              <ol>
+                <li>User prompt admitted.</li>
+                <li><span class="code">runtime.state = running</span>.</li>
+                <li>Monitor emits running deltas.</li>
+                <li>Idle-after-output or true completion settles run.</li>
+                <li><span class="code">SessionService</span> sets state back to <span class="code">idle</span>.</li>
+              </ol>
+            </div>
+            <div class="card">
+              <strong class="label">Long Run Path</strong>
+              <ol>
+                <li>Observation exceeds <span class="code">maxRuntimeMs</span>.</li>
+                <li>Run transitions to <span class="code">detached</span>.</li>
+                <li>Final settlement should still arrive later.</li>
+                <li>Admission remains closed until real finish or stop.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="problem-zones" class="section panel">
+      <h2>Problem Zones</h2>
+      <div class="callout danger">
+        <strong>Core mismatch:</strong>
+        the current code sometimes lets an observational signal behave like lifecycle truth.
+        That is the root cause behind "it says active run", "attach does not help", and "final reply already appeared but I still need stop".
+      </div>
+
+      <div class="details" open>
+        <summary>Problem A - "Timed out waiting for visible output."</summary>
+        <div class="details-body">
+          <div class="grid two">
+            <div class="card">
+              <strong class="label">What It Means Today</strong>
+              <p>The monitor did not see meaningful visible output within <span class="code">noOutputTimeoutMs</span>. This does <em>not</em> prove the backend has stopped.</p>
+            </div>
+            <div class="card">
+              <strong class="label">Why It Is Dangerous</strong>
+              <p>Current flow can convert that observation into a terminal run settlement and return the session to <span class="code">idle</span> too early.</p>
+            </div>
+          </div>
+          <div class="footnote">
+            Risk: the backend may still be running, but the session can look free again.
+          </div>
+        </div>
+      </div>
+
+      <div class="details" open>
+        <summary>Problem B - message-tool final reply can appear before run lifecycle is done</summary>
+        <div class="details-body">
+          <div class="grid two">
+            <div class="card">
+              <strong class="label">Surface Done</strong>
+              <p>The agent sent <span class="code">clisbot message send --final</span>, so the human sees a final chat reply.</p>
+            </div>
+            <div class="card">
+              <strong class="label">Lifecycle Not Done</strong>
+              <p>The active run remains live until <span class="code">SessionService</span> receives real settlement from monitor callbacks or an explicit stop.</p>
+            </div>
+          </div>
+          <div class="callout warn" style="margin-top:14px;">
+            Result: the chat looks done, but a new prompt is still blocked by active-run admission. <span class="code">/attach</span> only observes; it does not clear lifecycle state.
+          </div>
+        </div>
+      </div>
+
+      <div class="details">
+        <summary>Problem C - attach, watch, and stop semantics</summary>
+        <div class="details-body">
+          <div class="grid three">
+            <div class="card">
+              <strong class="label">/attach</strong>
+              <p>Reattaches this thread to current updates. It is an observer action, not a lifecycle action.</p>
+            </div>
+            <div class="card">
+              <strong class="label">/watch</strong>
+              <p>Changes observer mode to interval polling. Still no lifecycle ownership.</p>
+            </div>
+            <div class="card">
+              <strong class="label">/stop</strong>
+              <p>Explicit intervention. This is the only one of the three that is supposed to change the backend run itself.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="fix-shape" class="section panel">
+      <h2>Low-Side-Effect Fix Shape</h2>
+      <p class="summary">
+        This keeps the current architecture. It does not require inventing another manager.
+        It only tightens the contract between the existing owner boundaries.
+      </p>
+
+      <div class="grid two">
+        <div class="card">
+          <strong class="label">Rule 1</strong>
+          <p><span class="code">monitorTmuxRun()</span> should emit facts only.</p>
+          <ul>
+            <li>running delta seen</li>
+            <li>idle-after-output</li>
+            <li>max-runtime reached</li>
+            <li>no visible output yet</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong class="label">Rule 2</strong>
+          <p><span class="code">SessionService</span> should own all terminal transitions.</p>
+          <ul>
+            <li>Only this layer may clear active run and reopen admission.</li>
+            <li>Need stronger evidence than "pane silent".</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong class="label">Rule 3</strong>
+          <p><span class="code">RunnerService</span> should answer silent-but-alive vs blocked vs dead.</p>
+          <ul>
+            <li>Probe session liveness.</li>
+            <li>Probe runner waiting or still busy.</li>
+            <li>Map backend-specific uncertainty into one normalized answer.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong class="label">Rule 4</strong>
+          <p><span class="code">message-tool --final</span> needs a truthful contract.</p>
+          <ul>
+            <li>Either only send final when backend work is truly done.</li>
+            <li>Or surface a clear "reply sent, backend still active" state.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout warn" style="margin-top:16px;">
+        The main design sentence is:
+        <strong>observational timeout must not automatically mean lifecycle completion.</strong>
+      </div>
+    </section>
+
+    <section id="sources" class="section panel">
+      <h2>Sources Used</h2>
+      <p class="summary">
+        This artifact was built against the current code and docs, especially the owner-boundary and interaction-processing paths.
+      </p>
+      <ul class="source-list">
+        <li><span class="code">docs/architecture/runtime-architecture.md</span></li>
+        <li><span class="code">docs/architecture/architecture-overview.md</span></li>
+        <li><span class="code">docs/research/agents/2026-04-15-session-runner-boundary-validation.md</span></li>
+        <li><span class="code">docs/features/channels/agent-progress-reply-wrapper-and-prompt.md</span></li>
+        <li><span class="code">src/agents/session-service.ts</span></li>
+        <li><span class="code">src/agents/agent-service.ts</span></li>
+        <li><span class="code">src/agents/session-state.ts</span></li>
+        <li><span class="code">src/runners/tmux/run-monitor.ts</span></li>
+        <li><span class="code">src/shared/transcript-normalization.ts</span></li>
+        <li><span class="code">src/channels/interaction-processing.ts</span></li>
+      </ul>
+      <p class="footnote">
+        This page is intentionally self-contained so it can be opened directly from a lightweight static HTTP server on <span class="code">sandbox</span>.
+      </p>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>clisbot Runner Function Call Map</title>
+  <style>
+    :root {
+      --bg: #f5f1e8;
+      --panel: rgba(255, 251, 244, 0.92);
+      --panel-strong: #fff2d8;
+      --ink: #211d18;
+      --muted: #635b50;
+      --line: #d9cfbc;
+      --accent: #175f59;
+      --accent-soft: #dcefe9;
+      --warn: #9b5c00;
+      --warn-soft: #fff0cf;
+      --danger: #8d3131;
+      --danger-soft: #f7dede;
+      --violet: #4d4a8f;
+      --violet-soft: #e4e2fb;
+      --shadow: 0 18px 40px rgba(32, 25, 18, 0.08);
+      --mono: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+      --sans: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+      --radius: 18px;
+      --radius-sm: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at top left, rgba(23, 95, 89, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(141, 49, 49, 0.10), transparent 24%),
+        linear-gradient(180deg, #f8f3e8 0%, var(--bg) 45%, #efe6d5 100%);
+      line-height: 1.45;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    .page {
+      width: min(1560px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 24px 0 56px;
+    }
+
+    .hero,
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(217, 207, 188, 0.92);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    h1 {
+      margin-top: 14px;
+      font-size: clamp(34px, 4vw, 56px);
+    }
+
+    h2 {
+      font-size: clamp(24px, 2.5vw, 32px);
+      margin-bottom: 10px;
+    }
+
+    h3 {
+      font-size: 19px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .hero-copy {
+      max-width: 1100px;
+      margin-top: 14px;
+      font-size: 18px;
+      color: var(--muted);
+    }
+
+    .meta-grid,
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .meta-grid {
+      margin-top: 22px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .metric {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.56);
+    }
+
+    .metric strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .metric span {
+      display: block;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .sticky-nav {
+      position: sticky;
+      top: 8px;
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 12px;
+      margin-bottom: 18px;
+      border-radius: 999px;
+      background: rgba(255, 251, 244, 0.94);
+      border: 1px solid rgba(217, 207, 188, 0.95);
+      box-shadow: var(--shadow);
+    }
+
+    .sticky-nav a {
+      text-decoration: none;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .sticky-nav a:hover {
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.88);
+    }
+
+    .panel {
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+
+    .summary {
+      max-width: 1080px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .grid.hotspots {
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.54);
+    }
+
+    .card .label {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .card ul {
+      margin: 10px 0 0 18px;
+      padding: 0;
+      color: var(--muted);
+    }
+
+    .card li + li {
+      margin-top: 6px;
+    }
+
+    .flow-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .flow {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,248,236,0.88));
+    }
+
+    .flow strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .chain {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--muted);
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .filters {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 2fr repeat(4, minmax(160px, 1fr));
+      margin-bottom: 16px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.85);
+      padding: 11px 12px;
+      font: inherit;
+      color: var(--ink);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-family: var(--mono);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.66);
+      color: var(--muted);
+    }
+
+    .pill.high {
+      background: var(--danger-soft);
+      color: var(--danger);
+      border-color: rgba(141, 49, 49, 0.24);
+    }
+
+    .pill.warn {
+      background: var(--warn-soft);
+      color: var(--warn);
+      border-color: rgba(155, 92, 0, 0.20);
+    }
+
+    .pill.deep {
+      background: var(--violet-soft);
+      color: var(--violet);
+      border-color: rgba(77, 74, 143, 0.16);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.56);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1320px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #faf3e5;
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    tbody td {
+      vertical-align: top;
+      padding: 12px 14px;
+      border-top: 1px solid rgba(217, 207, 188, 0.72);
+      font-size: 14px;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: rgba(255,255,255,0.42);
+    }
+
+    tbody tr.row-high {
+      background: rgba(247, 222, 222, 0.30);
+    }
+
+    tbody tr.row-warn {
+      background: rgba(255, 240, 207, 0.28);
+    }
+
+    .fn {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .file {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      word-break: break-word;
+    }
+
+    .level {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      height: 28px;
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-weight: 700;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .level.deep {
+      background: var(--violet-soft);
+      color: var(--violet);
+    }
+
+    .list {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+    }
+
+    .list span {
+      display: block;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.88);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .tag.high {
+      background: var(--danger-soft);
+      color: var(--danger);
+      border-color: rgba(141, 49, 49, 0.20);
+    }
+
+    .tag.warn {
+      background: var(--warn-soft);
+      color: var(--warn);
+      border-color: rgba(155, 92, 0, 0.20);
+    }
+
+    .tag.deep {
+      background: var(--violet-soft);
+      color: var(--violet);
+      border-color: rgba(77, 74, 143, 0.18);
+    }
+
+    .footer-note {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 1100px) {
+      .filters {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        width: min(100% - 16px, 100%);
+      }
+
+      .hero,
+      .panel {
+        padding: 18px;
+      }
+
+      .filters {
+        grid-template-columns: 1fr;
+      }
+
+      .sticky-nav {
+        border-radius: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="eyebrow">Artifact / Function Map</div>
+      <h1>Runner, Observer, Prompt Submission, and State Call Map</h1>
+      <p class="hero-copy">
+        Focused review map for the messy path around prompt admission, active-run lifecycle, tmux submission,
+        observer delivery, transcript normalization, and persisted runtime state. Level here means review depth,
+        not TypeScript nesting: level 1 is the main entry or owner surface, then deeper helper layers fan out from it.
+      </p>
+      <div class="meta-grid">
+        <div class="metric">
+          <strong>Primary Review Goal</strong>
+          <span>Spot duplication, confusing names, mixed ownership, deep heuristics</span>
+        </div>
+        <div class="metric">
+          <strong>Core Slices</strong>
+          <span>prompt flow, steer flow, observer flow, tmux truth, runtime state, transcript cleanup</span>
+        </div>
+        <div class="metric">
+          <strong>Key Files</strong>
+          <span>8 files in the call-critical slice</span>
+        </div>
+        <div class="metric">
+          <strong>Why This Exists</strong>
+          <span>Make deep helper sprawl reviewable without hopping file-by-file</span>
+        </div>
+      </div>
+    </section>
+
+    <nav class="sticky-nav">
+      <a href="#hotspots">Hotspots</a>
+      <a href="#flows">Core Flows</a>
+      <a href="#table">Full Table</a>
+    </nav>
+
+    <section id="hotspots" class="panel">
+      <h2>Immediate Review Hotspots</h2>
+      <p class="summary">
+        The map below is not just an inventory. It is arranged to make hidden duplication and ownership leaks obvious.
+        The most suspicious areas are already called out here before the full table.
+      </p>
+      <div class="grid hotspots">
+        <article class="card">
+          <div class="label">Duplicate Submit Path</div>
+          <strong>Two different entry stories converge on the same tmux submit primitive.</strong>
+          <ul>
+            <li>Normal prompt: <span class="fn">executePromptDelivery -> enqueuePrompt -> executePrompt -> startRunMonitor -> monitorTmuxRun -> submitTmuxSessionInput</span></li>
+            <li>Steer or inject: <span class="fn">submitSessionInput -> RunnerService.submitSessionInput -> submitTmuxSessionInput</span></li>
+            <li>The shared low-level truth is good, but the service names above it are misleading and asymmetrical.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="label">Mixed Lifecycle Truth</div>
+          <strong><span class="fn">SessionService.startRunMonitor</span> owns too much at once.</strong>
+          <ul>
+            <li>It creates callbacks, mutates <span class="fn">steeringReady</span>, writes persisted runtime state, emits observer updates, and decides terminal settlement.</li>
+            <li>That means monitor signals, lifecycle truth, and surface delivery are entangled through callback glue.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="label">Observer Split</div>
+          <strong>Observer handling spans runtime core and channel rendering.</strong>
+          <ul>
+            <li><span class="fn">notifyRunObservers</span> decides which updates should fire.</li>
+            <li><span class="fn">executePromptDelivery.onUpdate</span> separately decides which ones become visible, when to hand off, and when to suppress.</li>
+            <li>This is a likely source of hidden side effects and stale preview bugs.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="label">Heuristic Wall</div>
+          <strong><span class="fn">cleanInteractionSnapshot</span> fans out into many runner-specific heuristics.</strong>
+          <ul>
+            <li>Prompt stripping, chrome dropping, message block unwrapping, wrap repair, duplicate collapse.</li>
+            <li>It is useful but deep, heuristic-heavy, and easy to drift away from lifecycle truth.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="label">State Writes Everywhere</div>
+          <strong>Runtime state is mutated from multiple layers.</strong>
+          <ul>
+            <li><span class="fn">SessionService</span> writes running, detached, idle.</li>
+            <li><span class="fn">RunnerService</span> touches and clears session state during startup, interrupt, transcript capture, and direct submit.</li>
+            <li><span class="fn">executePromptDelivery</span> writes reply and final markers through <span class="fn">recordConversationReply</span>.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <div class="label">Naming Drift</div>
+          <strong><span class="fn">submitSessionInput</span> sounds generic but is currently a session injection path.</strong>
+          <ul>
+            <li>Normal prompt flow does not use it.</li>
+            <li>Its current meaning is closer to <span class="fn">injectSessionInput</span> than a canonical prompt submit API.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="flows" class="panel">
+      <h2>Core Flows To Review First</h2>
+      <div class="flow-list">
+        <div class="flow">
+          <strong>Normal Prompt Flow</strong>
+          <div class="chain">src/channels/interaction-processing.ts &gt; executePromptDelivery &gt; src/agents/agent-service.ts &gt; AgentService.enqueuePrompt &gt; src/agents/session-service.ts &gt; SessionService.executePrompt &gt; SessionService.startRunMonitor &gt; src/runners/tmux/run-monitor.ts &gt; monitorTmuxRun &gt; src/runners/tmux/session-handshake.ts &gt; submitTmuxSessionInput</div>
+        </div>
+        <div class="flow">
+          <strong>Steer / Direct Inject Flow</strong>
+          <div class="chain">src/channels/interaction-processing.ts &gt; processChannelInteraction steer branches &gt; src/agents/agent-service.ts &gt; AgentService.submitSessionInput &gt; src/agents/runner-service.ts &gt; RunnerService.submitSessionInput &gt; src/runners/tmux/session-handshake.ts &gt; submitTmuxSessionInput</div>
+        </div>
+        <div class="flow">
+          <strong>Observer / Preview Flow</strong>
+          <div class="chain">SessionService.notifyRunObservers &gt; observer.onUpdate callback registered by executePromptDelivery &gt; preview render or suppress logic &gt; recordConversationReply / message-tool handoff / queue-start rendering</div>
+        </div>
+        <div class="flow">
+          <strong>Meaningful Output Flow</strong>
+          <div class="chain">monitorTmuxRun &gt; deriveRunningInteractionText &gt; cleanInteractionSnapshot &gt; prompt stripping / chrome stripping / unwrap helpers / duplicate collapse &gt; extractScrolledAppend</div>
+        </div>
+        <div class="flow">
+          <strong>Startup / Resume Truth Flow</strong>
+          <div class="chain">RunnerService.ensureSessionReady &gt; waitForTmuxSessionBootstrap &gt; finalizeSessionStartup &gt; verifySessionReady &gt; syncSessionIdentity or touchSessionEntry</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="table" class="panel">
+      <h2>Full Function Table</h2>
+      <p class="summary">
+        Search works across file, function, description, tags, called-by, and call-chain text. Use the filters to isolate deep heuristics,
+        state sinks, tmux submit paths, or observer logic.
+      </p>
+      <div class="filters">
+        <div class="field">
+          <label for="search">Search</label>
+          <input id="search" type="text" placeholder="search function, file, tag, called-by, call chain" />
+        </div>
+        <div class="field">
+          <label for="fileFilter">File</label>
+          <select id="fileFilter">
+            <option value="">All files</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="concernFilter">Concern</label>
+          <select id="concernFilter">
+            <option value="">All concerns</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="levelFilter">Min level</label>
+          <select id="levelFilter">
+            <option value="">Any level</option>
+            <option value="1">1+</option>
+            <option value="2">2+</option>
+            <option value="3">3+</option>
+            <option value="4">4+</option>
+            <option value="5">5+</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tagFilter">Tag</label>
+          <select id="tagFilter">
+            <option value="">All tags</option>
+          </select>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="pill high">high complexity or high confusion</span>
+        <span class="pill warn">mixed responsibility or likely duplication</span>
+        <span class="pill deep">deep helper chain</span>
+        <span class="pill">level = review depth from owner surface</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>File / Function</th>
+              <th>Level</th>
+              <th>Description</th>
+              <th>Called By Functions</th>
+              <th>Call Functions</th>
+              <th>Concerns / Tags</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="footer-note">
+        Suggested review order: <span class="fn">executePromptDelivery</span>, <span class="fn">SessionService.executePrompt</span>,
+        <span class="fn">SessionService.startRunMonitor</span>, <span class="fn">monitorTmuxRun</span>,
+        <span class="fn">submitTmuxSessionInput</span>, <span class="fn">RunnerService.ensureSessionReady</span>,
+        then the normalization chain rooted at <span class="fn">cleanInteractionSnapshot</span>.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const rows = [
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery",
+        level: 1,
+        description: "Channel-facing orchestrator for queueing a prompt, rendering preview or settlement, wiring observer updates, and reconciling message-tool vs pane-managed delivery.",
+        concerns: ["channel delivery", "observer bridge", "prompt admission", "surface settlement"],
+        calledBy: ["src/channels/interaction-processing.ts > processChannelInteraction"],
+        calls: [
+          "src/channels/interaction-processing.ts > executePromptDelivery > recordVisibleReply",
+          "src/channels/interaction-processing.ts > executePromptDelivery > renderResponseText",
+          "src/channels/interaction-processing.ts > executePromptDelivery > clearResponseText",
+          "src/channels/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
+          "src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
+          "src/channels/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor",
+          "src/channels/interaction-processing.ts > executePromptDelivery > waitForMessageToolFinalReply",
+          "src/channels/interaction-processing.ts > executePromptDelivery > maybeRenderQueueStartNotification",
+          "src/channels/interaction-processing.ts > executePromptDelivery > buildInitialPlaceholderText",
+          "src/agents/agent-service.ts > AgentService.enqueuePrompt"
+        ],
+        tags: ["high complexity", "mixed responsibility", "observer split", "delivery policy"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > recordVisibleReply",
+        level: 2,
+        description: "Marks reply or final visibility in persisted state so later message-tool or preview logic can reason about what already became visible.",
+        concerns: ["state write", "reply truth"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery"],
+        calls: ["src/agents/agent-service.ts > AgentService.recordConversationReply"],
+        tags: ["state sink", "reply marker"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > renderResponseText",
+        level: 2,
+        description: "Posts first visible chunk or reconciles an existing visible chunk chain in-place.",
+        concerns: ["rendering", "preview update"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calls: ["callback > postText", "callback > reconcileText"],
+        tags: ["render helper"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > clearResponseText",
+        level: 2,
+        description: "Clears current preview and resets rendered-state bookkeeping before message-tool handoff.",
+        concerns: ["preview cleanup"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview"],
+        calls: ["callback > reconcileText"],
+        tags: ["preview helper", "cleanup"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > handoffMessageToolPreview",
+        level: 2,
+        description: "Stops pane-driven preview from continuing once message-tool output boundary is seen.",
+        concerns: ["message-tool handoff", "preview ownership"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/channels/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calls: ["src/channels/interaction-processing.ts > executePromptDelivery > clearResponseText"],
+        tags: ["mixed responsibility", "handoff"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > getMessageToolRuntimeSignals",
+        level: 2,
+        description: "Reads persisted runtime timestamps for message-tool replies and finals so channel preview can decide when to stop.",
+        concerns: ["runtime query", "message-tool coordination"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor", "src/channels/interaction-processing.ts > executePromptDelivery > waitForMessageToolFinalReply", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calls: ["src/agents/agent-service.ts > AgentService.getSessionRuntime"],
+        tags: ["state read", "observer split"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > ensureMessageToolPreviewMonitor",
+        level: 2,
+        description: "Spawns polling loop to detect when message-tool output has already taken over, then clears pane preview.",
+        concerns: ["background polling", "preview ownership"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calls: [
+          "src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
+          "src/channels/interaction-processing.ts > executePromptDelivery > hasMessageToolReplyBoundary",
+          "src/channels/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
+          "src/shared/process.ts > sleep"
+        ],
+        tags: ["background monitor", "warn"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > waitForMessageToolFinalReply",
+        level: 2,
+        description: "Grace-window poll for a tool-final marker before allowing pane-derived completion fallback.",
+        concerns: ["final reply truth", "message-tool coordination"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery"],
+        calls: [
+          "src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
+          "src/shared/process.ts > sleep"
+        ],
+        tags: ["truth gate", "warn"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > maybeRenderQueueStartNotification",
+        level: 2,
+        description: "Decides whether queue-start notification should render now, defer into preview, or be skipped.",
+        concerns: ["queue preview", "surface notification"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calls: [
+          "src/channels/interaction-processing.ts > executePromptDelivery > renderResponseText",
+          "src/channels/interaction-processing.ts > executePromptDelivery > recordVisibleReply"
+        ],
+        tags: ["preview helper"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > buildInitialPlaceholderText",
+        level: 2,
+        description: "Builds initial queued or running placeholder before the first observer update lands.",
+        concerns: ["preview bootstrap"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery"],
+        calls: ["shared render helpers > renderQueueStartNotification / renderPlatformInteraction"],
+        tags: ["preview helper"]
+      },
+      {
+        file: "src/channels/interaction-processing.ts",
+        function: "executePromptDelivery > enqueuePrompt.onUpdate callback",
+        level: 3,
+        description: "Channel-side observer callback that filters visibility, updates preview, handles queue-start rendering, and reacts to message-tool takeover.",
+        concerns: ["observer delivery", "surface suppression", "preview race"],
+        calledBy: ["src/agents/session-service.ts > SessionService.notifyRunObservers > observer.onUpdate"],
+        calls: [
+          "src/channels/interaction-processing.ts > executePromptDelivery > maybeRenderQueueStartNotification",
+          "src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
+          "src/channels/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
+          "src/channels/interaction-processing.ts > executePromptDelivery > renderResponseText",
+          "src/channels/interaction-processing.ts > executePromptDelivery > recordVisibleReply",
+          "src/channels/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor"
+        ],
+        tags: ["high complexity", "observer split", "surface policy"]
+      },
+      {
+        file: "src/agents/agent-service.ts",
+        function: "AgentService.enqueuePrompt",
+        level: 1,
+        description: "Queue admission point for a normal prompt. Wraps SessionService.executePrompt in the job queue and provides the observer wiring used by channel delivery.",
+        concerns: ["queue admission", "prompt entry"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/agents/agent-service.ts > runIntervalLoopIteration"],
+        calls: ["job queue > AgentJobQueue.enqueue", "src/agents/session-service.ts > SessionService.executePrompt"],
+        tags: ["owner surface"]
+      },
+      {
+        file: "src/agents/agent-service.ts",
+        function: "AgentService.submitSessionInput",
+        level: 1,
+        description: "Direct session injection path used by steer-style flows. Name sounds generic but it does not create a new active run.",
+        concerns: ["steer injection", "naming drift"],
+        calledBy: ["src/channels/interaction-processing.ts > processChannelInteraction steer branches"],
+        calls: ["src/agents/runner-service.ts > RunnerService.submitSessionInput"],
+        tags: ["confusing name", "duplicate submit path", "warn"]
+      },
+      {
+        file: "src/agents/agent-service.ts",
+        function: "AgentService.hasActiveRun",
+        level: 1,
+        description: "Thin owner query used by channel logic before allowing steer or attach-like behaviors.",
+        concerns: ["active-run query"],
+        calledBy: ["src/channels/interaction-processing.ts > processChannelInteraction"],
+        calls: ["src/agents/session-service.ts > SessionService.hasActiveRun"],
+        tags: ["query"]
+      },
+      {
+        file: "src/agents/agent-service.ts",
+        function: "AgentService.canSteerActiveRun",
+        level: 1,
+        description: "Asks SessionService whether the current active run already finished startup and is allowed to accept injected input.",
+        concerns: ["steer gate"],
+        calledBy: ["src/channels/interaction-processing.ts > processChannelInteraction"],
+        calls: ["src/agents/session-service.ts > SessionService.canSteerActiveRun"],
+        tags: ["query"]
+      },
+      {
+        file: "src/agents/agent-service.ts",
+        function: "AgentService.recordConversationReply",
+        level: 1,
+        description: "Writes reply or final visibility markers into persisted session state.",
+        concerns: ["state write", "surface truth"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery > recordVisibleReply"],
+        calls: ["src/agents/session-state.ts > AgentSessionState.recordConversationReply"],
+        tags: ["state sink"]
+      },
+      {
+        file: "src/agents/agent-service.ts",
+        function: "AgentService.getSessionRuntime",
+        level: 1,
+        description: "Reads persisted runtime info so channel preview or tooling can reason about active session markers.",
+        concerns: ["runtime read"],
+        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals"],
+        calls: ["src/agents/session-state.ts > AgentSessionState.getSessionRuntime"],
+        tags: ["state read"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.recoverPersistedRuns",
+        level: 1,
+        description: "Rebuilds in-memory active-runs map from persisted runtime entries and immediately reattaches monitoring.",
+        concerns: ["runtime recovery", "startup truth"],
+        calledBy: ["src/agents/agent-service.ts > createSessionService startup path"],
+        calls: [
+          "src/agents/session-state.ts > AgentSessionState.listEntries",
+          "tmux client > hasSession / capturePane",
+          "src/shared/transcript-delta.ts > deriveInteractionText",
+          "src/agents/session-service.ts > createDeferred",
+          "src/agents/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session-service.ts > SessionService.startRunMonitor",
+          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime"
+        ],
+        tags: ["high complexity", "startup recovery", "state owner"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.executePrompt",
+        level: 1,
+        description: "Owns active-run admission, creates provisional run state, starts runner readiness, persists running state, and launches monitoring.",
+        concerns: ["run admission", "lifecycle start", "state write"],
+        calledBy: ["src/agents/agent-service.ts > AgentService.enqueuePrompt"],
+        calls: [
+          "src/agents/session-state.ts > AgentSessionState.getEntry",
+          "src/agents/session-service.ts > createDeferred",
+          "src/agents/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/runner-service.ts > RunnerService.ensureRunnerReady",
+          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime",
+          "src/agents/session-service.ts > SessionService.startRunMonitor",
+          "src/agents/session-service.ts > SessionService.failActiveRun"
+        ],
+        tags: ["owner surface", "high complexity"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.observeRun",
+        level: 1,
+        description: "Registers observer on active run or falls back to transcript capture when no active run exists.",
+        concerns: ["observer attach", "transcript fallback"],
+        calledBy: ["src/agents/agent-service.ts > AgentService.observeRun"],
+        calls: ["src/agents/runner-service.ts > RunnerService.captureTranscript"],
+        tags: ["observer"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.createRunUpdate",
+        level: 2,
+        description: "Normalizes all run updates into a single payload shape that both observer delivery and terminal settlement consume.",
+        concerns: ["update shape", "state payload"],
+        calledBy: [
+          "src/agents/session-service.ts > SessionService.recoverPersistedRuns",
+          "src/agents/session-service.ts > SessionService.executePrompt",
+          "src/agents/session-service.ts > SessionService.notifyRecoveryStep",
+          "src/agents/session-service.ts > SessionService.failActiveRun",
+          "src/agents/session-service.ts > SessionService.recoverLostMidRun",
+          "src/agents/session-service.ts > SessionService.startRunMonitor > callbacks"
+        ],
+        calls: [],
+        tags: ["shared payload", "warn"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.notifyRunObservers",
+        level: 2,
+        description: "Dispatches updates to live or polling observers, applies retryable delivery policy, and can detach observers on failure.",
+        concerns: ["observer policy", "delivery retry", "latest update truth"],
+        calledBy: [
+          "src/agents/session-service.ts > SessionService.notifyRecoveryStep",
+          "src/agents/session-service.ts > SessionService.finishActiveRun",
+          "src/agents/session-service.ts > SessionService.failActiveRun",
+          "src/agents/session-service.ts > SessionService.recoverLostMidRun",
+          "src/agents/session-service.ts > SessionService.startRunMonitor > onRunning callback"
+        ],
+        calls: [
+          "run-observation.ts > isTerminalRunStatus",
+          "src/agents/session-service.ts > isRetryableObserverDeliveryError",
+          "callback > observer.onUpdate",
+          "src/agents/session-service.ts > formatObserverError"
+        ],
+        tags: ["observer owner", "high complexity"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.finishActiveRun",
+        level: 2,
+        description: "Terminal idle transition for completed or timeout updates. Clears active run after notifying observers and resolving the initial result.",
+        concerns: ["terminal settlement", "idle transition"],
+        calledBy: ["src/agents/session-service.ts > SessionService.startRunMonitor > onCompleted callback", "src/agents/session-service.ts > SessionService.startRunMonitor > onTimeout callback"],
+        calls: [
+          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime",
+          "src/agents/session-service.ts > SessionService.notifyRunObservers"
+        ],
+        tags: ["state sink", "truth risk", "warn"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.failActiveRun",
+        level: 2,
+        description: "Error settlement path that marks runtime idle, sends error update, rejects the deferred initial result, and drops active run bookkeeping.",
+        concerns: ["error settlement", "idle transition"],
+        calledBy: ["src/agents/session-service.ts > SessionService.executePrompt", "src/agents/session-service.ts > SessionService.recoverLostMidRun", "src/agents/session-service.ts > SessionService.startRunMonitor"],
+        calls: [
+          "src/agents/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime",
+          "src/agents/session-service.ts > SessionService.notifyRunObservers"
+        ],
+        tags: ["state sink", "error path"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.recoverLostMidRun",
+        level: 2,
+        description: "Recovery coordinator for mid-run session loss. Tries reopen, then restart, and decides whether current run can continue or must fail truthfully.",
+        concerns: ["mid-run recovery", "retry budget", "ownership"],
+        calledBy: ["src/agents/session-service.ts > SessionService.startRunMonitor"],
+        calls: [
+          "src/agents/runner-service.ts > RunnerService.canRecoverMidRun",
+          "src/agents/session-service.ts > SessionService.notifyRecoveryStep",
+          "src/agents/runner-service.ts > RunnerService.reopenRunContext",
+          "src/agents/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session-service.ts > SessionService.notifyRunObservers",
+          "src/agents/session-service.ts > SessionService.startRunMonitor",
+          "src/agents/runner-service.ts > RunnerService.startFreshSession",
+          "src/agents/runner-service.ts > RunnerService.mapRunError",
+          "src/agents/session-service.ts > SessionService.failActiveRun",
+          "src/agents/session-service.ts > SessionService.recoverLostMidRun"
+        ],
+        tags: ["high complexity", "recovery", "owner logic"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.startRunMonitor",
+        level: 2,
+        description: "Bridges lifecycle state to monitor callbacks. This is the glue point where monitor facts become running, detached, completed, timeout, or recovery behavior.",
+        concerns: ["monitor bridge", "lifecycle owner", "callback glue"],
+        calledBy: [
+          "src/agents/session-service.ts > SessionService.recoverPersistedRuns",
+          "src/agents/session-service.ts > SessionService.executePrompt",
+          "src/agents/session-service.ts > SessionService.recoverLostMidRun"
+        ],
+        calls: [
+          "src/runners/tmux/run-monitor.ts > monitorTmuxRun",
+          "src/agents/session-service.ts > SessionService.recoverLostMidRun",
+          "src/agents/session-service.ts > SessionService.failActiveRun",
+          "src/agents/runner-service.ts > RunnerService.mapRunError"
+        ],
+        tags: ["high complexity", "mixed responsibility", "central glue"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.startRunMonitor > onPromptSubmitted",
+        level: 3,
+        description: "Marks run as steer-ready after prompt submit is confirmed by tmux-side submit logic.",
+        concerns: ["steer readiness", "submit truth"],
+        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
+        calls: [],
+        tags: ["callback", "state mutation"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.startRunMonitor > onRunning",
+        level: 3,
+        description: "Transforms monitor running updates into observer updates, while preserving detached note if the session already crossed the max-runtime boundary.",
+        concerns: ["observer update", "snapshot merge"],
+        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
+        calls: [
+          "run-recovery.ts > mergeRunSnapshot",
+          "src/agents/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session-service.ts > SessionService.notifyRunObservers",
+          "src/agents/session-service.ts > SessionService.buildDetachedNote"
+        ],
+        tags: ["callback", "observer bridge"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.startRunMonitor > onDetached",
+        level: 3,
+        description: "Writes detached runtime state, stores a detached update, and resolves the initial result while monitoring continues in the background.",
+        concerns: ["detached transition", "state write"],
+        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
+        calls: [
+          "src/agents/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime"
+        ],
+        tags: ["callback", "state sink"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.startRunMonitor > onCompleted",
+        level: 3,
+        description: "Maps completion callback into a terminal run update and idle settlement.",
+        concerns: ["completed settlement"],
+        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
+        calls: [
+          "src/agents/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session-service.ts > SessionService.finishActiveRun"
+        ],
+        tags: ["callback", "terminal"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "SessionService.startRunMonitor > onTimeout",
+        level: 3,
+        description: "Maps no-visible-output timeout into a terminal run update and idle settlement, even though the evidence is only monitor silence.",
+        concerns: ["timeout settlement", "truth risk"],
+        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
+        calls: [
+          "src/agents/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session-service.ts > SessionService.finishActiveRun"
+        ],
+        tags: ["callback", "truth risk", "warn"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "createDeferred",
+        level: 2,
+        description: "Creates deferred promise used as the one-shot result handle for active runs.",
+        concerns: ["deferred result"],
+        calledBy: ["src/agents/session-service.ts > SessionService.recoverPersistedRuns", "src/agents/session-service.ts > SessionService.executePrompt"],
+        calls: [],
+        tags: ["utility"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "isRetryableObserverDeliveryError",
+        level: 3,
+        description: "Heuristic retry classifier for observer delivery failures based on nested error codes or network-like messages.",
+        concerns: ["observer retry heuristic"],
+        calledBy: ["src/agents/session-service.ts > SessionService.notifyRunObservers"],
+        calls: ["src/agents/session-service.ts > listObserverErrorCodes"],
+        tags: ["heuristic", "observer"]
+      },
+      {
+        file: "src/agents/session-service.ts",
+        function: "listObserverErrorCodes",
+        level: 4,
+        description: "Recursively walks nested error shapes to collect codes for observer retry classification.",
+        concerns: ["error inspection"],
+        calledBy: ["src/agents/session-service.ts > isRetryableObserverDeliveryError"],
+        calls: [],
+        tags: ["deep helper"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.ensureSessionReady",
+        level: 1,
+        description: "Owns session reuse, new tmux session startup, resume command construction, bootstrap wait, retry-after-startup-fault, and state touch for session identity.",
+        concerns: ["startup owner", "resume policy", "session creation"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureRunnerReady", "src/agents/runner-service.ts > RunnerService.ensureShellPane", "src/agents/runner-service.ts > RunnerService.startFreshSession"],
+        calls: [
+          "wrapper helpers > ensureClisbotWrapper / ensureRunnerExitRecordDir / buildRunnerLaunchCommand / clearRunnerExitRecord",
+          "src/agents/runner-service.ts > RunnerService.buildRunnerArgs",
+          "src/agents/runner-service.ts > RunnerService.syncSessionIdentity",
+          "src/runners/tmux/session-handshake.ts > waitForTmuxSessionBootstrap",
+          "src/agents/runner-service.ts > RunnerService.abortUnreadySession",
+          "src/agents/runner-service.ts > RunnerService.finalizeSessionStartup",
+          "src/agents/runner-service.ts > RunnerService.retryAfterStartupFault",
+          "src/agents/runner-service.ts > RunnerService.mapSessionError",
+          "tmux client > isServerRunning / hasSession / newSession"
+        ],
+        tags: ["high complexity", "owner surface", "startup truth"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.ensureRunnerReady",
+        level: 1,
+        description: "Builds on ensureSessionReady, then captures the pane snapshot that SessionService treats as the baseline before prompt submission.",
+        concerns: ["pre-submit readiness", "baseline capture"],
+        calledBy: ["src/agents/session-service.ts > SessionService.executePrompt", "src/agents/runner-service.ts > RunnerService.reopenRunContext"],
+        calls: [
+          "src/agents/runner-service.ts > RunnerService.ensureSessionReady",
+          "src/agents/runner-service.ts > RunnerService.captureSessionSnapshot",
+          "src/agents/runner-service.ts > RunnerService.retryFreshStartWithClearedSessionId",
+          "src/agents/runner-service.ts > RunnerService.mapSessionError"
+        ],
+        tags: ["owner surface", "warn"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.submitSessionInput",
+        level: 1,
+        description: "Direct injection path into an existing tmux session. Updates session state touch but does not create new run lifecycle bookkeeping.",
+        concerns: ["steer injection", "naming drift"],
+        calledBy: ["src/agents/agent-service.ts > AgentService.submitSessionInput"],
+        calls: [
+          "tmux client > hasSession",
+          "src/runners/tmux/session-handshake.ts > submitTmuxSessionInput",
+          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry"
+        ],
+        tags: ["duplicate submit path", "confusing name", "warn"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.captureTranscript",
+        level: 1,
+        description: "Returns normalized pane snapshot for a session if tmux session still exists, otherwise returns an empty transcript.",
+        concerns: ["transcript read"],
+        calledBy: ["src/agents/session-service.ts > SessionService.observeRun", "src/agents/agent-service.ts > AgentService.captureTranscript"],
+        calls: [
+          "tmux client > hasSession / capturePane",
+          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry",
+          "src/shared/transcript-normalization.ts > normalizePaneText"
+        ],
+        tags: ["read path"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.interruptSession",
+        level: 1,
+        description: "Best-effort interrupt path that writes idle runtime immediately, then tries Escape and short sleep.",
+        concerns: ["stop truth", "state write before proof"],
+        calledBy: ["src/agents/agent-service.ts > AgentService.interruptSession"],
+        calls: [
+          "tmux client > hasSession / sendKey",
+          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry",
+          "src/shared/process.ts > sleep"
+        ],
+        tags: ["truth risk", "warn", "state sink"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.reopenRunContext",
+        level: 1,
+        description: "Recovery entry for reopening same conversation context when stored session ID and resume command mode are available.",
+        concerns: ["recovery entry", "resume policy"],
+        calledBy: ["src/agents/session-service.ts > SessionService.recoverLostMidRun"],
+        calls: [
+          "src/agents/session-state.ts > AgentSessionState.getEntry",
+          "src/agents/runner-service.ts > RunnerService.ensureRunnerReady"
+        ],
+        tags: ["recovery"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.startFreshSession",
+        level: 1,
+        description: "Recovery fallback that kills current tmux session, clears stored session ID, and starts from a clean runner session.",
+        concerns: ["fresh recovery", "state reset"],
+        calledBy: ["src/agents/session-service.ts > SessionService.recoverLostMidRun"],
+        calls: [
+          "tmux client > killSession",
+          "src/agents/session-state.ts > AgentSessionState.clearSessionIdEntry",
+          "src/agents/runner-service.ts > RunnerService.ensureSessionReady"
+        ],
+        tags: ["recovery", "state sink"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.mapSessionError",
+        level: 2,
+        description: "Maps startup or runtime tmux failures into operator-facing errors with optional exit record context.",
+        concerns: ["error mapping", "operator truth"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureSessionReady", "src/agents/runner-service.ts > RunnerService.ensureRunnerReady", "src/agents/runner-service.ts > RunnerService.mapRunError"],
+        calls: [
+          "wrapper helpers > readRunnerExitRecord",
+          "src/agents/runner-service.ts > isRecoverableStartupSessionLoss",
+          "src/agents/runner-service.ts > isTransientTmuxTargetError",
+          "src/agents/runner-service.ts > summarizeSnapshot"
+        ],
+        tags: ["error policy"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.syncSessionIdentity",
+        level: 2,
+        description: "Persists known session ID if already stored, or attempts to capture one with cooldown so status-command capture does not spam.",
+        concerns: ["session identity", "state write"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureSessionReady", "src/agents/runner-service.ts > RunnerService.finalizeSessionStartup"],
+        calls: [
+          "src/agents/session-state.ts > AgentSessionState.getEntry",
+          "src/agents/runner-service.ts > RunnerService.captureSessionIdentity",
+          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry"
+        ],
+        tags: ["identity", "state sink"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.captureSessionIdentity",
+        level: 3,
+        description: "Runs configured status-command capture path when runner supports extracting a durable session ID from the pane.",
+        concerns: ["status-command capture"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.syncSessionIdentity"],
+        calls: ["src/runners/tmux/session-handshake.ts > captureTmuxSessionIdentity"],
+        tags: ["identity"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.verifySessionReady",
+        level: 2,
+        description: "Stronger startup verification after bootstrap wait: server exists, session exists, pane capture works, trust prompt is handled, and transient target errors are retried.",
+        concerns: ["startup verification", "truth gate"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.finalizeSessionStartup"],
+        calls: [
+          "tmux client > isServerRunning / hasSession",
+          "src/agents/runner-service.ts > RunnerService.captureSessionSnapshot",
+          "src/runners/tmux/session-handshake.ts > tmuxPaneHasTrustPrompt",
+          "src/agents/runner-service.ts > RunnerService.dismissVisibleTrustPrompt",
+          "src/shared/process.ts > sleep"
+        ],
+        tags: ["truth gate", "warn"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.finalizeSessionStartup",
+        level: 2,
+        description: "Final post-bootstrap startup path. Dismisses trust prompt, verifies readiness, and persists session ID or sync result.",
+        concerns: ["startup finalization", "state write"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureSessionReady"],
+        calls: [
+          "src/agents/runner-service.ts > RunnerService.dismissTrustPrompt",
+          "src/agents/runner-service.ts > RunnerService.verifySessionReady",
+          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry",
+          "src/agents/runner-service.ts > RunnerService.syncSessionIdentity"
+        ],
+        tags: ["startup owner"]
+      },
+      {
+        file: "src/agents/runner-service.ts",
+        function: "RunnerService.captureSessionSnapshot",
+        level: 2,
+        description: "Thin normalized pane capture helper reused by readiness and initial baseline capture paths.",
+        concerns: ["pane snapshot"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.verifySessionReady", "src/agents/runner-service.ts > RunnerService.ensureRunnerReady"],
+        calls: ["tmux client > capturePane", "src/shared/transcript-normalization.ts > normalizePaneText"],
+        tags: ["read helper"]
+      },
+      {
+        file: "src/runners/tmux/run-monitor.ts",
+        function: "monitorTmuxRun",
+        level: 1,
+        description: "Polling monitor that optionally submits prompt, captures pane, derives meaningful deltas, signals running or detached states, and emits completed or timeout callbacks.",
+        concerns: ["monitor facts", "prompt submit", "timeout heuristic"],
+        calledBy: ["src/agents/session-service.ts > SessionService.startRunMonitor"],
+        calls: [
+          "src/runners/tmux/session-handshake.ts > submitTmuxSessionInput",
+          "callback > onPromptSubmitted",
+          "src/shared/process.ts > sleep",
+          "tmux client > capturePane",
+          "src/shared/transcript-normalization.ts > normalizePaneText",
+          "src/shared/transcript-delta.ts > deriveRunningInteractionText",
+          "src/shared/transcript-delta.ts > appendInteractionText",
+          "callback > onRunning / onDetached / onCompleted / onTimeout",
+          "src/shared/transcript-delta.ts > deriveInteractionText"
+        ],
+        tags: ["owner boundary", "truth risk", "high complexity"]
+      },
+      {
+        file: "src/runners/tmux/session-handshake.ts",
+        function: "submitTmuxSessionInput",
+        level: 1,
+        description: "Single low-level submit primitive: capture pre-paste pane state, paste literal text, wait for visible paste settlement, press Enter, and verify submit by pane state change.",
+        concerns: ["tmux submit truth", "shared low-level primitive"],
+        calledBy: [
+          "src/runners/tmux/run-monitor.ts > monitorTmuxRun",
+          "src/agents/runner-service.ts > RunnerService.submitSessionInput",
+          "src/runners/tmux/session-handshake.ts > captureTmuxSessionIdentity"
+        ],
+        calls: [
+          "tmux client > getPaneState / sendLiteral / sendKey",
+          "src/runners/tmux/session-handshake.ts > waitForPanePasteSettlement",
+          "src/runners/tmux/session-handshake.ts > waitForPaneSubmitConfirmation",
+          "control/latency-debug.ts > logLatencyDebug"
+        ],
+        tags: ["canonical submit primitive", "duplicate convergence"]
+      },
+      {
+        file: "src/runners/tmux/session-handshake.ts",
+        function: "captureTmuxSessionIdentity",
+        level: 1,
+        description: "Runs status-command capture loop to find runner session ID in pane output, with trust-prompt dismissal and retryable tmux target handling.",
+        concerns: ["status-command capture", "identity truth"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.captureSessionIdentity"],
+        calls: [
+          "src/runners/tmux/session-handshake.ts > submitTmuxSessionInput",
+          "src/shared/process.ts > sleep",
+          "tmux client > capturePane",
+          "src/shared/transcript-normalization.ts > normalizePaneText",
+          "src/runners/tmux/session-handshake.ts > isRetryableBootstrapTargetError",
+          "src/runners/tmux/session-handshake.ts > isBootstrapSessionGoneError",
+          "src/runners/tmux/session-handshake.ts > buildBootstrapSessionLostError",
+          "src/runners/tmux/session-handshake.ts > tmuxPaneHasTrustPrompt",
+          "src/runners/tmux/session-handshake.ts > dismissTrustPrompt",
+          "session-identity.ts > extractSessionId"
+        ],
+        tags: ["identity", "warn"]
+      },
+      {
+        file: "src/runners/tmux/session-handshake.ts",
+        function: "dismissTmuxTrustPromptIfPresent",
+        level: 1,
+        description: "Polls pane for trust prompt and dismisses it during startup if trustWorkspace is enabled.",
+        concerns: ["trust prompt handling"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.dismissVisibleTrustPrompt"],
+        calls: [
+          "tmux client > capturePane",
+          "src/shared/transcript-normalization.ts > normalizePaneText",
+          "src/runners/tmux/session-handshake.ts > isRetryableBootstrapTargetError",
+          "src/runners/tmux/session-handshake.ts > isBootstrapSessionGoneError",
+          "src/runners/tmux/session-handshake.ts > buildBootstrapSessionLostError",
+          "src/shared/process.ts > sleep",
+          "src/runners/tmux/session-handshake.ts > tmuxPaneHasTrustPrompt",
+          "src/runners/tmux/session-handshake.ts > dismissTrustPrompt"
+        ],
+        tags: ["startup helper"]
+      },
+      {
+        file: "src/runners/tmux/session-handshake.ts",
+        function: "waitForTmuxSessionBootstrap",
+        level: 1,
+        description: "Startup readiness poller for new tmux session. Handles retryable target errors, trust prompt, configured blockers, and optional readyPattern match.",
+        concerns: ["bootstrap wait", "readyPattern gate"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureSessionReady"],
+        calls: [
+          "tmux client > capturePane",
+          "src/shared/transcript-normalization.ts > normalizePaneText",
+          "src/runners/tmux/session-handshake.ts > isRetryableBootstrapTargetError",
+          "src/runners/tmux/session-handshake.ts > isBootstrapSessionGoneError",
+          "src/runners/tmux/session-handshake.ts > buildBootstrapSessionLostError",
+          "src/shared/process.ts > sleep",
+          "src/runners/tmux/session-handshake.ts > tmuxPaneHasTrustPrompt",
+          "src/runners/tmux/session-handshake.ts > dismissTrustPrompt"
+        ],
+        tags: ["startup truth", "owner boundary"]
+      },
+      {
+        file: "src/runners/tmux/session-handshake.ts",
+        function: "dismissTrustPrompt",
+        level: 2,
+        description: "Low-level Enter-and-poll helper used by multiple startup and status-command paths once a trust prompt is visible.",
+        concerns: ["trust prompt primitive"],
+        calledBy: [
+          "src/runners/tmux/session-handshake.ts > captureTmuxSessionIdentity",
+          "src/runners/tmux/session-handshake.ts > dismissTmuxTrustPromptIfPresent",
+          "src/runners/tmux/session-handshake.ts > waitForTmuxSessionBootstrap"
+        ],
+        calls: [
+          "tmux client > sendKey / capturePane",
+          "src/shared/process.ts > sleep",
+          "src/shared/transcript-normalization.ts > normalizePaneText",
+          "src/runners/tmux/session-handshake.ts > isRetryableBootstrapTargetError",
+          "src/runners/tmux/session-handshake.ts > isBootstrapSessionGoneError",
+          "src/runners/tmux/session-handshake.ts > buildBootstrapSessionLostError",
+          "src/runners/tmux/session-handshake.ts > tmuxPaneHasTrustPrompt"
+        ],
+        tags: ["shared primitive", "warn"]
+      },
+      {
+        file: "src/runners/tmux/session-handshake.ts",
+        function: "waitForPaneSubmitConfirmation",
+        level: 2,
+        description: "Checks whether Enter really submitted by polling pane state for a post-submit change.",
+        concerns: ["submit confirmation"],
+        calledBy: ["src/runners/tmux/session-handshake.ts > submitTmuxSessionInput"],
+        calls: [
+          "tmux client > getPaneState",
+          "src/runners/tmux/session-handshake.ts > hasPaneStateChanged",
+          "src/shared/process.ts > sleep"
+        ],
+        tags: ["submit truth"]
+      },
+      {
+        file: "src/runners/tmux/session-handshake.ts",
+        function: "waitForPanePasteSettlement",
+        level: 2,
+        description: "Lets pasted input visibly settle before Enter so multi-line prompts do not submit too early.",
+        concerns: ["paste settle", "tmux truth"],
+        calledBy: ["src/runners/tmux/session-handshake.ts > submitTmuxSessionInput"],
+        calls: [
+          "src/shared/process.ts > sleep",
+          "tmux client > getPaneState",
+          "src/runners/tmux/session-handshake.ts > hasPaneStateChanged",
+          "src/runners/tmux/session-handshake.ts > shouldWaitForVisiblePaste",
+          "src/runners/tmux/session-handshake.ts > arePaneStatesEqual"
+        ],
+        tags: ["submit truth", "warn"]
+      },
+      {
+        file: "src/runners/tmux/session-handshake.ts",
+        function: "tmuxPaneHasTrustPrompt",
+        level: 2,
+        description: "Normalizes trust-prompt detection across Codex, Claude, and Gemini prompt shapes.",
+        concerns: ["prompt detection heuristic"],
+        calledBy: [
+          "src/runners/tmux/session-handshake.ts > captureTmuxSessionIdentity",
+          "src/runners/tmux/session-handshake.ts > dismissTmuxTrustPromptIfPresent",
+          "src/runners/tmux/session-handshake.ts > waitForTmuxSessionBootstrap",
+          "src/runners/tmux/session-handshake.ts > dismissTrustPrompt",
+          "src/agents/runner-service.ts > RunnerService.verifySessionReady"
+        ],
+        calls: [
+          "src/runners/tmux/session-handshake.ts > looksLikeClaudeTrustPrompt",
+          "src/runners/tmux/session-handshake.ts > looksLikeGeminiTrustPrompt"
+        ],
+        tags: ["heuristic", "deep helper"]
+      },
+      {
+        file: "src/runners/tmux/session-handshake.ts",
+        function: "hasPaneStateChanged / arePaneStatesEqual / shouldWaitForVisiblePaste",
+        level: 3,
+        description: "Tiny submit heuristics for deciding whether paste or Enter visibly changed pane state and how long to wait.",
+        concerns: ["submit heuristics"],
+        calledBy: [
+          "src/runners/tmux/session-handshake.ts > waitForPaneSubmitConfirmation",
+          "src/runners/tmux/session-handshake.ts > waitForPanePasteSettlement"
+        ],
+        calls: [],
+        tags: ["deep helper"]
+      },
+      {
+        file: "src/shared/transcript-delta.ts",
+        function: "deriveRunningInteractionText",
+        level: 1,
+        description: "Derives meaningful running delta by cleaning previous and current pane snapshots, then extracting only appended interaction text.",
+        concerns: ["meaningful output", "monitor heuristic"],
+        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
+        calls: [
+          "src/shared/transcript-normalization.ts > cleanInteractionSnapshot",
+          "src/shared/transcript-delta.ts > extractScrolledAppend"
+        ],
+        tags: ["truth heuristic", "owner boundary"]
+      },
+      {
+        file: "src/shared/transcript-delta.ts",
+        function: "deriveInteractionText",
+        level: 1,
+        description: "More permissive interaction extractor used for detached, recovered, or initial transcript snapshots when append-only diff is insufficient.",
+        concerns: ["transcript diff"],
+        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun", "src/agents/session-service.ts > SessionService.recoverPersistedRuns"],
+        calls: [
+          "src/shared/transcript-normalization.ts > cleanInteractionSnapshot",
+          "src/shared/transcript-delta.ts > extractScrolledAppend",
+          "src/shared/transcript-delta.ts > diffText"
+        ],
+        tags: ["diff helper"]
+      },
+      {
+        file: "src/shared/transcript-delta.ts",
+        function: "appendInteractionText",
+        level: 1,
+        description: "Accumulates running interaction text while trimming overlap so monitor snapshots do not duplicate adjacent lines.",
+        concerns: ["snapshot accumulation"],
+        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
+        calls: [],
+        tags: ["diff helper"]
+      },
+      {
+        file: "src/shared/transcript-delta.ts",
+        function: "extractScrolledAppend",
+        level: 2,
+        description: "Append-only diff helper that tries strict prefix, contained previous snapshot, then suffix-window overlap scan.",
+        concerns: ["append heuristic"],
+        calledBy: ["src/shared/transcript-delta.ts > deriveRunningInteractionText", "src/shared/transcript-delta.ts > deriveInteractionText"],
+        calls: [],
+        tags: ["heuristic", "warn"]
+      },
+      {
+        file: "src/shared/transcript-delta.ts",
+        function: "diffText",
+        level: 2,
+        description: "Fallback diff when append-only extraction fails. Keeps changed block between common prefix and suffix.",
+        concerns: ["fallback diff"],
+        calledBy: ["src/shared/transcript-delta.ts > deriveInteractionText"],
+        calls: [
+          "src/shared/transcript-normalization.ts > collapseBlankLines",
+          "src/shared/transcript-normalization.ts > trimBlankLines"
+        ],
+        tags: ["diff helper"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "cleanInteractionSnapshot",
+        level: 1,
+        description: "Main transcript cleanup wall: identify runner family, strip prompt blocks, drop delivery and chrome noise, unwrap message blocks, unwrap soft wraps, and collapse duplicates.",
+        concerns: ["normalization owner", "heuristic wall"],
+        calledBy: [
+          "src/shared/transcript-delta.ts > deriveRunningInteractionText",
+          "src/shared/transcript-delta.ts > deriveInteractionText",
+          "src/shared/transcript-delta.ts > deriveMeaningfulPaneSnapshot"
+        ],
+        calls: [
+          "src/shared/transcript-normalization.ts > splitNormalizedLines",
+          "src/shared/transcript-normalization.ts > looksLikeCodexSnapshot / looksLikeClaudeSnapshot / looksLikeGeminiSnapshot",
+          "src/shared/transcript-normalization.ts > dropCodexPromptBlocks / dropClaudePromptBlocks / dropGeminiPromptBlocks",
+          "src/shared/transcript-normalization.ts > shouldDropDeliveryReportLine",
+          "src/shared/transcript-normalization.ts > shouldDropCodexChromeLine / shouldDropClaudeChromeLine / shouldDropGeminiChromeLine",
+          "src/shared/transcript-normalization.ts > unwrapCodexMessageBlocks / unwrapClaudeMessageBlocks",
+          "src/shared/transcript-normalization.ts > unwrapSoftWrappedLines",
+          "src/shared/transcript-normalization.ts > trimBlankLines / collapseBlankLines / collapseAdjacentDuplicateLines"
+        ],
+        tags: ["high complexity", "heuristic wall", "deep stack"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "splitNormalizedLines",
+        level: 2,
+        description: "Splits pane text into lines only after normalizePaneText cleaned VT sequences and newline forms.",
+        concerns: ["text normalization"],
+        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot", "src/shared/transcript-delta.ts > deriveMeaningfulPaneSnapshot"],
+        calls: ["src/shared/transcript-normalization.ts > normalizePaneText"],
+        tags: ["deep helper"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "normalizePaneText",
+        level: 3,
+        description: "Lowest-level pane text normalizer: strips VT control characters and normalizes line endings.",
+        concerns: ["pane text normalization"],
+        calledBy: [
+          "src/shared/transcript-normalization.ts > splitNormalizedLines",
+          "src/runners/tmux/run-monitor.ts > monitorTmuxRun",
+          "src/agents/runner-service.ts > RunnerService.captureSessionSnapshot",
+          "src/runners/tmux/session-handshake.ts > captureTmuxSessionIdentity / dismissTmuxTrustPromptIfPresent / waitForTmuxSessionBootstrap / dismissTrustPrompt"
+        ],
+        calls: [],
+        tags: ["deep helper"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "dropCodexPromptBlocks / dropClaudePromptBlocks / dropGeminiPromptBlocks",
+        level: 2,
+        description: "Runner-specific prompt removal before diffing. Codex and Gemini share generic block dropping, Claude uses its own skip-until-blank strategy.",
+        concerns: ["prompt stripping"],
+        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: ["src/shared/transcript-normalization.ts > dropPromptBlocks"],
+        tags: ["deep helper", "runner-specific"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "dropPromptBlocks",
+        level: 3,
+        description: "Generic prompt-block stripper used by multiple runner families when prompt marker plus indented continuation should be removed.",
+        concerns: ["prompt stripping primitive"],
+        calledBy: ["src/shared/transcript-normalization.ts > dropCodexPromptBlocks / dropGeminiPromptBlocks"],
+        calls: [],
+        tags: ["deep helper"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "shouldDropDeliveryReportLine",
+        level: 2,
+        description: "Filters out bot-side delivery confirmations so monitor and transcript diffs do not treat channel send reports as model output.",
+        concerns: ["delivery noise filter"],
+        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: ["src/shared/transcript-normalization.ts > normalizeBoundaryLine"],
+        tags: ["heuristic"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "shouldDropCodexChromeLine / shouldDropClaudeChromeLine / shouldDropGeminiChromeLine",
+        level: 2,
+        description: "Runner-family chrome and UI line filters. Huge heuristic surface and a likely drift source whenever upstream CLI text changes.",
+        concerns: ["runner chrome filter", "heuristic drift"],
+        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: ["src/shared/transcript-normalization.ts > isInterruptStatusLine", "src/shared/transcript-normalization.ts > isProgressLine"],
+        tags: ["high complexity", "heuristic wall", "warn"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "unwrapCodexMessageBlocks / unwrapClaudeMessageBlocks",
+        level: 2,
+        description: "Turns runner UI bullet blocks back into plain interaction text so downstream diffing is less sensitive to message container chrome.",
+        concerns: ["message unwrapping"],
+        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: ["src/shared/transcript-normalization.ts > unwrapMessageBlocks", "src/shared/transcript-normalization.ts > isProgressLine"],
+        tags: ["deep helper", "runner-specific"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "unwrapMessageBlocks",
+        level: 3,
+        description: "Shared block-unwrapper that keeps indented continuation lines when they belong to a message block instead of runner chrome.",
+        concerns: ["message block primitive"],
+        calledBy: ["src/shared/transcript-normalization.ts > unwrapCodexMessageBlocks / unwrapClaudeMessageBlocks"],
+        calls: [],
+        tags: ["deep helper"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "unwrapSoftWrappedLines",
+        level: 2,
+        description: "Repairs line wraps introduced by terminal width, including wrapped URLs and wrapped words.",
+        concerns: ["soft-wrap repair"],
+        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: [
+          "src/shared/transcript-normalization.ts > stripUrlContinuationGaps",
+          "src/shared/transcript-normalization.ts > shouldJoinWrappedLine",
+          "src/shared/transcript-normalization.ts > joinWrappedLines"
+        ],
+        tags: ["deep helper", "warn"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "stripUrlContinuationGaps",
+        level: 3,
+        description: "Collapses blank lines that exist only because wrapped URL fragments were split apart by terminal layout.",
+        concerns: ["url wrap repair"],
+        calledBy: ["src/shared/transcript-normalization.ts > unwrapSoftWrappedLines"],
+        calls: ["src/shared/transcript-normalization.ts > looksLikeUrlContinuation"],
+        tags: ["deep helper"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "shouldJoinWrappedLine / joinWrappedLines",
+        level: 3,
+        description: "Decides whether a new line is just a visual continuation of the prior line, then joins with or without spacing.",
+        concerns: ["line wrap heuristic"],
+        calledBy: ["src/shared/transcript-normalization.ts > unwrapSoftWrappedLines"],
+        calls: [
+          "src/shared/transcript-normalization.ts > isListOrStructuredLine",
+          "src/shared/transcript-normalization.ts > shouldJoinWrappedWord"
+        ],
+        tags: ["deep helper", "heuristic"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "shouldJoinWrappedWord / isListOrStructuredLine / looksLikeUrlContinuation",
+        level: 4,
+        description: "Leaf heuristics behind soft-wrap repair and structured-line protection.",
+        concerns: ["leaf heuristic"],
+        calledBy: [
+          "src/shared/transcript-normalization.ts > shouldJoinWrappedLine / joinWrappedLines",
+          "src/shared/transcript-normalization.ts > stripUrlContinuationGaps"
+        ],
+        calls: [],
+        tags: ["deep helper", "deep"]
+      },
+      {
+        file: "src/shared/transcript-normalization.ts",
+        function: "collapseAdjacentDuplicateLines",
+        level: 2,
+        description: "Collapses adjacent duplicates after boundary normalization so repeated bullet lines do not inflate diff output.",
+        concerns: ["duplicate cleanup"],
+        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: [
+          "src/shared/transcript-normalization.ts > normalizeBoundaryLine",
+          "src/shared/transcript-normalization.ts > collapseBlankLines"
+        ],
+        tags: ["deep helper"]
+      },
+      {
+        file: "src/agents/session-state.ts",
+        function: "AgentSessionState.touchSessionEntry",
+        level: 1,
+        description: "Generic state touch entry used by startup reuse, transcript reads, direct submit, nudge, and interrupt-like paths. Preserves most existing shape unless overridden.",
+        concerns: ["generic state write", "broad reuse"],
+        calledBy: [
+          "src/agents/runner-service.ts > RunnerService.syncSessionIdentity",
+          "src/agents/runner-service.ts > RunnerService.finalizeSessionStartup",
+          "src/agents/runner-service.ts > RunnerService.captureTranscript",
+          "src/agents/runner-service.ts > RunnerService.interruptSession",
+          "src/agents/runner-service.ts > RunnerService.nudgeSession",
+          "src/agents/runner-service.ts > RunnerService.submitSessionInput"
+        ],
+        calls: ["src/agents/session-state.ts > AgentSessionState.upsertSessionEntry"],
+        tags: ["state sink", "generic helper", "warn"]
+      },
+      {
+        file: "src/agents/session-state.ts",
+        function: "AgentSessionState.clearSessionIdEntry",
+        level: 1,
+        description: "Clears stored session ID and forces runtime back to idle, typically before a fresh restart path.",
+        concerns: ["identity reset", "idle write"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.retryFreshStartWithClearedSessionId", "src/agents/runner-service.ts > RunnerService.startFreshSession"],
+        calls: ["src/agents/session-state.ts > AgentSessionState.upsertSessionEntry"],
+        tags: ["state sink"]
+      },
+      {
+        file: "src/agents/session-state.ts",
+        function: "AgentSessionState.setSessionRuntime",
+        level: 1,
+        description: "Explicit runtime-state writer for running, detached, or idle transitions.",
+        concerns: ["runtime write"],
+        calledBy: [
+          "src/agents/session-service.ts > SessionService.recoverPersistedRuns",
+          "src/agents/session-service.ts > SessionService.executePrompt",
+          "src/agents/session-service.ts > SessionService.finishActiveRun",
+          "src/agents/session-service.ts > SessionService.failActiveRun",
+          "src/agents/session-service.ts > SessionService.startRunMonitor > onDetached callback"
+        ],
+        calls: ["src/agents/session-state.ts > AgentSessionState.upsertSessionEntry"],
+        tags: ["state sink", "owner truth"]
+      },
+      {
+        file: "src/agents/session-state.ts",
+        function: "AgentSessionState.getSessionRuntime",
+        level: 1,
+        description: "Reads persisted runtime markers such as active state, detachedAt, finalReplyAt, and message-tool timestamps.",
+        concerns: ["runtime read"],
+        calledBy: ["src/agents/agent-service.ts > AgentService.getSessionRuntime"],
+        calls: [],
+        tags: ["state read"]
+      },
+      {
+        file: "src/agents/session-state.ts",
+        function: "AgentSessionState.recordConversationReply",
+        level: 1,
+        description: "Persists reply timestamps for chat surfaces and message-tool finality markers. This is a second state-truth stream beside active-run state.",
+        concerns: ["reply timestamps", "surface truth"],
+        calledBy: ["src/agents/agent-service.ts > AgentService.recordConversationReply"],
+        calls: ["src/agents/session-state.ts > AgentSessionState.upsertSessionEntry"],
+        tags: ["state sink", "mixed truth", "warn"]
+      },
+      {
+        file: "src/agents/session-state.ts",
+        function: "AgentSessionState.upsertSessionEntry",
+        level: 2,
+        description: "Single persistence funnel for session entry mutation. Almost all state writes eventually end here.",
+        concerns: ["state persistence funnel"],
+        calledBy: [
+          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry",
+          "src/agents/session-state.ts > AgentSessionState.clearSessionIdEntry",
+          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime",
+          "src/agents/session-state.ts > AgentSessionState.recordConversationReply"
+        ],
+        calls: ["src/agents/session-store.ts > SessionStore.update"],
+        tags: ["state funnel", "owner boundary"]
+      }
+    ];
+
+    const tbody = document.getElementById("rows");
+    const search = document.getElementById("search");
+    const fileFilter = document.getElementById("fileFilter");
+    const concernFilter = document.getElementById("concernFilter");
+    const levelFilter = document.getElementById("levelFilter");
+    const tagFilter = document.getElementById("tagFilter");
+
+    function uniqueValues(values) {
+      return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+    }
+
+    function populateSelect(select, values) {
+      for (const value of values) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      }
+    }
+
+    populateSelect(fileFilter, uniqueValues(rows.map((row) => row.file)));
+    populateSelect(concernFilter, uniqueValues(rows.flatMap((row) => row.concerns)));
+    populateSelect(tagFilter, uniqueValues(rows.flatMap((row) => row.tags)));
+
+    function scoreRow(row) {
+      if (row.tags.some((tag) => tag.includes("high complexity") || tag.includes("heuristic wall"))) {
+        return "row-high";
+      }
+      if (row.tags.some((tag) => tag.includes("warn") || tag.includes("truth risk") || tag.includes("mixed"))) {
+        return "row-warn";
+      }
+      return "";
+    }
+
+    function tagClass(tag) {
+      if (tag.includes("high complexity") || tag.includes("heuristic wall")) {
+        return "tag high";
+      }
+      if (tag.includes("warn") || tag.includes("truth risk") || tag.includes("mixed")) {
+        return "tag warn";
+      }
+      if (tag.includes("deep")) {
+        return "tag deep";
+      }
+      return "tag";
+    }
+
+    function renderList(items) {
+      return `<div class="list">${items.map((item) => `<span>${item}</span>`).join("")}</div>`;
+    }
+
+    function renderRows() {
+      const searchValue = search.value.trim().toLowerCase();
+      const fileValue = fileFilter.value;
+      const concernValue = concernFilter.value;
+      const levelValue = Number(levelFilter.value || 0);
+      const tagValue = tagFilter.value;
+
+      const filtered = rows.filter((row) => {
+        if (fileValue && row.file !== fileValue) {
+          return false;
+        }
+        if (concernValue && !row.concerns.includes(concernValue)) {
+          return false;
+        }
+        if (levelValue && row.level < levelValue) {
+          return false;
+        }
+        if (tagValue && !row.tags.includes(tagValue)) {
+          return false;
+        }
+        if (!searchValue) {
+          return true;
+        }
+        const haystack = [
+          row.file,
+          row.function,
+          row.description,
+          row.concerns.join(" "),
+          row.calledBy.join(" "),
+          row.calls.join(" "),
+          row.tags.join(" ")
+        ].join(" ").toLowerCase();
+        return haystack.includes(searchValue);
+      });
+
+      tbody.innerHTML = filtered.map((row) => `
+        <tr class="${scoreRow(row)}">
+          <td>
+            <div class="fn">${row.function}</div>
+            <span class="file">${row.file}</span>
+          </td>
+          <td>
+            <span class="level ${row.level >= 4 ? "deep" : ""}">${row.level}</span>
+          </td>
+          <td>${row.description}</td>
+          <td>${renderList(row.calledBy)}</td>
+          <td>${renderList(row.calls)}</td>
+          <td>
+            <div class="tag-list">
+              ${[...row.concerns, ...row.tags].map((tag) => `<span class="${tagClass(tag)}">${tag}</span>`).join("")}
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    search.addEventListener("input", renderRows);
+    fileFilter.addEventListener("change", renderRows);
+    concernFilter.addEventListener("change", renderRows);
+    levelFilter.addEventListener("change", renderRows);
+    tagFilter.addEventListener("change", renderRows);
+
+    renderRows();
+  </script>
+</body>
+</html>

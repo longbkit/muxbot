@@ -90,7 +90,7 @@ These are broad or legacy-looking for the current `clisbot` Slack design and sho
 | `function_executed` event | Not consumed by current code |
 | `app_home.messages_tab_enabled` and related App Home surface config | Not required for current chat-routing behavior |
 | `org_deploy_enabled` | Not needed for the current local or workspace-level setup story |
-| `hermes_app_type` and `function_runtime` | Not needed for the current Slack Socket Mode bot |
+| `function_runtime` | Not needed for the current Slack Socket Mode bot |
 
 ## Practical Recommendation
 
