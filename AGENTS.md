@@ -1,108 +1,109 @@
 # AGENTS.md
 
 ## Scope
-
 These rules apply to everything inside this repository.
 
-This repo must follow the decisions in:
-
+The stable implementation contract lives in:
 - `docs/architecture/architecture-overview.md`
 - `docs/architecture/surface-architecture.md`
 - `docs/architecture/runtime-architecture.md`
 - `docs/architecture/model-taxonomy-and-boundaries.md`
 
 If implementation conflicts with those docs:
-
 1. stop
 2. refactor toward the docs if the fix is clear
-3. ask the user before proceeding if the conflict changes behavior, architecture, or delivery scope
+3. ask the user before proceeding if the conflict changes behavior, architecture, or scope
 
-Do not silently drift away from these documents.
+Do not silently drift away from the architecture docs.
 
-## Documentation Workflow Rules
+## First Read Order
+Load context in this order unless the task is obviously narrower:
+1. `README.md`
+2. `docs/overview/README.md`
+3. the architecture docs listed above
 
-Use the repo doc workflows consistently.
+Then load only the smallest extra context that matches the task:
+- feature work: `docs/features/README.md`, the relevant feature doc, then linked task docs
+- task execution: `docs/tasks/README.md`, `docs/tasks/backlog.md`, then the relevant task doc
+- operator or onboarding or release work: `docs/development/README.md` and the relevant user-guide doc
+- research-heavy questions: the relevant file under `docs/research/`
 
-- Use `docs/overview/README.md` for the human-readable project overview and goal summary.
-- Use `docs/overview/human-requirements.md` for raw human-provided requirements and notes.
-- Do not modify `docs/overview/human-requirements.md` unless the human explicitly asks for that file to be changed.
-- For task planning, execution tracking, and backlog management, follow `docs/tasks/README.md` and update `docs/tasks/backlog.md`.
-- For feature-level planning, feature state, and feature navigation, follow `docs/features/README.md` and update `docs/features/feature-tables.md`.
-- Use `docs/research/<feature>/` for source-driven analysis, investigations, experiments, and research output that is not yet a stable architecture contract.
-- Keep task docs brief when they mostly track research work; link to the detailed research output in `docs/research/<feature>/` instead of duplicating the full analysis in `docs/tasks/`.
-- Keep task docs in the task workflow and feature docs in the feature workflow.
-- Use `docs/features/non-functionals/` for performance, security, reliability, accessibility, tracing, monitoring, product analytics, and architecture-conformance work that does not belong to one feature alone.
-- Maintain `docs/lessons/` as a reusable lessons-learned and developer-guidelines space for issues that receive human feedback, especially repeated feedback, human preferences likely to be reused or referenced later, and problems that required long struggles, research, or multiple iterations to resolve, with the goal of reducing repeated struggle, avoiding misunderstanding, and growing transferable lessons for future projects.
-- Prefer links between these systems over copying the same status, scope, or rationale into multiple files.
+Do not front-load the whole docs tree.
 
-## Product And Architecture Rules
+## Documentation Precedence
+When documents disagree, use this order:
+1. `docs/architecture/`
+2. `README.md`, `docs/development/README.md`, and `docs/user-guide/`
+3. `docs/features/`
+4. `docs/tasks/`
+5. `docs/research/` and `docs/lessons/`
 
-### Architecture conformance rule
+`docs/research/` and `docs/lessons/` are supporting context only. They should not silently override architecture or guide docs.
 
-- Treat `docs/architecture/` as the stable implementation contract.
-- Document intentional exceptions before implementing them.
+## Repo Map
+Use this ownership map before editing:
+- `src/channels`: Slack and Telegram surfaces, route handling, rendering, pairing, follow-up behavior
+- `src/agents`: durable agent state, sessions, queueing, loops, attachments, run lifecycle
+- `src/auth`: roles, permissions, owner claim, authorization resolution
+- `src/config`: schema, loading, credentials, templates
+- `src/control`: operator CLI, runtime lifecycle, health, status, logs, bootstrap
+- `src/runners`: execution backends, currently tmux
+- `src/shared`: cross-cutting utilities
+- `test/`: regression and behavior coverage
+- `docs/tests/`: readable validation scenarios when behavior needs explicit ground truth
 
-### Backend contract rule
+## Command Baseline
+Prefer these repo-standard commands:
+- install: `bun install`
+- typecheck: `bunx tsc --noEmit`
+- targeted tests: `bun test <file>`
+- full tests: `bun test`
+- full local gate: `bun run check`
+- local dev start: `bun run start ...`
+- local dev status: `bun run status`
+- local dev logs: `bun run logs`
+- package build: `bun run build`
+- publish: follow `docs/development/README.md`
 
-- Backend-facing models must stay resource-oriented and revision-aware.
-- Do not leak transient runtime state into persistence contracts.
-- Prefer standard REST resources and nested ownership-based payloads over page-specific aggregate endpoints.
-- Do not introduce aggregate or backend-for-frontend endpoints unless the need is documented and the simpler resource model still exceeds the `10` request threshold after reasonable `include=` support and ordinary caching.
+Do not invent ad hoc verification flows when one of these commands already fits.
 
-### Model governance rule
+## Runtime And Env Precedence
+Repo-local convenience scripts use the repo `.env` and default to:
+- `CLISBOT_HOME=~/.clisbot-dev`
 
-- Use `docs/architecture/model-taxonomy-and-boundaries.md` as the default reference for model naming, ownership, lifecycle, invariants, and mapping boundaries.
-- Do not introduce new model shapes that mix entity, projection, DTO, persistence, and runtime-state concerns without documenting the tradeoff explicitly.
+Treat runtime path resolution in this order:
+1. explicit CLI or function parameters
+2. explicit `CLISBOT_*` path env vars
+3. `CLISBOT_HOME`-derived defaults
 
-## Refactoring And Conflict Triggers
+If runtime behavior looks wrong, inspect `CLISBOT_HOME`, `CLISBOT_CONFIG_PATH`, `CLISBOT_PID_PATH`, `CLISBOT_LOG_PATH`, and related runtime env vars before assuming the code is wrong.
 
-Refactor immediately when you see:
+## Documentation Workflow
+Use the repo doc systems consistently:
+- `docs/overview/README.md` is the top-level project overview
+- `docs/overview/human-requirements.md` is raw human input; do not edit it unless the user explicitly asks
+- `docs/tasks/backlog.md` is the source of truth for task status and priority
+- `docs/features/feature-tables.md` is the source of truth for feature state
+- `docs/research/<feature>/` is for source-driven analysis that is not yet stable contract
+- `docs/features/non-functionals/` is for cross-cutting quality work
+- `docs/lessons/` is for reusable lessons from repeated feedback, delivery struggles, or durable operator preferences
+- keep task docs brief when they mostly track research work; link to `docs/research/` instead of duplicating analysis
+- keep task docs in the task workflow and feature docs in the feature workflow
 
-- architecture conflicting with the docs above
-- duplicated logic
-- duplicated file purpose
-- duplicated naming for the same concept
-- one name used for different concepts
-- confusing or ambiguous naming
-- inconsistent naming conventions
-- repeated wrappers that should be one shared wrapper
-- repeated data transformations that should be one shared utility
-- repeated mutation or command paths that should share one implementation path
+Prefer links over repeated context.
 
-Ask the user before proceeding when:
+## Design Defaults
+Follow these defaults unless the user explicitly asks for a different tradeoff:
+- KISS: prefer the smallest change that keeps architecture, runtime truthfulness, and operator flow clear
+- DRY: prefer one shared implementation path over parallel wrappers or duplicated mutations
+- backend-facing models must stay resource-oriented and revision-aware
+- do not leak transient runtime state into persistence contracts
+- use `docs/architecture/model-taxonomy-and-boundaries.md` for model naming, ownership, lifecycle, and mapping boundaries
+- do not introduce aggregate or backend-for-frontend endpoints unless the simpler resource model is documented as insufficient
+- document intentional architecture exceptions before implementing them
 
-- refactoring changes visible behavior
-- refactoring changes a public interface
-- two doc rules conflict and the right direction is not obvious
-- exact reuse or backward compatibility appears impossible without a higher-level tradeoff
-
-## Hard Size Limits
-
-These are strict rules, not suggestions.
-
-### File size
-
-- Target: keep files under `500` lines.
-- Hard refactor limit: `700` lines.
-- If a file crosses `500`, prefer splitting it.
-- If a file reaches `700`, refactor before adding more logic unless the user explicitly approves an exception.
-
-### Function size
-
-- Target: keep functions under `30` lines.
-- Hard refactor limit: `50` lines.
-- If a function crosses `30`, look for extraction opportunities.
-- If a function reaches `50`, refactor before adding more logic unless the user explicitly approves an exception.
-
-### Nesting depth
-
-- Maximum `3` levels of nesting.
-- If logic wants a fourth level, extract a function, guard clause, or derived helper.
-
-## DRY Rules
-
-Follow DRY strictly across:
-
+## DRY And Naming Rules
+Apply DRY across:
 - logic
 - files
 - functions
@@ -112,72 +113,78 @@ Follow DRY strictly across:
 - wrappers
 - data contracts
 
-Do not duplicate:
-
-- the same mutation or command path
-- the same serialization logic
-- the same component or adapter mapping logic
-- the same validation logic
-- the same naming for equivalent objects
-
 If you copy something once, treat that as a refactoring signal.
 
-## Naming And Standardization Rules
+Naming rules:
+- prefer boring, obvious names
+- one concept should have one name
+- one name should refer to one concept
+- reuse established product and architecture terms where they already fit
+- do not invent a new naming convention when the repo already has one
 
-Use one naming system consistently.
+Refactor when you see:
+- duplicated logic or duplicated file purpose
+- duplicated mutation or command paths
+- repeated wrappers or transformations that should be shared
+- ambiguous, overloaded, misleading, or inconsistent names
+- one concept using multiple names
+- one name referring to multiple concepts
 
-### Required behavior
+Ask the user before proceeding when refactoring changes visible behavior, changes a public interface, or requires a real tradeoff about compatibility or doc direction.
 
-- Prefer boring, obvious names over clever names.
-- One concept should have one name.
-- One name should refer to one concept.
-- Reuse established product and architecture terms where they already fit.
+## Hard Limits
+These are strict rules, not suggestions:
+- file target: under `500` lines; hard limit: `700`
+- function target: under `30` lines; hard limit: `50`
+- nesting depth: maximum `3`
 
-### Naming conflicts are refactoring signals
+If you cross the target, treat that as a refactoring trigger.
 
-Refactor when naming is:
+## Autonomous Execution
+When the user asks to continue or work autonomously:
+- continue until the requested scope is actually complete
+- do not stop after one clean sub-batch if the next in-scope step is clear
+- stop only when the task is complete, a real dependency is missing, or continuing would risk conflict with architecture or user intent
 
-- ambiguous
-- duplicated
-- inconsistent
-- overloaded
-- misleading
-- too local for a shared concept
+## Verification Baseline
+For product, runtime, or operator work:
+- run targeted tests when the change is scoped
+- run `bun run check` before claiming completion for broad or risky changes
+- run build verification when packaging or startup behavior changed
+- check logs when runtime behavior is unclear
+- do not claim completion from static inspection alone when runtime validation is practical
 
-Do not invent a new naming convention each time.
+## Live Validation Guardrails
+Use only the configured shared test surfaces unless the user explicitly asks for another target.
 
-## Autonomous Execution Rules
+Slack:
+- use `SLACK_TEST_CHANNEL` for channel validation
+- keep `.env` authoritative for the shared Slack channel route; do not hardcode channel ids in instruction files
+- the only allowed DM validation surface is `SLACK_TEST_DM_CHANNEL`
 
-When the user asks to continue, proceed, work autonomously, or otherwise signals autonomous execution:
-
-- do not stop after one clean sub-batch just because it is implemented
-- continue into the next highest-value task that is still inside the active scope
-- if the user says to continue until backlog items are done, treat backlog completion in the requested scope as the default stop condition
-- only stop when:
-  - the requested task and its requested backlog scope are actually complete
-  - you are blocked by a real missing dependency or decision
-  - continuing would risk conflict with architecture or user intent
-
-### Required autonomous verification loop
-
-For product or runtime work, use the available tools end-to-end when relevant:
-
-- run the local server when needed
-- use browser testing for real interaction validation
-- run unit tests or targeted test suites when relevant
-- run build verification when relevant
-- check logs when behavior is unclear
-- for Slack live validation, always use the channel id from `SLACK_TEST_CHANNEL`; do not switch to ad hoc channels or DMs unless the user explicitly asks for that
-- for the shared bot Claude Code CLI route in this repo, `SLACK_TEST_CHANNEL` must point to `C07U0LDK6ER`
-- the only Slack DM surface allowed for live validation is `SLACK_TEST_DM_CHANNEL`
-- for Telegram live validation, always use the configured Telegram test surface only:
-- `TELEGRAM_DEV_BOT_USERNAME`
-- `TELEGRAM_CONTROL_BOT_USERNAME`
-- `TELEGRAM_TEST_GROUP_ID`
-- `TELEGRAM_TEST_TOPIC_CODEX_ID`
-- `TELEGRAM_TEST_TOPIC_CLAUDE_ID`
-- do not switch to other Telegram groups, topics, or DMs unless the user explicitly asks for that
-- use `TELEGRAM_CONTROL_BOT_TOKEN` only for control-bot-driven testing against the configured Telegram test group
+Telegram:
+- use only `TELEGRAM_DEV_BOT_USERNAME`
+- use only `TELEGRAM_CONTROL_BOT_USERNAME`
+- use only `TELEGRAM_TEST_GROUP_ID`
+- use only `TELEGRAM_TEST_TOPIC_CODEX_ID`
+- use only `TELEGRAM_TEST_TOPIC_CLAUDE_ID`
+- use `TELEGRAM_CONTROL_BOT_TOKEN` only for control-bot-driven validation against the configured test group
 - use `TELEGRAM_DEV_BOT_TOKEN` only for the target bot route under test in this repo
 
-Do not claim completion based only on static code review when runtime verification is practical.
+Never switch to ad hoc Slack channels, Slack DMs, Telegram groups, Telegram topics, or Telegram DMs unless the user explicitly asks.
+
+## Done Criteria
+Do not call work done until the matching bundle is complete:
+- code change: implementation + targeted tests + updated docs or help when behavior or contract changed
+- runtime or control change: implementation + truthful status or logs or CLI surfaces + regression coverage
+- doc change: docs are consistent with current code and examples are truthful
+- release change: version is correct, checks passed, publish flow verified, and live version confirmed when publishing was requested
+
+## High-Blast-Radius Actions
+Treat these as high-risk and report them truthfully:
+- Slack or Telegram live sends
+- pairing or auth changes against real surfaces
+- runtime start or stop or reload against shared environments
+- npm publish and any other external release step
+
+Prefer attached sessions, concrete logs, and exact operator-facing next steps for these flows.
