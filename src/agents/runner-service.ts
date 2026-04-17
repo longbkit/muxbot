@@ -247,6 +247,17 @@ export class RunnerService {
     });
   }
 
+  private async retryAfterStartupTimeout(
+    target: AgentSessionTarget,
+    resolved: ResolvedAgentTarget,
+    allowFreshRetry?: boolean,
+  ) {
+    return this.retryFreshStartWithClearedSessionId(target, resolved, {
+      allowRetry: allowFreshRetry,
+      nextAllowFreshRetry: false,
+    });
+  }
+
   private async abortUnreadySession(
     resolved: ResolvedAgentTarget,
     reason: string,
@@ -435,6 +446,14 @@ export class RunnerService {
       }
 
       if (bootstrapResult.status === "timeout" && resolved.runner.startupReadyPattern) {
+        const retried = await this.retryAfterStartupTimeout(
+          target,
+          resolved,
+          options.allowFreshRetry,
+        );
+        if (retried) {
+          return retried;
+        }
         await this.abortUnreadySession(
           resolved,
           `Runner session "${resolved.sessionName}" did not reach the configured ready state within ${resolved.runner.startupDelayMs}ms.`,

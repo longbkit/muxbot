@@ -1316,8 +1316,10 @@ describe("AgentService session identity", () => {
       loaded.raw.agents.defaults.runner.startupDelayMs = 50;
       loaded.raw.agents.defaults.runner.startupReadyPattern = "Type your message or @path/to/file";
       const tmux = new FakeTmuxClient();
+      let newSessionCount = 0;
       const originalNewSession = tmux.newSession.bind(tmux);
       tmux.newSession = async (params) => {
+        newSessionCount += 1;
         await originalNewSession(params);
         const session = (tmux as unknown as { sessions: Map<string, FakeSession> }).sessions.get(
           params.sessionName,
@@ -1343,6 +1345,7 @@ describe("AgentService session identity", () => {
       ).rejects.toThrow(
         "did not reach the configured ready state",
       );
+      expect(newSessionCount).toBe(2);
       expect(await tmux.hasSession("default-main")).toBe(false);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });

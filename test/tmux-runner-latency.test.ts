@@ -250,23 +250,32 @@ describe("tmux runner latency behavior", () => {
 
   test("monitorTmuxRun polls quickly for the first visible output", async () => {
     let snapshot = "";
+    let pasteVisible = false;
     let submitted = false;
 
     const fakeTmux = {
       async sendLiteral() {
-        submitted = true;
+        pasteVisible = true;
       },
       async sendKey() {
-        if (submitted) {
+        if (pasteVisible) {
+          submitted = true;
           snapshot = "READY\nFIRST";
         }
       },
       async getPaneState() {
-        return submitted
+        if (submitted) {
+          return {
+            cursorX: 0,
+            cursorY: snapshot ? 1 : 0,
+            historySize: snapshot ? 1 : 0,
+          };
+        }
+        return pasteVisible
           ? {
-              cursorX: 0,
-              cursorY: snapshot ? 1 : 0,
-              historySize: snapshot ? 1 : 0,
+              cursorX: 4,
+              cursorY: 0,
+              historySize: 0,
             }
           : {
               cursorX: 0,
@@ -460,6 +469,9 @@ describe("tmux runner latency behavior", () => {
       async getPaneState() {
         return state;
       },
+      async capturePane() {
+        return "";
+      },
     } as unknown as TmuxClient;
 
     await expect(
@@ -514,6 +526,9 @@ describe("tmux runner latency behavior", () => {
         }
         return state;
       },
+      async capturePane() {
+        return "";
+      },
     } as unknown as TmuxClient;
 
     await expect(
@@ -530,20 +545,115 @@ describe("tmux runner latency behavior", () => {
     expect(state.historySize).toBe(8);
   });
 
-  test("submitTmuxSessionInput fails when pane state never confirms submit", async () => {
+  test("submitTmuxSessionInput revalidates paste visibility before Enter without re-pasting", async () => {
+    let sendLiteralCount = 0;
+    let capturePaneCount = 0;
+    let enterCount = 0;
+    let state = {
+      cursorX: 4,
+      cursorY: 0,
+      historySize: 0,
+    };
+    let snapshot = "";
+
     const fakeTmux = {
       async sendLiteral() {
-        return;
+        sendLiteralCount += 1;
+        snapshot = "ping";
+      },
+      async sendKey() {
+        enterCount += 1;
+        state = {
+          cursorX: 0,
+          cursorY: 1,
+          historySize: 1,
+        };
+      },
+      async getPaneState() {
+        return state;
+      },
+      async capturePane() {
+        capturePaneCount += 1;
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      submitTmuxSessionInput({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        text: "ping",
+        promptSubmitDelayMs: 1,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(sendLiteralCount).toBe(1);
+    expect(capturePaneCount).toBeGreaterThanOrEqual(2);
+    expect(enterCount).toBe(1);
+  });
+
+  test("submitTmuxSessionInput fails when paste never becomes visible", async () => {
+    let sendLiteralCount = 0;
+    let capturePaneCount = 0;
+    let enterCount = 0;
+    const fakeTmux = {
+      async sendLiteral() {
+        sendLiteralCount += 1;
+      },
+      async sendKey() {
+        enterCount += 1;
+      },
+      async getPaneState() {
+        return {
+          cursorX: 4,
+          cursorY: 0,
+          historySize: 0,
+        };
+      },
+      async capturePane() {
+        capturePaneCount += 1;
+        return "";
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      submitTmuxSessionInput({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        text: "ping",
+        promptSubmitDelayMs: 1,
+      }),
+    ).rejects.toThrow("tmux paste was not confirmed before Enter");
+
+    expect(sendLiteralCount).toBe(1);
+    expect(capturePaneCount).toBeGreaterThanOrEqual(2);
+    expect(enterCount).toBe(0);
+  });
+
+  test("submitTmuxSessionInput fails when pane state never confirms submit", async () => {
+    let sendLiteralCount = 0;
+    let state = {
+      cursorX: 4,
+      cursorY: 0,
+      historySize: 0,
+    };
+    const fakeTmux = {
+      async sendLiteral() {
+        sendLiteralCount += 1;
+        state = {
+          cursorX: 8,
+          cursorY: 0,
+          historySize: 0,
+        };
       },
       async sendKey() {
         return;
       },
       async getPaneState() {
-        return {
-          cursorX: 8,
-          cursorY: 0,
-          historySize: 0,
-        };
+        return state;
+      },
+      async capturePane() {
+        return "";
       },
     } as unknown as TmuxClient;
 
@@ -555,5 +665,7 @@ describe("tmux runner latency behavior", () => {
         promptSubmitDelayMs: 1,
       }),
     ).rejects.toThrow("tmux submit was not confirmed after Enter");
+
+    expect(sendLiteralCount).toBe(1);
   });
 });

@@ -6,6 +6,12 @@ Investigate and fix cases where a routed user message appears to reach `clisbot`
 
 The reported symptom is that the human sends a message, nothing gets processed, then asks again once or twice and only then the prompt takes effect. The issue is reported more often on Telegram than on Slack.
 
+Bounded retry rule for this flow:
+
+- startup: one fresh-start retry if the runner times out before ready state
+- paste: one confirmation revalidation if prompt delivery is not yet visibly confirmed
+- submit: one retry if `Enter` still does not confirm execution
+
 ## Status
 
 In Progress
@@ -43,8 +49,11 @@ The fix must respect the project requirement that stability and speed are both f
 - there is now a real user report that first-turn submit sometimes does not take effect until one or two extra follow-up messages are sent
 - the issue appears more common on Telegram than on Slack, which suggests either different timing pressure, different follow-up behavior, or different visibility of a shared runner weakness
 - current implementation work in this slice now uses tmux bracketed paste for literal prompt injection instead of raw `send-keys -l`
-- current implementation work now treats submit as tentatively incomplete until pane state changes after `Enter`
-- current implementation work retries only `Enter` once when pane state stays unchanged inside a short confirmation budget, instead of re-sending the whole prompt
+- current implementation work now treats prompt delivery and post-`Enter` submit confirmation as separate phases
+- current implementation work now applies one bounded retry at each relevant phase:
+  - one fresh-start retry if startup times out before ready state
+  - one paste confirmation revalidation if prompt delivery is still not visible
+  - one `Enter` retry if submit confirmation still does not arrive
 - live Claude tracing on April 13, 2026 confirmed two concrete runner-side gaps:
   - Claude trust prompt startup text had drifted away from the older Codex-style trust prompt detection, so a fresh Claude workspace could still be blocked even when higher layers thought startup had finished
   - multiline prompt paste could become visibly settled only after the fixed `promptSubmitDelayMs`, so the first `Enter` could be sent too early and get ignored
@@ -76,14 +85,18 @@ The fix must respect the project requirement that stability and speed are both f
 
 - prompt text injection now uses tmux buffer paste with bracketed paste mode so multiline and long prompt delivery is less fragile than raw literal key injection
 - after the configured minimum `promptSubmitDelayMs`, clisbot now waits for visible paste settlement before locking the pre-submit pane baseline
+- if that visible paste confirmation never arrives from pane-state polling, clisbot revalidates once via `capture-pane` before failing with an explicit paste-unconfirmed error
 - clisbot then sends `Enter` and waits only a short confirmation window for pane state to change
 - if pane state still does not change, clisbot retries only `Enter` once
 - if pane state remains unchanged after that second `Enter`, clisbot throws an explicit submit-unconfirmed error instead of pretending the prompt was submitted
+- if startup times out under a configured ready-pattern gate, clisbot does one fresh-start retry before surfacing the startup failure
 - latency instrumentation now emits:
+  - `tmux-paste-retry`
+  - `tmux-paste-unconfirmed`
   - `tmux-submit-enter-retry`
   - `tmux-submit-unconfirmed`
 - this keeps the retry truthful and narrow:
-  - no duplicate prompt body resend
+  - no duplicate prompt body resend during paste confirmation
   - no open-ended polling
   - only one extra `Enter`
 - this strategy is still provisional:

@@ -11,6 +11,8 @@ const PASTE_SETTLE_POLL_INTERVAL_MS = 40;
 const PASTE_SETTLE_QUIET_WINDOW_MS = 60;
 const PASTE_SETTLE_MULTILINE_MAX_WAIT_MS = 800;
 const PASTE_SETTLE_SINGLE_LINE_MAX_WAIT_MS = 80;
+const PASTE_CAPTURE_REVALIDATE_POLL_INTERVAL_MS = 40;
+const PASTE_CAPTURE_REVALIDATE_MAX_WAIT_MS = 160;
 const SUBMIT_CONFIRM_POLL_INTERVAL_MS = 40;
 const SUBMIT_CONFIRM_MAX_WAIT_MS = 160;
 const TMUX_MISSING_TARGET_PATTERN = /(?:no current target|can't find pane|can't find window)/i;
@@ -50,14 +52,39 @@ export async function submitTmuxSessionInput(params: {
   timingContext?: LatencyDebugContext;
 }) {
   const prePasteState = await params.tmux.getPaneState(params.sessionName);
+  const captureLines = estimatePasteCaptureLines(params.text);
+  const prePasteSnapshot = normalizePaneText(
+    await params.tmux.capturePane(params.sessionName, captureLines),
+  );
   await params.tmux.sendLiteral(params.sessionName, params.text);
-  const preSubmitState = await waitForPanePasteSettlement({
+  const pasteSettlement = await waitForPanePasteSettlement({
     tmux: params.tmux,
     sessionName: params.sessionName,
     baseline: prePasteState,
     text: params.text,
     minDelayMs: params.promptSubmitDelayMs,
   });
+  let preSubmitState = pasteSettlement.state;
+  if (!pasteSettlement.visible) {
+    logLatencyDebug("tmux-paste-retry", params.timingContext, {
+      sessionName: params.sessionName,
+    });
+    const snapshotConfirmed = await waitForPanePasteSnapshotConfirmation({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      baselineSnapshot: prePasteSnapshot,
+      captureLines,
+    });
+    if (!snapshotConfirmed) {
+      logLatencyDebug("tmux-paste-unconfirmed", params.timingContext, {
+        sessionName: params.sessionName,
+      });
+      throw new Error(
+        "tmux paste was not confirmed before Enter. The pane state did not change, so clisbot did not treat the prompt as visibly delivered.",
+      );
+    }
+    preSubmitState = await params.tmux.getPaneState(params.sessionName);
+  }
 
   await params.tmux.sendKey(params.sessionName, "Enter");
   if (
@@ -341,12 +368,18 @@ async function waitForPanePasteSettlement(params: {
 
   while (true) {
     if (sawChange && Date.now() - lastChangeAt >= PASTE_SETTLE_QUIET_WINDOW_MS) {
-      return currentState;
+      return {
+        visible: true,
+        state: currentState,
+      };
     }
 
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) {
-      return currentState;
+      return {
+        visible: sawChange,
+        state: currentState,
+      };
     }
 
     await sleep(Math.min(PASTE_SETTLE_POLL_INTERVAL_MS, remainingMs));
@@ -359,6 +392,34 @@ async function waitForPanePasteSettlement(params: {
       lastChangeAt = Date.now();
     }
   }
+}
+
+async function waitForPanePasteSnapshotConfirmation(params: {
+  tmux: TmuxClient;
+  sessionName: string;
+  baselineSnapshot: string;
+  captureLines: number;
+}) {
+  const deadline = Date.now() + PASTE_CAPTURE_REVALIDATE_MAX_WAIT_MS;
+
+  while (true) {
+    const snapshot = normalizePaneText(
+      await params.tmux.capturePane(params.sessionName, params.captureLines),
+    );
+    if (snapshot !== params.baselineSnapshot) {
+      return true;
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      return false;
+    }
+    await sleep(Math.min(PASTE_CAPTURE_REVALIDATE_POLL_INTERVAL_MS, remainingMs));
+  }
+}
+
+function estimatePasteCaptureLines(text: string) {
+  return Math.max(40, Math.min(160, text.split("\n").length + 24));
 }
 
 function hasPaneStateChanged(left: TmuxPaneState, right: TmuxPaneState) {
