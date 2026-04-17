@@ -22,6 +22,7 @@ import {
 } from "./api.ts";
 import {
   getTelegramUpdateSkipReason,
+  hasForeignTelegramMention,
   hasTelegramBotMention,
   isReplyToTelegramBot,
   isTelegramBotOriginatedMessage,
@@ -534,6 +535,10 @@ export class TelegramPollingService {
       Boolean(slashCommand && rawText.startsWith("/"));
     const followUpState =
       await this.agentService.getConversationFollowUpState(routeInfo.sessionTarget);
+    if (hasForeignTelegramMention(rawText, this.botUsername)) {
+      await this.processedEventsStore.markCompleted(eventId);
+      return;
+    }
     const effectiveFollowUpMode = resolveFollowUpMode({
       defaultMode: routeInfo.route.followUp.mode,
       overrideMode: followUpState.overrideMode,

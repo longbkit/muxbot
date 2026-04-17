@@ -102,15 +102,25 @@ export function canUseImplicitSlackFollowUp(params: {
 }
 
 export function hasBotMention(text: string, botUserId?: string) {
-  if (!text) {
+  const mentions = extractSlackMentionedUserIds(text);
+  if (botUserId) {
+    return mentions.includes(botUserId);
+  }
+
+  return mentions.length > 0;
+}
+
+export function hasForeignSlackUserMention(text: string, botUserId?: string) {
+  const mentions = extractSlackMentionedUserIds(text);
+  if (mentions.length === 0) {
     return false;
   }
 
-  if (botUserId) {
-    return text.includes(`<@${botUserId}>`);
+  if (!botUserId) {
+    return true;
   }
 
-  return /<@[^>]+>/.test(text);
+  return !mentions.includes(botUserId);
 }
 
 export function stripBotMention(text: string, botUserId?: string) {
@@ -132,4 +142,14 @@ export function resolveSlackDirectReplyThreadTs(params: {
 
   const messageTs = (params.messageTs ?? "").trim();
   return messageTs || undefined;
+}
+
+function extractSlackMentionedUserIds(text: string) {
+  if (!text) {
+    return [];
+  }
+
+  return [...text.matchAll(/<@([A-Z0-9_]+)(?:\|[^>]+)?>/gi)]
+    .map((match) => match[1]?.trim())
+    .filter((value): value is string => Boolean(value));
 }

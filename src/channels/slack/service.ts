@@ -40,6 +40,7 @@ import { App } from "./bolt-compat.ts";
 import {
   canUseImplicitSlackFollowUp,
   getSlackEventSkipReason,
+  hasForeignSlackUserMention,
   hasBotMention,
   isBotOriginatedSlackEvent,
   isImplicitBotThreadReply,
@@ -398,6 +399,14 @@ export class SlackSocketService {
       conversationKind: params.conversationKind,
       replyToMode: params.route.replyToMode,
     });
+    if (hasForeignSlackUserMention(event.text ?? "", this.botUserId)) {
+      debugSlackEvent("drop-foreign-mention", {
+        eventId,
+        channelId,
+      });
+      await this.processedEventsStore.markCompleted(eventId);
+      return;
+    }
     const explicitMention =
       params.wasMentioned || hasBotMention(event.text ?? "", this.botUserId);
     const followUpState =

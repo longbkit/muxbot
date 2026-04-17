@@ -62,8 +62,21 @@ export function hasTelegramBotMention(text: string, botUsername?: string) {
     return false;
   }
 
-  const pattern = new RegExp(`(^|\\s)@${escapeRegExp(normalizedBotUsername)}\\b`, "i");
-  return pattern.test(text);
+  return extractTelegramMentionTargets(text).includes(normalizedBotUsername.toLowerCase());
+}
+
+export function hasForeignTelegramMention(text: string, botUsername?: string) {
+  const mentions = extractTelegramMentionTargets(text);
+  if (mentions.length === 0) {
+    return false;
+  }
+
+  const normalizedBotUsername = (botUsername ?? "").trim().replace(/^@/, "").toLowerCase();
+  if (!normalizedBotUsername) {
+    return true;
+  }
+
+  return !mentions.includes(normalizedBotUsername);
 }
 
 export function stripTelegramBotMention(text: string, botUsername?: string) {
@@ -86,4 +99,30 @@ export function isReplyToTelegramBot(message: TelegramMessage, botUserId?: numbe
 
 function escapeRegExp(raw: string) {
   return raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractTelegramMentionTargets(text: string) {
+  if (!text) {
+    return [];
+  }
+
+  const matches = new Set<string>();
+  const mentionPattern = /(^|\s)@([A-Za-z0-9_]{2,32})\b/g;
+  const slashCommandTargetPattern = /(^|\s)\/[A-Za-z0-9_]+@([A-Za-z0-9_]{2,32})\b/g;
+
+  for (const match of text.matchAll(mentionPattern)) {
+    const username = match[2]?.trim().toLowerCase();
+    if (username) {
+      matches.add(username);
+    }
+  }
+
+  for (const match of text.matchAll(slashCommandTargetPattern)) {
+    const username = match[2]?.trim().toLowerCase();
+    if (username) {
+      matches.add(username);
+    }
+  }
+
+  return [...matches];
 }

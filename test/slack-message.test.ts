@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   canUseImplicitSlackFollowUp,
   getSlackEventSkipReason,
+  hasForeignSlackUserMention,
   hasBotMention,
   isBotOriginatedSlackEvent,
   isImplicitBotThreadReply,
@@ -116,6 +117,13 @@ describe("slack message helpers", () => {
     expect(hasBotMention("<@U_BOT> reply with pong", "U_BOT")).toBe(true);
     expect(stripBotMention("<@U_BOT> reply with pong", "U_BOT")).toBe("reply with pong");
     expect(stripBotMention("reply with pong", "U_BOT")).toBe("reply with pong");
+  });
+
+  test("treats Slack user mentions for someone else as foreign mentions", () => {
+    expect(hasForeignSlackUserMention("<@U_OTHER> please check", "U_BOT")).toBe(true);
+    expect(hasForeignSlackUserMention("<@U_BOT> please check", "U_BOT")).toBe(false);
+    expect(hasForeignSlackUserMention("<@U_BOT> <@U_OTHER> please check", "U_BOT")).toBe(false);
+    expect(hasForeignSlackUserMention("plain follow-up", "U_BOT")).toBe(false);
   });
 
   test("uses the resolved Slack thread ts for DM replies and falls back to message ts", () => {
