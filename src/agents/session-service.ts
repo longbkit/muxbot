@@ -368,6 +368,31 @@ export class SessionService {
     return this.activeRuns.get(target.sessionKey)?.steeringReady ?? false;
   }
 
+  async submitSessionInput(target: AgentSessionTarget, text: string) {
+    const result = await this.runnerSessions.submitSessionInput(target, text);
+    const run = this.activeRuns.get(target.sessionKey);
+    if (!run) {
+      return result;
+    }
+
+    const startedAt = Date.now();
+    run.startedAt = startedAt;
+    if (run.latestUpdate.status === "detached") {
+      run.latestUpdate = this.createRunUpdate({
+        resolved: run.resolved,
+        status: "running",
+        snapshot: run.latestUpdate.snapshot,
+        fullSnapshot: run.latestUpdate.fullSnapshot,
+        initialSnapshot: run.latestUpdate.initialSnapshot,
+      });
+    }
+    await this.sessionState.setSessionRuntime(run.resolved, {
+      state: "running",
+      startedAt,
+    });
+    return result;
+  }
+
   async stop() {
     this.stopping = true;
     const activeRuns = [...this.activeRuns.values()];

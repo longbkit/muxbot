@@ -22,6 +22,8 @@ function createResolvedTarget(): ResolvedAgentTarget {
       args: [],
       trustWorkspace: true,
       startupDelayMs: 3000,
+      startupRetryCount: 2,
+      startupRetryDelayMs: 1000,
       promptSubmitDelayMs: 10,
       sessionId: {
         create: {
@@ -354,5 +356,53 @@ describe("SessionService observer delivery", () => {
     expect(restartParams.prompt).toBe(MID_RUN_RECOVERY_CONTINUE_PROMPT);
     expect(restartParams.recoveryAttempt).toBe(2);
     expect(MID_RUN_RECOVERY_MAX_ATTEMPTS).toBe(2);
+  });
+
+  test("submitSessionInput resets the detach window for an active run", async () => {
+    const resolved = createResolvedTarget();
+    const setSessionRuntime = mock(async () => undefined);
+    const submitSessionInput = mock(async () => ({
+      agentId: resolved.agentId,
+      sessionKey: resolved.sessionKey,
+      sessionName: resolved.sessionName,
+      workspacePath: resolved.workspacePath,
+    }));
+    const manager = new SessionService(
+      {} as TmuxClient,
+      {
+        setSessionRuntime,
+      } as unknown as AgentSessionState,
+      {
+        submitSessionInput,
+      } as unknown as RunnerService,
+      () => resolved,
+    ) as any;
+    const run = createRun(resolved, new Map());
+    run.startedAt = 123;
+    run.latestUpdate = createUpdate(resolved, {
+      status: "detached",
+      snapshot: "Still working through the repository.",
+      fullSnapshot: "Still working through the repository.",
+      initialSnapshot: "",
+      note: "detached note",
+    });
+    manager.activeRuns.set(resolved.sessionKey, run);
+
+    const before = Date.now();
+    await manager.submitSessionInput(
+      { agentId: resolved.agentId, sessionKey: resolved.sessionKey },
+      "follow up",
+    );
+    const after = Date.now();
+
+    expect(submitSessionInput).toHaveBeenCalledTimes(1);
+    expect(run.startedAt).toBeGreaterThanOrEqual(before);
+    expect(run.startedAt).toBeLessThanOrEqual(after);
+    expect(run.latestUpdate.status).toBe("running");
+    expect(run.latestUpdate.note).toBeUndefined();
+    expect(setSessionRuntime).toHaveBeenCalledWith(resolved, {
+      state: "running",
+      startedAt: run.startedAt,
+    });
   });
 });

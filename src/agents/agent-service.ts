@@ -330,7 +330,7 @@ export class AgentService {
   }
 
   async submitSessionInput(target: AgentSessionTarget, text: string) {
-    return this.runnerSessions.submitSessionInput(target, text);
+    return this.activeRuns.submitSessionInput(target, text);
   }
 
   isSessionBusy(target: AgentSessionTarget) {
