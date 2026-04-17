@@ -29,7 +29,9 @@ export function renderSlackRouteChoiceMessage(params: {
   channelId: string;
   botLabel?: string;
 }) {
-  const botHandle = params.botLabel?.trim() ? `@${params.botLabel.trim()}` : "@<botname>";
+  const botReference = params.botLabel?.trim()
+    ? `mention this bot (${params.botLabel.trim()})`
+    : "mention this bot";
   return [
     "clisbot: this Slack channel is not configured yet.",
     "",
@@ -37,17 +39,47 @@ export function renderSlackRouteChoiceMessage(params: {
     `- \`clisbot channels add slack-channel ${params.channelId}\``,
     `- \`clisbot channels add slack-channel ${params.channelId} --agent <id>\``,
     "",
-    `After that, mention \`${botHandle} \\start\` or \`${botHandle} \\status\` here.`,
+    `After that, ${botReference} and send \`\\start\` or \`\\status\` here.`,
   ].join("\n");
 }
 
 export function renderSlackMentionRequiredMessage(botLabel?: string) {
-  const botHandle = botLabel?.trim() ? `@${botLabel.trim()}` : "@<botname>";
+  const botReference = botLabel?.trim()
+    ? `mention this bot (${botLabel.trim()})`
+    : "mention this bot";
   return [
     "clisbot: this Slack channel requires a bot mention for new commands.",
-    `Try \`${botHandle} \\start\` or \`${botHandle} \\status\` here.`,
+    `Try ${botReference} and send \`\\start\` or \`\\status\` here.`,
     "After the bot replies in a thread, normal follow-up messages there can continue according to the follow-up policy.",
   ].join("\n");
+}
+
+export function shouldSendSlackMentionRequiredGuidance(params: {
+  conversationKind: "channel" | "group" | "dm";
+  isCommandLike: boolean;
+}) {
+  return params.conversationKind === "dm" && params.isCommandLike;
+}
+
+export function shouldGuideUnroutedSlackEvent(params: {
+  conversationKind: "channel" | "group" | "dm";
+  isCommandLike: boolean;
+  wasMentioned: boolean;
+  isBotOriginated: boolean;
+}) {
+  if (params.isBotOriginated) {
+    return false;
+  }
+
+  if (!params.isCommandLike) {
+    return false;
+  }
+
+  if (params.conversationKind === "dm") {
+    return true;
+  }
+
+  return params.wasMentioned;
 }
 
 export async function sendSlackGuidanceOnce(params: {

@@ -7,6 +7,8 @@ import {
   renderSlackMentionRequiredMessage,
   renderSlackRouteChoiceMessage,
   sendSlackGuidanceOnce,
+  shouldGuideUnroutedSlackEvent,
+  shouldSendSlackMentionRequiredGuidance,
 } from "../src/channels/slack/feedback.ts";
 import { ProcessedEventsStore } from "../src/channels/processed-events-store.ts";
 
@@ -33,15 +35,89 @@ describe("slack feedback helpers", () => {
     expect(text).toContain("this Slack channel is not configured yet");
     expect(text).toContain("`clisbot channels add slack-channel C123`");
     expect(text).toContain("`clisbot channels add slack-channel C123 --agent <id>`");
-    expect(text).toContain("`@clisbot \\start`");
+    expect(text).toContain("mention this bot (clisbot)");
+    expect(text).toContain("`\\start`");
+    expect(text).not.toContain("@clisbot");
   });
 
   test("renders mention-required guidance with concrete examples", () => {
     const text = renderSlackMentionRequiredMessage("clisbot");
 
     expect(text).toContain("requires a bot mention");
-    expect(text).toContain("`@clisbot \\start`");
-    expect(text).toContain("`@clisbot \\status`");
+    expect(text).toContain("mention this bot (clisbot)");
+    expect(text).toContain("`\\start`");
+    expect(text).toContain("`\\status`");
+    expect(text).not.toContain("@clisbot");
+  });
+
+  test("mention-required guidance stays silent in shared channels and groups", () => {
+    expect(
+      shouldSendSlackMentionRequiredGuidance({
+        conversationKind: "channel",
+        isCommandLike: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSendSlackMentionRequiredGuidance({
+        conversationKind: "group",
+        isCommandLike: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSendSlackMentionRequiredGuidance({
+        conversationKind: "dm",
+        isCommandLike: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendSlackMentionRequiredGuidance({
+        conversationKind: "dm",
+        isCommandLike: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("unrouted shared-channel guidance requires mention and drops bot-originated events", () => {
+    expect(
+      shouldGuideUnroutedSlackEvent({
+        conversationKind: "channel",
+        isCommandLike: true,
+        wasMentioned: false,
+        isBotOriginated: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldGuideUnroutedSlackEvent({
+        conversationKind: "channel",
+        isCommandLike: true,
+        wasMentioned: true,
+        isBotOriginated: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldGuideUnroutedSlackEvent({
+        conversationKind: "group",
+        isCommandLike: true,
+        wasMentioned: false,
+        isBotOriginated: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldGuideUnroutedSlackEvent({
+        conversationKind: "dm",
+        isCommandLike: true,
+        wasMentioned: false,
+        isBotOriginated: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldGuideUnroutedSlackEvent({
+        conversationKind: "channel",
+        isCommandLike: true,
+        wasMentioned: true,
+        isBotOriginated: true,
+      }),
+    ).toBe(false);
   });
 
   test("guidance posts only once per processed event id", async () => {

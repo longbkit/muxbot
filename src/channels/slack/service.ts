@@ -55,6 +55,8 @@ import {
   isSlackCommandLikeMessage,
   renderSlackMentionRequiredMessage,
   renderSlackRouteChoiceMessage,
+  shouldSendSlackMentionRequiredGuidance,
+  shouldGuideUnroutedSlackEvent,
   sendSlackGuidanceOnce,
 } from "./feedback.ts";
 import { resolveSlackAttachmentPaths } from "./attachments.ts";
@@ -417,12 +419,16 @@ export class SlackSocketService {
           directReplyToBot: isImplicitBotThreadReply(event, this.botUserId),
         }));
     if (requiresMention && !wasMentioned) {
+      const isCommandLike = isSlackCommandLikeMessage({
+        text: event.text ?? "",
+        botUserId: this.botUserId,
+        botUsername: this.botLabel,
+        commandPrefixes: params.route.commandPrefixes,
+      });
       if (
-        isSlackCommandLikeMessage({
-          text: event.text ?? "",
-          botUserId: this.botUserId,
-          botUsername: this.botLabel,
-          commandPrefixes: params.route.commandPrefixes,
+        shouldSendSlackMentionRequiredGuidance({
+          conversationKind: params.conversationKind,
+          isCommandLike,
         })
       ) {
         try {
@@ -440,6 +446,7 @@ export class SlackSocketService {
         channelId,
         requiresMention,
         explicitMention,
+        isCommandLike,
         effectiveFollowUpMode,
       });
       await this.processedEventsStore.markCompleted(eventId);
@@ -674,6 +681,16 @@ export class SlackSocketService {
       );
       const route = resolvedRoute.route;
       if (!route) {
+        if (
+          isBotOriginatedSlackEvent(normalizedEvent) &&
+          !this.loadedConfig.raw.channels.slack.allowBots
+        ) {
+          debugSlackEvent("drop-unrouted-bot-mention", {
+            eventId: body.event_id,
+            allowBots: this.loadedConfig.raw.channels.slack.allowBots,
+          });
+          return;
+        }
         try {
           await this.maybeGuideUnroutedSlackEvent({
             eventId: body.event_id,
@@ -721,12 +738,18 @@ export class SlackSocketService {
       const route = resolvedRoute.route;
 
       if (!route) {
-        const shouldGuide =
-          isSlackCommandLikeMessage({
+        const shouldGuide = shouldGuideUnroutedSlackEvent({
+          conversationKind: resolvedRoute.conversationKind,
+          isCommandLike: isSlackCommandLikeMessage({
             text: normalizedEvent.text ?? "",
             botUserId: this.botUserId,
             botUsername: this.botLabel,
             commandPrefixes: this.loadedConfig.raw.channels.slack.commandPrefixes,
+          }),
+          wasMentioned: hasBotMention(normalizedEvent.text ?? "", this.botUserId),
+          isBotOriginated:
+            isBotOriginatedSlackEvent(normalizedEvent) &&
+            !this.loadedConfig.raw.channels.slack.allowBots,
         });
         if (shouldGuide) {
           try {
