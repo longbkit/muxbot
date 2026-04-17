@@ -15,6 +15,8 @@ const PASTE_CAPTURE_REVALIDATE_POLL_INTERVAL_MS = 40;
 const PASTE_CAPTURE_REVALIDATE_MAX_WAIT_MS = 160;
 const SUBMIT_CONFIRM_POLL_INTERVAL_MS = 40;
 const SUBMIT_CONFIRM_MAX_WAIT_MS = 160;
+const SUBMIT_SNAPSHOT_CONFIRM_POLL_INTERVAL_MS = 40;
+const SUBMIT_SNAPSHOT_CONFIRM_MAX_WAIT_MS = 320;
 const TMUX_MISSING_TARGET_PATTERN = /(?:no current target|can't find pane|can't find window)/i;
 const TMUX_MISSING_SESSION_PATTERN = /(?:can't find session:|no server running on )/i;
 const TMUX_SERVER_UNAVAILABLE_PATTERN = /(?:No such file or directory|error connecting to|failed to connect to server)/i;
@@ -79,11 +81,10 @@ export async function submitTmuxSessionInput(params: {
       logLatencyDebug("tmux-paste-unconfirmed", params.timingContext, {
         sessionName: params.sessionName,
       });
-      throw new Error(
-        "tmux paste was not confirmed before Enter. The pane state did not change, so clisbot did not treat the prompt as visibly delivered.",
-      );
+      preSubmitState = prePasteState;
+    } else {
+      preSubmitState = await params.tmux.getPaneState(params.sessionName);
     }
-    preSubmitState = await params.tmux.getPaneState(params.sessionName);
   }
 
   await params.tmux.sendKey(params.sessionName, "Enter");
@@ -92,6 +93,8 @@ export async function submitTmuxSessionInput(params: {
       tmux: params.tmux,
       sessionName: params.sessionName,
       baseline: preSubmitState,
+      baselineSnapshot: prePasteSnapshot,
+      captureLines,
     })
   ) {
     return;
@@ -106,9 +109,17 @@ export async function submitTmuxSessionInput(params: {
       tmux: params.tmux,
       sessionName: params.sessionName,
       baseline: preSubmitState,
+      baselineSnapshot: prePasteSnapshot,
+      captureLines,
     })
   ) {
     return;
+  }
+
+  if (!pasteSettlement.visible) {
+    throw new Error(
+      "tmux paste was not confirmed before Enter, and submission still could not be confirmed after Enter. clisbot did not treat the prompt as truthfully delivered.",
+    );
   }
 
   logLatencyDebug("tmux-submit-unconfirmed", params.timingContext, {
@@ -332,6 +343,8 @@ async function waitForPaneSubmitConfirmation(params: {
   tmux: TmuxClient;
   sessionName: string;
   baseline: TmuxPaneState;
+  baselineSnapshot: string;
+  captureLines: number;
 }) {
   const deadline = Date.now() + SUBMIT_CONFIRM_MAX_WAIT_MS;
   while (true) {
@@ -340,11 +353,50 @@ async function waitForPaneSubmitConfirmation(params: {
       return true;
     }
 
+    const snapshotChanged = await waitForPaneSubmitSnapshotConfirmation({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      baselineSnapshot: params.baselineSnapshot,
+      captureLines: params.captureLines,
+      maxWaitMs: Math.min(
+        SUBMIT_SNAPSHOT_CONFIRM_MAX_WAIT_MS,
+        Math.max(0, deadline - Date.now()),
+      ),
+    });
+    if (snapshotChanged) {
+      return true;
+    }
+
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) {
       return false;
     }
     await sleep(Math.min(SUBMIT_CONFIRM_POLL_INTERVAL_MS, remainingMs));
+  }
+}
+
+async function waitForPaneSubmitSnapshotConfirmation(params: {
+  tmux: TmuxClient;
+  sessionName: string;
+  baselineSnapshot: string;
+  captureLines: number;
+  maxWaitMs: number;
+}) {
+  const deadline = Date.now() + params.maxWaitMs;
+
+  while (true) {
+    const snapshot = normalizePaneText(
+      await params.tmux.capturePane(params.sessionName, params.captureLines),
+    );
+    if (snapshot !== params.baselineSnapshot) {
+      return true;
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      return false;
+    }
+    await sleep(Math.min(SUBMIT_SNAPSHOT_CONFIRM_POLL_INTERVAL_MS, remainingMs));
   }
 }
 
