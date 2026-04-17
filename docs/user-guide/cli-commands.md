@@ -140,8 +140,8 @@ Important behavior:
 - `clisbot agents list`
 - `clisbot agents list --bindings`
 - `clisbot agents list --json`
-- `clisbot agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bootstrap <personal-assistant|team-assistant>] [--bind <channel[:accountId]>]...`
-- `clisbot agents bootstrap <id> --mode <personal-assistant|team-assistant> [--force]`
+- `clisbot agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>] [--bind <channel[:accountId]>]...`
+- `clisbot agents bootstrap <id> --bot-type <personal|team> [--force]`
 - `clisbot agents bindings [--agent <id>] [--json]`
 - `clisbot agents bind --agent <id> --bind <channel[:accountId]>`
 - `clisbot agents unbind --agent <id> [--bind <channel[:accountId]> | --all]`

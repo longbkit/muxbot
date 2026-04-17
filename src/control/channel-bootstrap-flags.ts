@@ -31,15 +31,15 @@ function isLiteralToken(token?: ParsedTokenInput) {
   return token?.kind === "mem";
 }
 
-function parseBotType(rawValue: string) {
+export function parseBotType(rawValue: string) {
   const value = rawValue.trim().toLowerCase();
-  if (value === "personal" || value === "personal-assistant") {
+  if (value === "personal") {
     return "personal-assistant" satisfies AgentBootstrapMode;
   }
-  if (value === "team" || value === "team-assistant") {
+  if (value === "team") {
     return "team-assistant" satisfies AgentBootstrapMode;
   }
-  throw new Error(`Invalid bot type: ${rawValue}`);
+  throw new Error(`Invalid bot type: ${rawValue}. Expected personal or team.`);
 }
 
 function parseOptionValue(args: string[], name: string, index: number) {
@@ -113,11 +113,6 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
     const arg = args[index];
     if (arg === "--cli") {
       cliTool = parseOptionValue(args, arg, index) as AgentCliToolId;
-      index += 1;
-      continue;
-    }
-    if (arg === "--bootstrap") {
-      bootstrap = parseBotType(parseOptionValue(args, arg, index));
       index += 1;
       continue;
     }

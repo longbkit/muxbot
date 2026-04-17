@@ -32,15 +32,15 @@ describe("parseBootstrapFlags", () => {
     expect(parsed.bootstrap).toBe("team-assistant");
   });
 
-  test("keeps --bootstrap as a compatibility alias", () => {
-    const parsed = parseBootstrapFlags([
-      "--bootstrap",
-      "team-assistant",
-      "--telegram-bot-token",
-      "TELEGRAM_BOT_TOKEN",
-    ]);
-
-    expect(parsed.bootstrap).toBe("team-assistant");
+  test("rejects legacy --bootstrap alias", () => {
+    expect(() =>
+      parseBootstrapFlags([
+        "--bootstrap",
+        "team-assistant",
+        "--telegram-bot-token",
+        "TELEGRAM_BOT_TOKEN",
+      ]),
+    ).toThrow("Unknown option for start/init: --bootstrap");
   });
 
   test("rejects unknown bot types", () => {

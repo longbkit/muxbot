@@ -314,10 +314,11 @@ function appendBootstrapGuidance(lines: string[], summary: RuntimeOperatorSummar
   lines.push("");
   lines.push("Guidance:");
   for (const agent of pendingBootstrap) {
+    const botType = agent.bootstrapMode === "team-assistant" ? "team" : "personal";
     if (agent.bootstrapState === "missing") {
       lines.push(`  Agent ${agent.id} is missing bootstrap files.`);
       lines.push(`    workspace: ${agent.workspacePath}`);
-      lines.push(`    run: clisbot agents bootstrap ${agent.id} --mode ${agent.bootstrapMode}`);
+      lines.push(`    run: clisbot agents bootstrap ${agent.id} --bot-type ${botType}`);
       continue;
     }
 

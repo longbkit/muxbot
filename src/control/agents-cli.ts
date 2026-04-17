@@ -2,7 +2,6 @@ import { applyTemplate, expandHomePath } from "../shared/paths.ts";
 import {
   buildRunnerFromToolTemplate,
   DEFAULT_AGENT_TOOL_TEMPLATES,
-  SUPPORTED_BOOTSTRAP_MODES,
   type AgentBootstrapMode,
   type AgentCliToolId,
   inferAgentCliToolId,
@@ -11,6 +10,7 @@ import { type ClisbotConfig } from "../config/schema.ts";
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
 import { applyBootstrapTemplate, getBootstrapWorkspaceState } from "../agents/bootstrap.ts";
 import { formatBinding } from "../config/bindings.ts";
+import { parseBotType } from "./channel-bootstrap-flags.ts";
 import type {
   AdditionalMessageMode,
   ResponseMode,
@@ -74,8 +74,8 @@ function renderAgentsHelp() {
     "  clisbot agents --help",
     "  clisbot agents help",
     "  clisbot agents list [--bindings] [--json]",
-    "  clisbot agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bootstrap <personal-assistant|team-assistant>] [--bind <channel[:accountId]>]...",
-    "  clisbot agents bootstrap <id> --mode <personal-assistant|team-assistant> [--force]",
+    "  clisbot agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>] [--bind <channel[:accountId]>]...",
+    "  clisbot agents bootstrap <id> --bot-type <personal|team> [--force]",
     "  clisbot agents bindings [--agent <id>] [--json]",
     "  clisbot agents bind --agent <id> --bind <channel[:accountId]>",
     "  clisbot agents unbind --agent <id> [--bind <channel[:accountId]> | --all]",
@@ -341,7 +341,13 @@ export async function addAgentToEditableConfig(params: AddAgentParams) {
 async function addAgent(args: string[]) {
   const agentId = args[0]?.trim();
   if (!agentId) {
-    throw new Error("Usage: agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bootstrap <personal-assistant|team-assistant>] [--bind <channel[:accountId]>]...");
+    throw new Error("Usage: agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>] [--bind <channel[:accountId]>]...");
+  }
+  if (hasFlag(args, "--bootstrap")) {
+    throw new Error("agents add no longer accepts --bootstrap; use --bot-type personal or --bot-type team");
+  }
+  if (hasFlag(args, "--mode")) {
+    throw new Error("agents add does not use --mode; use --bot-type personal or --bot-type team");
   }
 
   const cliTool = parseSingleOption(args, "--cli") as AgentCliToolId | undefined;
@@ -351,9 +357,10 @@ async function addAgent(args: string[]) {
 
   const workspace = parseSingleOption(args, "--workspace");
   const startupOptions = parseRepeatedOption(args, "--startup-option");
-  const bootstrap = parseSingleOption(args, "--bootstrap") as AgentBootstrapMode | undefined;
-  if (hasFlag(args, "--bootstrap") && (!bootstrap || !SUPPORTED_BOOTSTRAP_MODES.includes(bootstrap))) {
-    throw new Error("--bootstrap requires personal-assistant or team-assistant");
+  let bootstrap: AgentBootstrapMode | undefined;
+  const botType = parseSingleOption(args, "--bot-type");
+  if (botType) {
+    bootstrap = parseBotType(botType);
   }
 
   const bindings = parseRepeatedOption(args, "--bind").map(parseBinding);
@@ -381,14 +388,23 @@ async function bootstrapAgent(args: string[]) {
   const agentId = args[0]?.trim();
   if (!agentId) {
     throw new Error(
-      "Usage: agents bootstrap <id> --mode <personal-assistant|team-assistant> [--force]",
+      "Usage: agents bootstrap <id> --bot-type <personal|team> [--force]",
+    );
+  }
+  if (hasFlag(args, "--mode")) {
+    throw new Error("agents bootstrap no longer accepts --mode; use --bot-type personal or --bot-type team");
+  }
+  if (hasFlag(args, "--bootstrap")) {
+    throw new Error(
+      "agents bootstrap does not use --bootstrap; use --bot-type personal or --bot-type team",
     );
   }
 
-  const mode = parseSingleOption(args, "--mode") as AgentBootstrapMode | undefined;
-  if (!mode || !SUPPORTED_BOOTSTRAP_MODES.includes(mode)) {
-    throw new Error("agents bootstrap requires --mode personal-assistant or --mode team-assistant");
+  const botType = parseSingleOption(args, "--bot-type");
+  if (!botType) {
+    throw new Error("agents bootstrap requires --bot-type personal or --bot-type team");
   }
+  const mode = parseBotType(botType);
 
   const force = hasFlag(args, "--force");
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());

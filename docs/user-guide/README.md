@@ -169,7 +169,7 @@ Current subcommands:
 - `clisbot agents list --bindings`
 - `clisbot agents list --json`
 - `clisbot agents add <id> --cli <codex|claude|gemini>`
-- `clisbot agents bootstrap <id> --mode <personal-assistant|team-assistant>`
+- `clisbot agents bootstrap <id> --bot-type <personal|team>`
 - `clisbot agents bindings`
 - `clisbot agents bindings --agent <id>`
 - `clisbot agents bind --agent <id> --bind <channel[:accountId]>`
@@ -188,11 +188,10 @@ Important rules:
 - supported tools are `codex`, `claude`, and `gemini`
 - `--startup-option` may be repeated
 - when `--startup-option` is omitted, clisbot uses the built-in startup options for the selected CLI
-- public first-run `start` or `init` uses `--bot-type personal|team`; the `agents` CLI below is the lower-level workspace-template surface
-- if `--bootstrap` is present, it must be `personal-assistant` or `team-assistant`
-- `personal-assistant` fits one assistant for one human
-- `team-assistant` fits one shared assistant for a team, channel, or group workflow
-- `agents bootstrap` requires `--mode`
+- `start`, `init`, `agents add`, and `agents bootstrap` all use the same public flag: `--bot-type personal|team`
+- `--bot-type personal` fits one assistant for one human
+- `--bot-type team` fits one shared assistant for a team, channel, or group workflow
+- `agents bootstrap` requires `--bot-type`
 - `agents bootstrap` uses the agent's configured CLI tool to decide which tool-specific bootstrap file is required
 - `agents bootstrap` runs a dry conflict check first and asks for `--force` before overwriting any template markdown file
 - `--bind` may be repeated and currently accepts `slack`, `telegram`, `slack:<accountId>`, or `telegram:<accountId>`
@@ -206,7 +205,7 @@ clisbot agents add work --cli claude --bind telegram
 ```
 
 ```bash
-clisbot agents add gem --cli gemini --bootstrap personal-assistant
+clisbot agents add gem --cli gemini --bot-type personal
 ```
 
 ```bash
@@ -214,11 +213,11 @@ clisbot agents bind --agent work --bind slack:ops
 ```
 
 ```bash
-clisbot agents add ops --cli codex --startup-option --dangerously-skip-permissions --bootstrap team-assistant --bind telegram:ops
+clisbot agents add ops --cli codex --startup-option --dangerously-skip-permissions --bot-type team --bind telegram:ops
 ```
 
 ```bash
-clisbot agents bootstrap ops --mode team-assistant --force
+clisbot agents bootstrap ops --bot-type team --force
 ```
 
 Binding behavior:

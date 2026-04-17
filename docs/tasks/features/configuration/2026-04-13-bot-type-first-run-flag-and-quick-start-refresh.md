@@ -2,19 +2,18 @@
 
 ## Summary
 
-Replace the public first-run `start` and `init` surface from:
-
-```bash
-clisbot start --cli codex --bootstrap personal-assistant
-```
-
-to:
+Replace the public bootstrap CLI surface with a single operator-facing flag:
 
 ```bash
 clisbot start --cli codex --bot-type personal
 ```
 
-while keeping `--bootstrap` as a backward-compatible parser alias for existing scripts.
+and keep the same shape across:
+
+```bash
+clisbot agents add default --cli codex --bot-type personal
+clisbot agents bootstrap default --bot-type personal
+```
 
 ## Status
 
@@ -22,21 +21,22 @@ Done
 
 ## Why
 
-`--bootstrap personal-assistant` is accurate internally but heavier than necessary for first-run operators.
+`--bootstrap personal-assistant` and `--mode team-assistant` leak internal naming into the CLI surface.
 
 The public surface should optimize for:
 
 - fast comprehension on first run
+- one flag name across all bootstrap entry points
 - wording that matches the product choice the operator is actually making
 - quick-start docs that lead with Telegram plus inline token input
 - a clear `--persist` upgrade path so later runs can use plain `clisbot start`
 
 ## Scope
 
-- add `--bot-type <personal|team>` for `clisbot start` and `clisbot init`
+- use `--bot-type <personal|team>` for `clisbot start`, `clisbot init`, `clisbot agents add`, and `clisbot agents bootstrap`
 - map `personal` to internal bootstrap mode `personal-assistant`
 - map `team` to internal bootstrap mode `team-assistant`
-- keep `--bootstrap` working as a compatibility alias without documenting it on `start` or `init`
+- reject legacy `--bootstrap` and `--mode` flags instead of keeping compatibility aliases
 - update first-run warnings, help text, runtime summaries, README, and user-guide examples
 - move README quick-start emphasis to Telegram-first plus `--persist`
 - keep env-backed setup documented, but lower in prominence than inline-token quick start
@@ -45,14 +45,14 @@ The public surface should optimize for:
 ## Non-Goals
 
 - renaming internal bootstrap modes
-- changing `clisbot agents add --bootstrap ...`
-- changing `clisbot agents bootstrap --mode ...`
-- removing backward compatibility for existing automation that still uses `--bootstrap`
+- changing persisted internal bootstrap mode values
+- renaming bootstrap templates or workspace file contracts
 
 ## Implementation Notes
 
-- `src/control/channel-bootstrap-flags.ts` is the only new translation layer; it normalizes `--bot-type` and legacy `--bootstrap` into the existing internal bootstrap modes.
-- `src/main.ts`, `src/control/runtime-summary.ts`, and `src/control/startup-bootstrap.ts` now present only `--bot-type` in first-run guidance.
+- `src/control/channel-bootstrap-flags.ts` normalizes `--bot-type personal|team` into the existing internal bootstrap modes and rejects legacy aliases.
+- `src/control/agents-cli.ts` uses the same `--bot-type` parser so `start`, `init`, `agents add`, and `agents bootstrap` share one contract.
+- `src/main.ts`, `src/control/runtime-summary.ts`, and `src/control/startup-bootstrap.ts` present only `--bot-type` in operator guidance.
 - visible quick-start docs now lead with:
   - Telegram first
   - inline token first
@@ -63,6 +63,7 @@ The public surface should optimize for:
 
 - `clisbot start --cli codex --bot-type personal --telegram-bot-token ...` works
 - `clisbot init --cli claude --bot-type team ...` works
-- first-run help and status no longer tell operators to use `start --bootstrap ...`
-- README and user guide use `--bot-type` for `start` and `init`
-- tests cover canonical `--bot-type` parsing and backward-compatible `--bootstrap` alias handling
+- `clisbot agents add default --cli codex --bot-type personal` works
+- `clisbot agents bootstrap default --bot-type team --force` works
+- help, status, README, and user guide no longer tell operators to use `--bootstrap` or `--mode`
+- tests cover canonical `--bot-type` parsing and legacy flag rejection

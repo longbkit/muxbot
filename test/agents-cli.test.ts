@@ -33,8 +33,8 @@ describe("agents cli", () => {
       "codex",
       "--workspace",
       join(tempDir, "workspaces", "default"),
-      "--bootstrap",
-      "personal-assistant",
+      "--bot-type",
+      "personal",
       "--bind",
       "slack",
     ]);
@@ -103,8 +103,8 @@ describe("agents cli", () => {
       "codex",
       "--workspace",
       join(tempDir, "workspaces", "team"),
-      "--bootstrap",
-      "team-assistant",
+      "--bot-type",
+      "team",
     ]);
 
     const userMd = readFileSync(
@@ -155,8 +155,8 @@ describe("agents cli", () => {
       "gemini",
       "--workspace",
       join(tempDir, "workspaces", "gem"),
-      "--bootstrap",
-      "team-assistant",
+      "--bot-type",
+      "team",
     ]);
 
     const rawConfig = JSON.parse(
@@ -375,17 +375,37 @@ describe("agents cli", () => {
     writeFileSync(join(workspacePath, "IDENTITY.md"), "custom identity\n");
 
     await expect(
-      runAgentsCli(["bootstrap", "work", "--mode", "team-assistant"]),
+      runAgentsCli(["bootstrap", "work", "--bot-type", "team"]),
     ).rejects.toThrow("Run again with --force to overwrite.");
 
     expect(readFileSync(join(workspacePath, "IDENTITY.md"), "utf8")).toBe("custom identity\n");
 
-    await runAgentsCli(["bootstrap", "work", "--mode", "team-assistant", "--force"]);
+    await runAgentsCli(["bootstrap", "work", "--bot-type", "team", "--force"]);
 
     expect(existsSync(join(workspacePath, "CLAUDE.md"))).toBe(true);
     expect(existsSync(join(workspacePath, "AGENTS.md"))).toBe(false);
     expect(existsSync(join(workspacePath, "LOOP.md"))).toBe(true);
     expect(readFileSync(join(workspacePath, "IDENTITY.md"), "utf8")).not.toBe("custom identity\n");
     expect(output.join("\n")).toContain("Rebootstrapped agent work with claude/team-assistant");
+  });
+
+  test("rejects legacy agent bootstrap flags", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-agents-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+
+    await expect(
+      runAgentsCli(["add", "legacy", "--cli", "codex", "--bootstrap", "personal-assistant"]),
+    ).rejects.toThrow(
+      "agents add no longer accepts --bootstrap; use --bot-type personal or --bot-type team",
+    );
+
+    await runAgentsCli(["add", "work", "--cli", "claude"]);
+
+    await expect(
+      runAgentsCli(["bootstrap", "work", "--mode", "team-assistant"]),
+    ).rejects.toThrow(
+      "agents bootstrap no longer accepts --mode; use --bot-type personal or --bot-type team",
+    );
   });
 });
