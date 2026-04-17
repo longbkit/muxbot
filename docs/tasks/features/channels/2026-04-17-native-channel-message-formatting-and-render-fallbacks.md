@@ -4,6 +4,11 @@
 
 Improve `clisbot` reply readability by making channel output feel native to each surface instead of looking like plain text pasted into Slack or Telegram.
 
+Shipped follow-up note:
+
+- the current message command surface now uses `--body-file` as the preferred file-backed body option, with `--message-file` kept only as a compatibility alias
+- bot-facing guidance still prefers `--message` with inline text or heredoc bodies instead of file-backed payloads
+
 This task focuses on two complementary paths:
 
 1. AI passes a channel-native safe format directly when the model is good enough
@@ -100,6 +105,7 @@ Examples:
 
 ## Related Docs
 
+- [Message Command Formatting And Render Modes](../../../features/channels/message-command-formatting-and-render-modes.md)
 - [Structured Channel Rendering And Native Surface Capabilities](2026-04-14-structured-channel-rendering-and-native-surface-capabilities.md)
 - [docs/features/channels/README.md](../../../features/channels/README.md)
 - [docs/features/non-functionals/stability/README.md](../../../features/non-functionals/stability/README.md)

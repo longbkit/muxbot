@@ -1,5 +1,7 @@
 import { callTelegramApi } from "./api.ts";
+import { TelegramApiError } from "./api.ts";
 import { sleep } from "../../shared/process.ts";
+import type { TelegramWireFormat } from "./content.ts";
 
 const TELEGRAM_MIN_EDIT_INTERVAL_MS = 4000;
 const lastTelegramEditAtByMessage = new Map<string, number>();
@@ -51,6 +53,37 @@ export type TelegramPostedMessageChunk = {
   messageId: number;
 };
 
+type TelegramTextPayload = {
+  text: string;
+  parseMode?: "HTML";
+};
+
+function buildTelegramTextPayload(params: {
+  text: string;
+  wireFormat?: TelegramWireFormat;
+}): TelegramTextPayload {
+  if (params.wireFormat !== "html") {
+    return {
+      text: params.text,
+    };
+  }
+
+  return {
+    text: params.text,
+    parseMode: "HTML",
+  };
+}
+
+function isTelegramHtmlParseError(error: unknown) {
+  return (
+    error instanceof TelegramApiError &&
+    error.errorCode === 400 &&
+    /can't parse entities|unsupported start tag|unexpected end tag|entity beginning/i.test(
+      error.description,
+    )
+  );
+}
+
 function splitTelegramText(text: string, maxChars = 3900) {
   if (!text) {
     return [];
@@ -90,26 +123,70 @@ export async function postTelegramText(params: {
   text: string;
   topicId?: number;
   omitThreadId?: boolean;
+  wireFormat?: TelegramWireFormat;
 }) {
   const posted: TelegramPostedMessageChunk[] = [];
-  const chunks = splitTelegramText(params.text);
+  const rawChunks = splitTelegramText(params.text);
 
-  for (const chunk of chunks) {
-    const response = await callTelegramApi<{ message_id: number }>(
-      params.token,
-      "sendMessage",
-      {
-        chat_id: params.chatId,
+  try {
+    for (const chunk of rawChunks) {
+      const payload = buildTelegramTextPayload({
         text: chunk,
-        ...(params.topicId != null && !params.omitThreadId
-          ? { message_thread_id: params.topicId }
-          : {}),
-      },
-    );
-    posted.push({
-      text: chunk,
-      messageId: response.message_id,
-    });
+        wireFormat: params.wireFormat,
+      });
+      const response = await callTelegramApi<{ message_id: number }>(
+        params.token,
+        "sendMessage",
+        {
+          chat_id: params.chatId,
+          text: payload.text,
+          ...(payload.parseMode ? { parse_mode: payload.parseMode } : {}),
+          ...(params.topicId != null && !params.omitThreadId
+            ? { message_thread_id: params.topicId }
+            : {}),
+        },
+      );
+      posted.push({
+        text: payload.text,
+        messageId: response.message_id,
+      });
+    }
+  } catch (error) {
+    if (params.wireFormat !== "html" || !isTelegramHtmlParseError(error)) {
+      throw error;
+    }
+
+    for (const chunk of posted) {
+      await callTelegramApi(params.token, "deleteMessage", {
+        chat_id: params.chatId,
+        message_id: chunk.messageId,
+      });
+      lastTelegramEditAtByMessage.delete(
+        getTelegramEditKey({
+          token: params.token,
+          chatId: params.chatId,
+          messageId: chunk.messageId,
+        }),
+      );
+    }
+    posted.length = 0;
+    for (const chunk of rawChunks) {
+      const response = await callTelegramApi<{ message_id: number }>(
+        params.token,
+        "sendMessage",
+        {
+          chat_id: params.chatId,
+          text: chunk,
+          ...(params.topicId != null && !params.omitThreadId
+            ? { message_thread_id: params.topicId }
+            : {}),
+        },
+      );
+      posted.push({
+        text: chunk,
+        messageId: response.message_id,
+      });
+    }
   }
 
   return posted;
@@ -122,89 +199,114 @@ export async function reconcileTelegramText(params: {
   text: string;
   topicId?: number;
   omitThreadId?: boolean;
+  wireFormat?: TelegramWireFormat;
 }) {
-  const nextTexts = splitTelegramText(params.text);
-  const reconciled: TelegramPostedMessageChunk[] = [];
-  const sharedCount = Math.min(params.chunks.length, nextTexts.length);
+  const rawNextTexts = splitTelegramText(params.text);
+  const reconcileWithTexts = async (nextTexts: string[], parseMode?: "HTML") => {
+    const reconciled: TelegramPostedMessageChunk[] = [];
+    const sharedCount = Math.min(params.chunks.length, nextTexts.length);
 
-  for (let index = 0; index < sharedCount; index += 1) {
-    const existingChunk = params.chunks[index];
-    const nextText = nextTexts[index];
-    if (!existingChunk || !nextText) {
-      continue;
-    }
+    for (let index = 0; index < sharedCount; index += 1) {
+      const existingChunk = params.chunks[index];
+      const nextText = nextTexts[index];
+      if (!existingChunk || !nextText) {
+        continue;
+      }
 
-    if (existingChunk.text !== nextText) {
-      await paceTelegramEdit({
-        token: params.token,
-        chatId: params.chatId,
+      if (existingChunk.text !== nextText) {
+        await paceTelegramEdit({
+          token: params.token,
+          chatId: params.chatId,
+          messageId: existingChunk.messageId,
+        });
+        await callTelegramApi(
+          params.token,
+          "editMessageText",
+          {
+            chat_id: params.chatId,
+            message_id: existingChunk.messageId,
+            text: nextText,
+            ...(parseMode ? { parse_mode: parseMode } : {}),
+          },
+        );
+        recordTelegramEdit({
+          token: params.token,
+          chatId: params.chatId,
+          messageId: existingChunk.messageId,
+        });
+      }
+
+      reconciled.push({
+        text: nextText,
         messageId: existingChunk.messageId,
       });
-      await callTelegramApi(
+    }
+
+    for (let index = sharedCount; index < nextTexts.length; index += 1) {
+      const nextText = nextTexts[index];
+      if (!nextText) {
+        continue;
+      }
+
+      const response = await callTelegramApi<{ message_id: number }>(
         params.token,
-        "editMessageText",
+        "sendMessage",
         {
           chat_id: params.chatId,
-          message_id: existingChunk.messageId,
           text: nextText,
+          ...(parseMode ? { parse_mode: parseMode } : {}),
+          ...(params.topicId != null && !params.omitThreadId
+            ? { message_thread_id: params.topicId }
+            : {}),
         },
       );
-      recordTelegramEdit({
-        token: params.token,
-        chatId: params.chatId,
-        messageId: existingChunk.messageId,
+      reconciled.push({
+        text: nextText,
+        messageId: response.message_id,
       });
     }
 
-    reconciled.push({
-      text: nextText,
-      messageId: existingChunk.messageId,
-    });
-  }
+    for (let index = nextTexts.length; index < params.chunks.length; index += 1) {
+      const staleChunk = params.chunks[index];
+      if (!staleChunk) {
+        continue;
+      }
 
-  for (let index = sharedCount; index < nextTexts.length; index += 1) {
-    const nextText = nextTexts[index];
-    if (!nextText) {
-      continue;
-    }
-
-    const response = await callTelegramApi<{ message_id: number }>(
-      params.token,
-      "sendMessage",
-      {
+      await callTelegramApi(params.token, "deleteMessage", {
         chat_id: params.chatId,
-        text: nextText,
-        ...(params.topicId != null && !params.omitThreadId
-          ? { message_thread_id: params.topicId }
-          : {}),
-      },
-    );
-    reconciled.push({
-      text: nextText,
-      messageId: response.message_id,
-    });
-  }
-
-  for (let index = nextTexts.length; index < params.chunks.length; index += 1) {
-    const staleChunk = params.chunks[index];
-    if (!staleChunk) {
-      continue;
+        message_id: staleChunk.messageId,
+      });
+      lastTelegramEditAtByMessage.delete(
+        getTelegramEditKey({
+          token: params.token,
+          chatId: params.chatId,
+          messageId: staleChunk.messageId,
+        }),
+      );
     }
 
-    await callTelegramApi(params.token, "deleteMessage", {
-      chat_id: params.chatId,
-      message_id: staleChunk.messageId,
-    });
-    lastTelegramEditAtByMessage.delete(
-      getTelegramEditKey({
-        token: params.token,
-        chatId: params.chatId,
-        messageId: staleChunk.messageId,
-      }),
-    );
+    return reconciled;
+  };
+
+  if (params.wireFormat !== "html") {
+    return await reconcileWithTexts(rawNextTexts);
   }
 
-  return reconciled;
+  try {
+    const renderedTexts = rawNextTexts.map((text) =>
+      buildTelegramTextPayload({
+        text,
+        wireFormat: params.wireFormat,
+      }).text
+    );
+    return await reconcileWithTexts(renderedTexts, "HTML");
+  } catch (error) {
+    if (!isTelegramHtmlParseError(error)) {
+      throw error;
+    }
+
+    return await reconcileWithTexts(rawNextTexts);
+  }
 }
 
 export function shouldOmitTelegramThreadId(topicId?: number) {

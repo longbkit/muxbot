@@ -114,6 +114,26 @@ Examples:
 - `clisbot message pins ...`
 - `clisbot message search ...`
 
+Important behavior:
+
+- `message send` and `message edit` now accept:
+  - `--input <plain|md|html|mrkdwn|blocks>`
+  - `--render <native|none|html|mrkdwn|blocks>`
+  - `--body-file <path>` as an alternative to `--message`
+  - `--message-file <path>` as a compatibility alias for `--body-file`
+- default behavior is intentionally short and stable:
+  - `--input md`
+  - `--render native`
+- `native` means channel-owned rendering:
+  - Telegram currently resolves to Telegram-safe HTML
+  - Slack currently resolves to Slack `mrkdwn`
+- use `--render none` when the content is already in the destination-native format
+  - Telegram example: `--input html --render none`
+  - Slack example: `--input mrkdwn --render none`
+  - Slack raw Block Kit example: `--input blocks --render none`
+- use `--render blocks` when you want Slack Block Kit output from markdown input
+- for the full contract, channel matrix, and current renderer behavior, see [Message Command Formatting And Render Modes](../features/channels/message-command-formatting-and-render-modes.md)
+
 ## Agents
 
 - `clisbot agents help`

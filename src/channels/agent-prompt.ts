@@ -17,6 +17,7 @@ You are operating inside clisbot.
 {{delivery_intro}}
 {{reply_command}}
 {{reply_rules}}
+{{reply_style_hint}}
 ${CONFIGURATION_GUIDANCE}{{protected_control_suffix}}
 </system>
 
@@ -72,16 +73,27 @@ export const FINAL_RULE_OPTIONAL = "final response is optional";
 
 export const EMPTY_REPLY_COMMAND = "";
 export const EMPTY_REPLY_RULES = "";
+export const EMPTY_REPLY_STYLE_HINT = "";
 
 export const SLACK_REPLY_COMMAND_BASE = `{{command}} message send \\
   --channel slack \\
 {{account_clause}}  --target channel:{{channel_id}} \\
-{{thread_clause}}`;
+{{thread_clause}}  --input md \\
+  --render blocks \\
+`;
 
 export const TELEGRAM_REPLY_COMMAND_BASE = `{{command}} message send \\
   --channel telegram \\
 {{account_clause}}  --target {{chat_id}} \\
-{{thread_clause}}`;
+{{thread_clause}}  --input md \\
+  --render native \\
+`;
+
+export const SLACK_REPLY_STYLE_HINT =
+  "Put readable hierarchical Markdown in the --message body.";
+
+export const TELEGRAM_REPLY_STYLE_HINT =
+  "Put readable hierarchical Markdown in the --message body.";
 
 export const ACCOUNT_CLAUSE = "  --account {{account_id}} \\\n";
 export const EMPTY_ACCOUNT_CLAUSE = "";
@@ -153,6 +165,7 @@ function buildChannelPromptText(params: {
     delivery_intro: promptParts.deliveryIntro,
     reply_command: promptParts.replyCommand,
     reply_rules: promptParts.replyRules,
+    reply_style_hint: promptParts.replyStyleHint,
     protected_control_suffix: renderProtectedControlSuffix(
       params.protectedControlMutationRule,
     ),
@@ -172,6 +185,7 @@ function renderMessagePromptParts(params: {
       deliveryIntro: DELIVERY_INTRO_CAPTURE_PANE,
       replyCommand: EMPTY_REPLY_COMMAND,
       replyRules: EMPTY_REPLY_RULES,
+      replyStyleHint: EMPTY_REPLY_STYLE_HINT,
     };
   }
 
@@ -200,7 +214,14 @@ function renderMessagePromptParts(params: {
       }),
       final_rule_line: finalRuleLine,
     }),
+    replyStyleHint: buildReplyStyleHint(params.identity),
   };
+}
+
+function buildReplyStyleHint(identity: ChannelIdentity) {
+  return identity.platform === "slack"
+    ? SLACK_REPLY_STYLE_HINT
+    : TELEGRAM_REPLY_STYLE_HINT;
 }
 
 function renderProtectedControlSuffix(rule?: string) {

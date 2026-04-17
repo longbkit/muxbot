@@ -198,6 +198,7 @@ function buildOwnerAlertCommand(params: {
     account: params.accountId,
     target: params.platform === "slack" ? `user:${params.userId}` : params.userId,
     message: params.message,
+    messageFile: undefined,
     media: undefined,
     messageId: undefined,
     emoji: undefined,
@@ -213,6 +214,8 @@ function buildOwnerAlertCommand(params: {
     progress: false,
     final: false,
     json: false,
+    inputFormat: "md",
+    renderMode: "native",
   };
 }
 

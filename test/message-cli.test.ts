@@ -233,11 +233,13 @@ function createDependencies() {
             remove: command.remove,
             limit: command.limit,
             query: command.query,
-            pollQuestion: command.pollQuestion,
-            pollOptions: command.pollOptions,
-            progress: command.progress,
-            final: command.final,
-          };
+          pollQuestion: command.pollQuestion,
+          pollOptions: command.pollOptions,
+          inputFormat: command.inputFormat,
+          renderMode: command.renderMode,
+          progress: command.progress,
+          final: command.final,
+        };
           calls.push({ provider: "slack", action: command.action, params });
           return {
             accountId: command.account ?? "work",
@@ -314,6 +316,8 @@ function createDependencies() {
                   pollOptions: command.pollOptions,
                   forceDocument: command.forceDocument,
                   silent: command.silent,
+                  inputFormat: command.inputFormat,
+                  renderMode: command.renderMode,
                   progress: command.progress,
                   final: command.final,
                 };
@@ -397,6 +401,11 @@ describe("message cli", () => {
     expect(calls).toHaveLength(0);
     expect(logs[0]).toContain("clisbot message");
     expect(logs[0]).toContain("message send");
+    expect(logs[0]).toContain("--body-file");
+    expect(logs[0]).toContain("--message-file");
+    expect(logs[0]).toContain("--input <plain|md|html|mrkdwn|blocks>");
+    expect(logs[0]).toContain("--render <native|none|html|mrkdwn|blocks>");
+    expect(logs[0]).toContain("Render Rules:");
   });
 
   test("routes slack send through the resolved account config", async () => {
@@ -439,6 +448,8 @@ describe("message cli", () => {
           query: undefined,
           pollQuestion: undefined,
           pollOptions: [],
+          inputFormat: "md",
+          renderMode: "native",
           progress: false,
           final: false,
         },
@@ -578,6 +589,96 @@ describe("message cli", () => {
         materializeChannels: ["telegram"],
       },
     ]);
+  });
+
+  test("loads message body from --body-file", async () => {
+    const { deps, calls } = createDependencies();
+    const messageFile = "/tmp/clisbot-message-cli-test.txt";
+    await Bun.write(messageFile, "hello from file");
+
+    await runMessageCli(
+      [
+        "send",
+        "--channel",
+        "telegram",
+        "--target",
+        "-1001234567890",
+        "--body-file",
+        messageFile,
+      ],
+      deps,
+    );
+
+    expect(calls[0]).toEqual({
+      provider: "telegram",
+      action: "send",
+      params: {
+        botToken: "telegram-test",
+        target: "-1001234567890",
+        threadId: undefined,
+        replyTo: undefined,
+        message: "hello from file",
+        media: undefined,
+        messageId: undefined,
+        emoji: undefined,
+        remove: false,
+        limit: undefined,
+        query: undefined,
+        pollQuestion: undefined,
+        pollOptions: [],
+        forceDocument: false,
+        silent: false,
+        inputFormat: "md",
+        renderMode: "native",
+        progress: false,
+        final: false,
+      },
+    });
+  });
+
+  test("keeps --message-file as a compatibility alias", async () => {
+    const { deps, calls } = createDependencies();
+    const messageFile = "/tmp/clisbot-message-cli-test-compat.txt";
+    await Bun.write(messageFile, "hello from compat alias");
+
+    await runMessageCli(
+      [
+        "send",
+        "--channel",
+        "telegram",
+        "--target",
+        "-1001234567890",
+        "--message-file",
+        messageFile,
+      ],
+      deps,
+    );
+
+    expect(calls[0]).toEqual({
+      provider: "telegram",
+      action: "send",
+      params: {
+        botToken: "telegram-test",
+        target: "-1001234567890",
+        threadId: undefined,
+        replyTo: undefined,
+        message: "hello from compat alias",
+        media: undefined,
+        messageId: undefined,
+        emoji: undefined,
+        remove: false,
+        limit: undefined,
+        query: undefined,
+        pollQuestion: undefined,
+        pollOptions: [],
+        forceDocument: false,
+        silent: false,
+        inputFormat: "md",
+        renderMode: "native",
+        progress: false,
+        final: false,
+      },
+    });
   });
 
   test("rejects conflicting progress and final flags", async () => {

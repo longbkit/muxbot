@@ -2,6 +2,8 @@ import { basename } from "node:path";
 import { readFile } from "node:fs/promises";
 import { webApi as slackWebApi } from "@slack/bolt";
 import { deleteSlackMessage, postSlackText } from "./transport.ts";
+import { resolveSlackMessageContent } from "./content.ts";
+import type { MessageInputFormat, MessageRenderMode } from "../message-command.ts";
 
 const { WebClient } = slackWebApi;
 
@@ -26,6 +28,8 @@ export type SlackMessageActionParams = {
   query?: string;
   pollQuestion?: string;
   pollOptions?: string[];
+  inputFormat?: MessageInputFormat;
+  renderMode?: MessageRenderMode;
 };
 
 function createSlackClient(botToken: string) {
@@ -114,6 +118,11 @@ export async function sendSlackMessage(params: SlackMessageActionParams) {
     params.threadId,
     params.replyTo,
   );
+  const resolvedMessage = resolveSlackMessageContent({
+    text: params.message ?? "",
+    inputFormat: params.inputFormat ?? "md",
+    renderMode: params.renderMode ?? "native",
+  });
 
   if (params.media) {
     const media = await loadSlackMedia(params.media);
@@ -129,7 +138,7 @@ export async function sendSlackMessage(params: SlackMessageActionParams) {
     await filesClient.uploadV2({
       channel_id: target.channelId,
       thread_ts: target.threadTs,
-      initial_comment: params.message,
+      initial_comment: resolvedMessage.text,
       filename: media.filename,
       file: media.data,
     });
@@ -142,11 +151,26 @@ export async function sendSlackMessage(params: SlackMessageActionParams) {
     };
   }
 
-  const posted = await postSlackText(client as any, {
-    channel: target.channelId,
-    threadTs: target.threadTs,
-    text: params.message ?? "",
-  });
+  const posted = resolvedMessage.blocks
+    ? [
+        {
+          text: resolvedMessage.text,
+          ts:
+            (
+              await client.chat.postMessage({
+                channel: target.channelId,
+                thread_ts: target.threadTs,
+                text: resolvedMessage.apiText ?? resolvedMessage.text,
+                blocks: resolvedMessage.blocks,
+              } as any)
+            ).ts ?? "",
+        },
+      ].filter((entry) => entry.ts)
+    : await postSlackText(client as any, {
+        channel: target.channelId,
+        threadTs: target.threadTs,
+        text: resolvedMessage.text,
+      });
   return {
     ok: true,
     channel: target.channelId,
@@ -212,11 +236,17 @@ export async function editSlackMessage(params: SlackMessageActionParams) {
   }
   const client = createSlackClient(params.botToken);
   const target = await resolveSlackTarget(client, params.target);
+  const resolvedMessage = resolveSlackMessageContent({
+    text: params.message,
+    inputFormat: params.inputFormat ?? "md",
+    renderMode: params.renderMode ?? "native",
+  });
   await client.chat.update({
     channel: target.channelId,
     ts: params.messageId,
-    text: params.message,
-  });
+    text: resolvedMessage.apiText ?? resolvedMessage.text,
+    ...(resolvedMessage.blocks ? { blocks: resolvedMessage.blocks } : {}),
+  } as any);
   return { ok: true };
 }
 

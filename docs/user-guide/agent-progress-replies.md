@@ -36,6 +36,8 @@ Preferred reply pattern for multi-line or quote-heavy content:
   --channel slack \
   --target channel:C1234567890 \
   --thread-id 1712345678.123456 \
+  --input md \
+  --render native \
   --message "$(cat <<\__CLISBOT_MESSAGE__
 working on it
 
@@ -49,6 +51,49 @@ Why this exact form:
 - keep the delimiter unquoted as `<<\__CLISBOT_MESSAGE__` so the rendered prompt carries fewer nested quotes and is less likely to break when another tool wraps it inside JSON or shell strings
 - keep `__CLISBOT_MESSAGE__` alone on its own line when closing the heredoc
 - this pattern is now regression-tested against multi-line text, mixed quotes, shell-like text, steering-style blocks, and markdown code fences
+- `--input md --render native` is the shipped default, so the flags are optional; they are shown here because they make the reply contract explicit and easier to review
+
+Common render choices:
+
+- default markdown to native channel rendering:
+
+```bash
+~/.clisbot/bin/clisbot message send \
+  --channel telegram \
+  --target -1001234567890 \
+  --thread-id 42 \
+  --input md \
+  --render native \
+  --message "## Status\n\n- step 1 done"
+```
+
+- Telegram content already prepared as safe HTML:
+
+```bash
+~/.clisbot/bin/clisbot message send \
+  --channel telegram \
+  --target -1001234567890 \
+  --thread-id 42 \
+  --input html \
+  --render none \
+  --message "<b>Status</b>\n\nstep 1 done"
+```
+
+- Slack content already prepared as raw `mrkdwn`:
+
+```bash
+~/.clisbot/bin/clisbot message send \
+  --channel slack \
+  --target channel:C1234567890 \
+  --thread-id 1712345678.123456 \
+  --input mrkdwn \
+  --render none \
+  --message "*Status*\n• step 1 done"
+```
+
+For advanced operator workflows, `message send` also supports `--body-file <path>` for large payloads such as raw Slack Block Kit JSON, with `--message-file` kept as a compatibility alias. That path is intentionally not the promoted bot-facing default; injected agent reply guidance should keep using `--message` with normal inline text or heredoc bodies.
+
+For the full `--input` and `--render` contract, see [Message Command Formatting And Render Modes](../features/channels/message-command-formatting-and-render-modes.md).
 
 ## Important Rules
 

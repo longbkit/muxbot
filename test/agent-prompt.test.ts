@@ -42,6 +42,8 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("  --channel slack \\");
     expect(prompt).toContain("  --target channel:C123 \\");
     expect(prompt).toContain("  --thread-id 171234.5678 \\");
+    expect(prompt).toContain("  --input md \\");
+    expect(prompt).toContain("  --render blocks \\");
     expect(prompt).toContain("  --final \\");
     expect(prompt).toContain("--message \"$(cat <<\\__CLISBOT_MESSAGE__");
     expect(prompt).toContain("__CLISBOT_MESSAGE__");
@@ -51,6 +53,7 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("- use that command only for the final user-facing reply");
     expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
     expect(prompt).toContain("- send exactly 1 final user-facing response");
+    expect(prompt).toContain("Put readable hierarchical Markdown in the --message body.");
     expect(prompt).toContain(
       "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot channels --help`, or `clisbot auth --help` for details.",
     );
@@ -90,7 +93,10 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("  --channel telegram \\");
     expect(prompt).toContain("  --target -1001 \\");
     expect(prompt).toContain("  --thread-id 4 \\");
+    expect(prompt).toContain("  --input md \\");
+    expect(prompt).toContain("  --render native \\");
     expect(prompt).toContain("  --final \\");
+    expect(prompt).toContain("Put readable hierarchical Markdown in the --message body.");
     expect(prompt).toContain("topic Launch (4) in group Release Ops (-1001) | sender Alice Smith (123)");
   });
 
@@ -141,6 +147,7 @@ describe("agent prompt envelope", () => {
     expect(prompt).not.toContain("To send a user-visible progress update or final reply, use the following CLI command:");
     expect(prompt).not.toContain("/tmp/clis message send \\");
     expect(prompt).not.toContain("When replying to the user:");
+    expect(prompt).not.toContain("Put readable hierarchical Markdown in the --message body.");
     expect(prompt).not.toContain("- send at most 3 progress updates");
     expect(prompt).not.toContain("- send exactly 1 final user-facing response");
   });
@@ -174,6 +181,7 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
     expect(prompt).toContain("- use that command only for the final user-facing reply");
     expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
+    expect(prompt).toContain("Put readable hierarchical Markdown in the --message body.");
     expect(prompt).not.toContain("Gemini-specific rule:");
   });
 
@@ -201,11 +209,14 @@ describe("agent prompt envelope", () => {
     });
 
     expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
+    expect(prompt).toContain("  --input md \\");
+    expect(prompt).toContain("  --render native \\");
     expect(prompt).toContain("  --final|progress \\");
     expect(prompt).toContain("- use that command to send progress updates and the final reply back to the conversation");
     expect(prompt).toContain("- send at most 3 progress updates");
     expect(prompt).toContain("- send exactly 1 final user-facing response");
     expect(prompt).toContain("- keep progress updates short and meaningful");
+    expect(prompt).toContain("Put readable hierarchical Markdown in the --message body.");
     expect(prompt).toContain(
       "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot channels --help`, or `clisbot auth --help` for details.",
     );

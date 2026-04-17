@@ -42,6 +42,7 @@ import {
   shouldOmitTelegramThreadId,
   type TelegramPostedMessageChunk,
 } from "./transport.ts";
+import { resolveTelegramMessageContent } from "./content.ts";
 import { resolveTelegramAttachmentPaths } from "./attachments.ts";
 import { sleep } from "../../shared/process.ts";
 import type { TelegramAccountConfig } from "../../config/channel-accounts.ts";
@@ -240,12 +241,18 @@ export class TelegramPollingService {
           return;
         }
         const topicId = binding.topicId ? Number(binding.topicId) : undefined;
+        const renderedNotification = resolveTelegramMessageContent({
+          text,
+          inputFormat: "md",
+          renderMode: "native",
+        });
         await postTelegramText({
           token: this.accountConfig.botToken,
           chatId,
-          text,
+          text: renderedNotification.text,
           topicId: Number.isFinite(topicId) ? topicId : undefined,
           omitThreadId: shouldOmitTelegramThreadId(Number.isFinite(topicId) ? topicId : undefined),
+          wireFormat: renderedNotification.wireFormat,
         });
       },
     });
@@ -530,15 +537,15 @@ export class TelegramPollingService {
         }
       }
     }
+    if (hasForeignTelegramMention(rawText, this.botUsername)) {
+      await this.processedEventsStore.markCompleted(eventId);
+      return;
+    }
     const explicitMention =
       hasTelegramBotMention(rawText, this.botUsername) ||
       Boolean(slashCommand && rawText.startsWith("/"));
     const followUpState =
       await this.agentService.getConversationFollowUpState(routeInfo.sessionTarget);
-    if (hasForeignTelegramMention(rawText, this.botUsername)) {
-      await this.processedEventsStore.markCompleted(eventId);
-      return;
-    }
     const effectiveFollowUpMode = resolveFollowUpMode({
       defaultMode: routeInfo.route.followUp.mode,
       overrideMode: followUpState.overrideMode,
@@ -678,23 +685,35 @@ export class TelegramPollingService {
           maxChars: this.getTelegramMaxChars(routeInfo.route.agentId),
           timingContext,
           postText: async (nextText) => {
+            const renderedReply = resolveTelegramMessageContent({
+              text: nextText,
+              inputFormat: "md",
+              renderMode: "native",
+            });
             responseChunks = await postTelegramText({
               token: this.accountConfig.botToken,
               chatId: message.chat.id,
-              text: nextText,
+              text: renderedReply.text,
               topicId: routeInfo.topicId,
               omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
+              wireFormat: renderedReply.wireFormat,
             });
             return responseChunks;
           },
           reconcileText: async (chunks, nextText) => {
+            const renderedReply = resolveTelegramMessageContent({
+              text: nextText,
+              inputFormat: "md",
+              renderMode: "native",
+            });
             responseChunks = await reconcileTelegramText({
               token: this.accountConfig.botToken,
               chatId: message.chat.id,
               chunks,
-              text: nextText,
+              text: renderedReply.text,
               topicId: routeInfo.topicId,
               omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
+              wireFormat: renderedReply.wireFormat,
             });
             return responseChunks;
           },

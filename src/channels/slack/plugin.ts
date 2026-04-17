@@ -159,6 +159,8 @@ export const slackChannelPlugin: ChannelPlugin = {
       query: command.query,
       pollQuestion: command.pollQuestion,
       pollOptions: command.pollOptions,
+      inputFormat: command.inputFormat,
+      renderMode: command.renderMode,
     };
 
     switch (command.action) {

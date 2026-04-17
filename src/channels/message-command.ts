@@ -1,3 +1,6 @@
+export type MessageInputFormat = "plain" | "md" | "html" | "mrkdwn" | "blocks";
+export type MessageRenderMode = "native" | "none" | "html" | "mrkdwn" | "blocks";
+
 export type MessageAction =
   | "send"
   | "poll"
@@ -17,6 +20,7 @@ export type ParsedMessageCommand = {
   account?: string;
   target?: string;
   message?: string;
+  messageFile?: string;
   media?: string;
   messageId?: string;
   emoji?: string;
@@ -32,4 +36,6 @@ export type ParsedMessageCommand = {
   progress: boolean;
   final: boolean;
   json: boolean;
+  inputFormat: MessageInputFormat;
+  renderMode: MessageRenderMode;
 };
