@@ -38,6 +38,7 @@ type Deferred<T> = {
 };
 
 type ActiveRun = {
+  runId: string;
   resolved: ResolvedAgentTarget;
   observers: Map<string, RunObserver>;
   observerFailures: Map<string, number>;
@@ -144,6 +145,7 @@ function createDeferred<T>(): Deferred<T> {
 
 export class SessionService {
   private readonly activeRuns = new Map<string, ActiveRun>();
+  private nextRunId = 1;
   private stopping = false;
 
   constructor(
@@ -184,6 +186,7 @@ export class SessionService {
       });
 
       this.activeRuns.set(resolved.sessionKey, {
+        runId: this.allocateRunId(),
         resolved,
         observers: new Map(),
         observerFailures: new Map(),
@@ -193,6 +196,7 @@ export class SessionService {
         startedAt: entry.runtime.startedAt ?? Date.now(),
       });
       this.startRunMonitor(resolved.sessionKey, {
+        runId: this.activeRuns.get(resolved.sessionKey)?.runId ?? "",
         prompt: undefined,
         initialSnapshot: fullSnapshot,
         startedAt: entry.runtime.startedAt ?? Date.now(),
@@ -237,7 +241,9 @@ export class SessionService {
 
     const initialResult = createDeferred<AgentExecutionResult>();
     const provisionalResolved = this.resolveTarget(target);
+    const runId = this.allocateRunId();
     this.activeRuns.set(provisionalResolved.sessionKey, {
+      runId,
       resolved: provisionalResolved,
       observers: new Map([[observer.id, { ...observer }]]),
       observerFailures: new Map(),
@@ -289,6 +295,7 @@ export class SessionService {
         startedAt,
       });
       this.startRunMonitor(resolved.sessionKey, {
+        runId,
         prompt,
         initialSnapshot,
         startedAt,
@@ -298,7 +305,7 @@ export class SessionService {
 
       return initialResult.promise;
     } catch (error) {
-      await this.failActiveRun(provisionalResolved.sessionKey, error);
+      await this.failActiveRun(provisionalResolved.sessionKey, runId, error);
       throw error;
     }
   }
@@ -511,8 +518,8 @@ export class SessionService {
     }
   }
 
-  private async finishActiveRun(sessionKey: string, update: AgentExecutionResult) {
-    const run = this.activeRuns.get(sessionKey);
+  private async finishActiveRun(sessionKey: string, runId: string, update: AgentExecutionResult) {
+    const run = this.getRun(sessionKey, runId);
     if (!run) {
       return;
     }
@@ -525,8 +532,8 @@ export class SessionService {
     this.activeRuns.delete(run.resolved.sessionKey);
   }
 
-  private async failActiveRun(sessionKey: string, error: unknown) {
-    const run = this.activeRuns.get(sessionKey);
+  private async failActiveRun(sessionKey: string, runId: string, error: unknown) {
+    const run = this.getRun(sessionKey, runId);
     if (!run) {
       return;
     }
@@ -552,6 +559,7 @@ export class SessionService {
   private async recoverLostMidRun(
     sessionKey: string,
     params: {
+      runId: string;
       timingContext?: RunObserver["timingContext"];
       recoveryAttempt?: number;
     },
@@ -561,7 +569,7 @@ export class SessionService {
       return false;
     }
 
-    const run = this.activeRuns.get(sessionKey);
+    const run = this.getRun(sessionKey, params.runId);
     if (!run) {
       return true;
     }
@@ -581,7 +589,7 @@ export class SessionService {
     );
     try {
       const recovered = await this.runnerSessions.reopenRunContext(target, params.timingContext);
-      const currentRun = this.activeRuns.get(sessionKey);
+      const currentRun = this.getRun(sessionKey, params.runId);
       if (!currentRun) {
         return true;
       }
@@ -597,6 +605,7 @@ export class SessionService {
       });
       await this.notifyRunObservers(currentRun, currentRun.latestUpdate);
       this.startRunMonitor(sessionKey, {
+        runId: currentRun.runId,
         prompt: MID_RUN_RECOVERY_CONTINUE_PROMPT,
         initialSnapshot: recovered.initialSnapshot,
         startedAt: currentRun.startedAt,
@@ -614,13 +623,14 @@ export class SessionService {
         return await this.recoverLostMidRun(
           sessionKey,
           {
+            runId: params.runId,
             timingContext: params.timingContext,
             recoveryAttempt: recoveryAttempt + 1,
           },
           reopenError,
         );
       }
-      const currentRun = this.activeRuns.get(sessionKey);
+      const currentRun = this.getRun(sessionKey, params.runId);
       if (!currentRun) {
         return true;
       }
@@ -630,6 +640,7 @@ export class SessionService {
       } catch (freshError) {
         await this.failActiveRun(
           sessionKey,
+          currentRun.runId,
           await this.runnerSessions.mapRunError(
             freshError,
             currentRun.resolved.sessionName,
@@ -638,7 +649,11 @@ export class SessionService {
         );
         return true;
       }
-      await this.failActiveRun(sessionKey, new Error(buildRunRecoveryNote("fresh-required")));
+      await this.failActiveRun(
+        sessionKey,
+        currentRun.runId,
+        new Error(buildRunRecoveryNote("fresh-required")),
+      );
       return true;
     }
   }
@@ -646,6 +661,7 @@ export class SessionService {
   private startRunMonitor(
     sessionKey: string,
     params: {
+      runId: string;
       prompt?: string;
       initialSnapshot: string;
       startedAt: number;
@@ -655,7 +671,7 @@ export class SessionService {
       recoveryAttempt?: number;
     },
   ) {
-    const run = this.activeRuns.get(sessionKey);
+    const run = this.getRun(sessionKey, params.runId);
     if (!run) {
       return;
     }
@@ -680,14 +696,14 @@ export class SessionService {
           detachedAlready: params.detachedAlready,
           timingContext: params.timingContext,
           onPromptSubmitted: async () => {
-            const currentRun = this.activeRuns.get(sessionKey);
+            const currentRun = this.getRun(sessionKey, params.runId);
             if (!currentRun) {
               return;
             }
             currentRun.steeringReady = true;
           },
           onRunning: async (update) => {
-            const currentRun = this.activeRuns.get(sessionKey);
+            const currentRun = this.getRun(sessionKey, params.runId);
             if (!currentRun) {
               return;
             }
@@ -707,7 +723,7 @@ export class SessionService {
             );
           },
           onDetached: async (update) => {
-            const currentRun = this.activeRuns.get(sessionKey);
+            const currentRun = this.getRun(sessionKey, params.runId);
             if (!currentRun) {
               return;
             }
@@ -730,14 +746,18 @@ export class SessionService {
             currentRun.initialResult.resolve(detachedUpdate);
           },
           onCompleted: async (update) => {
+            const currentRun = this.getRun(sessionKey, params.runId);
+            if (!currentRun) {
+              return;
+            }
             const runUpdate = this.createRunUpdate({
-              resolved: run.resolved,
+              resolved: currentRun.resolved,
               status: "completed",
               snapshot: mergeRunSnapshot(params.snapshotPrefix ?? "", update.snapshot),
               fullSnapshot: update.fullSnapshot,
               initialSnapshot: update.initialSnapshot,
             });
-            await this.finishActiveRun(sessionKey, runUpdate);
+            await this.finishActiveRun(sessionKey, params.runId, runUpdate);
           },
         });
       } catch (error) {
@@ -745,6 +765,7 @@ export class SessionService {
           await this.recoverLostMidRun(
             sessionKey,
             {
+              runId: params.runId,
               timingContext: params.timingContext,
               recoveryAttempt: (params.recoveryAttempt ?? 0) + 1,
             },
@@ -755,6 +776,7 @@ export class SessionService {
         }
         await this.failActiveRun(
           sessionKey,
+          params.runId,
           await this.runnerSessions.mapRunError(
             error,
             run.resolved.sessionName,
@@ -763,5 +785,17 @@ export class SessionService {
         );
       }
     })();
+  }
+
+  private allocateRunId() {
+    return String(this.nextRunId++);
+  }
+
+  private getRun(sessionKey: string, runId: string) {
+    const run = this.activeRuns.get(sessionKey);
+    if (!run || run.runId !== runId) {
+      return null;
+    }
+    return run;
   }
 }

@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ActiveRunInProgressError, AgentService } from "../src/agents/agent-service.ts";
+import { AgentService } from "../src/agents/agent-service.ts";
+import { ClearedQueuedTaskError } from "../src/agents/job-queue.ts";
 import { resolveAgentTarget } from "../src/agents/resolved-target.ts";
 import { loadConfig, resolveSessionStorePath } from "../src/config/load-config.ts";
 import { AgentSessionState } from "../src/agents/session-state.ts";
@@ -2252,7 +2253,7 @@ describe("AgentService session identity", () => {
     }
   });
 
-  test("rejects a new prompt while a detached active run is still being monitored", async () => {
+  test("keeps a new prompt queued while a detached active run is still being monitored", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 
     try {
@@ -2313,13 +2314,117 @@ describe("AgentService session identity", () => {
       }).result;
       expect(first.status).toBe("detached");
 
-      const second = await service.enqueuePrompt(target, "ping", {
+      let secondSettled = false;
+      const second = service.enqueuePrompt(target, "ping", {
         onUpdate: () => undefined,
-      }).result.catch((error) => error);
+      });
+      void second.result.then(
+        () => {
+          secondSettled = true;
+        },
+        () => {
+          secondSettled = true;
+        },
+      );
 
-      expect(second).toBeInstanceOf(ActiveRunInProgressError);
-      expect((second as Error).message).toContain("/attach");
-      expect((second as Error).message).toContain("/watch every 30s");
+      await Bun.sleep(80);
+      expect(secondSettled).toBe(false);
+      expect(service.listQueuedPrompts(target).map((item) => item.text)).toEqual(["ping"]);
+
+      const cleared = service.clearQueuedPrompts(target);
+      expect(cleared).toBe(1);
+
+      const queuedError = await second.result.catch((error) => error);
+      expect(queuedError).toBeInstanceOf(ClearedQueuedTaskError);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps queued prompts pending behind a detached run until the session is truly idle", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              updateIntervalMs: 5,
+              idleTimeoutMs: 5000,
+              noOutputTimeoutMs: 5000,
+              maxRuntimeSec: 1,
+            },
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c9:thread:904.1004",
+      };
+
+      const first = await service.enqueuePrompt(target, "stream-forever", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(first.status).toBe("detached");
+
+      let secondSettled = false;
+      const second = service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      });
+      void second.result.then(
+        () => {
+          secondSettled = true;
+        },
+        () => {
+          secondSettled = true;
+        },
+      );
+
+      await Bun.sleep(80);
+
+      expect(secondSettled).toBe(false);
+      expect(service.listQueuedPrompts(target).map((item) => item.text)).toEqual(["ping"]);
+
+      const cleared = service.clearQueuedPrompts(target);
+      expect(cleared).toBe(1);
+
+      const queuedError = await second.result.catch((error) => error);
+      expect(queuedError).toBeInstanceOf(ClearedQueuedTaskError);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -2399,10 +2504,26 @@ describe("AgentService session identity", () => {
       expect(observed.active).toBe(true);
       expect(observed.update.status).toBe("detached");
 
-      const second = await recoveredService.enqueuePrompt(target, "ping", {
+      let secondSettled = false;
+      const second = recoveredService.enqueuePrompt(target, "ping", {
         onUpdate: () => undefined,
-      }).result.catch((error) => error);
-      expect(second).toBeInstanceOf(ActiveRunInProgressError);
+      });
+      void second.result.then(
+        () => {
+          secondSettled = true;
+        },
+        () => {
+          secondSettled = true;
+        },
+      );
+      await Bun.sleep(80);
+      expect(secondSettled).toBe(false);
+      expect(recoveredService.listQueuedPrompts(target).map((item) => item.text)).toEqual(["ping"]);
+
+      const cleared = recoveredService.clearQueuedPrompts(target);
+      expect(cleared).toBe(1);
+      const queuedError = await second.result.catch((error) => error);
+      expect(queuedError).toBeInstanceOf(ClearedQueuedTaskError);
       await recoveredService.stop();
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -2773,6 +2894,101 @@ describe("AgentService session identity", () => {
       expect(execution.status).toBe("completed");
       expect(execution.snapshot).toContain("PONG");
       expect(readSessionId(storePath, sessionKey)).toBe(RUNNER_GENERATED_ID);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("ignores stale run callbacks after a new run has started for the same session key", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              updateIntervalMs: 5,
+              idleTimeoutMs: 5000,
+              noOutputTimeoutMs: 5000,
+              maxRuntimeSec: 1,
+            },
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c10:thread:905.1005",
+      };
+
+      const first = await service.enqueuePrompt(target, "stream-forever", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(first.status).toBe("detached");
+
+      const sessionService = (service as any).activeRuns;
+      const previousRun = sessionService.activeRuns.get(target.sessionKey);
+      expect(previousRun?.runId).toBeDefined();
+
+      await sessionService.failActiveRun(
+        target.sessionKey,
+        previousRun.runId,
+        new Error("cleanup detached run"),
+      );
+      const resolved = resolveAgentTarget(loaded, target);
+      await fakeTmux.killSession(resolved.sessionName);
+
+      const second = service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      });
+      await Bun.sleep(20);
+      const currentRun = sessionService.activeRuns.get(target.sessionKey);
+      expect(currentRun?.runId).toBeDefined();
+      expect(currentRun?.runId).not.toBe(previousRun.runId);
+
+      await sessionService.failActiveRun(
+        target.sessionKey,
+        previousRun.runId,
+        new Error("stale callback should be ignored"),
+      );
+      expect(sessionService.activeRuns.get(target.sessionKey)?.runId).toBe(currentRun?.runId);
+
+      const result = await second.result;
+      expect(result.status).not.toBe("error");
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

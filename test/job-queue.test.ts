@@ -100,4 +100,50 @@ describe("AgentJobQueue", () => {
     await expect(second.result).rejects.toBeInstanceOf(ClearedQueuedTaskError);
     await expect(third.result).rejects.toBeInstanceOf(ClearedQueuedTaskError);
   });
+
+  test("keeps the next job pending until canStart allows it", async () => {
+    const queue = new AgentJobQueue();
+    const order: string[] = [];
+    let releaseFirst!: () => void;
+    let allowSecond = false;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    const first = queue.enqueue(
+      "default",
+      async () => {
+        order.push("first:start");
+        await firstGate;
+        order.push("first:end");
+        return "first";
+      },
+      { text: "first" },
+    );
+    const second = queue.enqueue(
+      "default",
+      async () => {
+        order.push("second:start");
+        order.push("second:end");
+        return "second";
+      },
+      {
+        text: "second",
+        canStart: () => allowSecond,
+      },
+    );
+
+    await Bun.sleep(20);
+    releaseFirst();
+    await Bun.sleep(20);
+
+    expect(order).toEqual(["first:start", "first:end"]);
+    expect(queue.listPending("default").map((item) => item.text)).toEqual(["second"]);
+
+    allowSecond = true;
+
+    await expect(first.result).resolves.toBe("first");
+    await expect(second.result).resolves.toBe("second");
+    expect(order).toEqual(["first:start", "first:end", "second:start", "second:end"]);
+  });
 });

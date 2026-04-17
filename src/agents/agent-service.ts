@@ -592,13 +592,14 @@ export class AgentService {
       target.sessionKey,
       async () =>
         this.activeRuns.executePrompt(target, prompt, {
-        id: callbacks.observerId ?? `prompt:${target.sessionKey}`,
-        mode: "live",
-        timingContext: callbacks.timingContext,
-        onUpdate: callbacks.onUpdate,
+          id: callbacks.observerId ?? `prompt:${target.sessionKey}`,
+          mode: "live",
+          timingContext: callbacks.timingContext,
+          onUpdate: callbacks.onUpdate,
         }),
       {
         text: prompt,
+        canStart: async () => !this.activeRuns.hasActiveRun(target),
       },
     );
   }

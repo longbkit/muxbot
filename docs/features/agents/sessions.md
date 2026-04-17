@@ -85,6 +85,13 @@ Current recovery rule:
 - if that stored `sessionId` is no longer attachable for this `sessionKey`, clear it and start a fresh tool session
 - if no `sessionId` is available, start a fresh runner session
 
+Current queue and recovery ordering rule:
+
+- a queued prompt must not start just because an earlier observer was detached
+- queued prompts wait until the prior logical run for that `sessionKey` is truly idle
+- mid-run recovery callbacks are bound to the current logical run instance, not only the shared `sessionKey`
+- this prevents stale recovery work from replaying old prompts or mutating a newer run that already started later on the same surface
+
 ## Current Stale Runner Cleanup
 
 Runner residency is now separate from logical conversation continuity.

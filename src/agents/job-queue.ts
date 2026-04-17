@@ -1,4 +1,9 @@
+import { sleep } from "../shared/process.ts";
+
 type QueueTask<T> = () => Promise<T>;
+type QueueCanStart = () => Promise<boolean> | boolean;
+
+const QUEUE_PENDING_POLL_INTERVAL_MS = 25;
 
 export type PendingQueueItem = {
   id: string;
@@ -11,6 +16,7 @@ type QueueEntry<T> = {
   text?: string;
   createdAt: number;
   status: "pending" | "running";
+  canStart?: QueueCanStart;
   task: QueueTask<T>;
   resolve: (value: T | PromiseLike<T>) => void;
   reject: (reason?: unknown) => void;
@@ -33,7 +39,11 @@ export class AgentJobQueue {
   private states = new Map<string, QueueState>();
   private nextId = 1;
 
-  enqueue<T>(key: string, task: QueueTask<T>, options: { text?: string } = {}) {
+  enqueue<T>(
+    key: string,
+    task: QueueTask<T>,
+    options: { text?: string; canStart?: QueueCanStart } = {},
+  ) {
     const state = this.getOrCreateState(key);
     const positionAhead = state.entries.length;
     let resolve!: (value: T | PromiseLike<T>) => void;
@@ -48,6 +58,7 @@ export class AgentJobQueue {
       text: options.text,
       createdAt: Date.now(),
       status: "pending",
+      canStart: options.canStart,
       task,
       resolve,
       reject,
@@ -127,6 +138,11 @@ export class AgentJobQueue {
         const nextEntry = state.entries.find((entry) => entry.status === "pending");
         if (!nextEntry) {
           break;
+        }
+
+        if (nextEntry.canStart && !(await nextEntry.canStart())) {
+          await sleep(QUEUE_PENDING_POLL_INTERVAL_MS);
+          continue;
         }
 
         nextEntry.status = "running";
