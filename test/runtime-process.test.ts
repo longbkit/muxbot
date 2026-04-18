@@ -10,6 +10,8 @@ import {
   readRuntimePid,
   stopDetachedRuntime,
 } from "../src/control/runtime-process.ts";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 const tempDirs: string[] = [];
 const originalClisbotConfigPath = process.env.CLISBOT_CONFIG_PATH;
@@ -36,132 +38,21 @@ function createTempDir() {
 }
 
 function createConfig() {
-  return {
-    meta: { schemaVersion: 1 },
-    tmux: { socketPath: "~/.clisbot/state/clisbot.sock" },
-    session: {
-      mainKey: "main",
-      dmScope: "per-channel-peer",
-      identityLinks: {},
-      storePath: "~/.clisbot/state/sessions.json",
-    },
-    agents: {
-      defaults: {
-        workspace: "~/.clisbot/workspaces/{agentId}",
-        runner: {
-          command: "codex",
-          args: ["-C", "{workspace}"],
-          trustWorkspace: true,
-          startupDelayMs: 1,
-          promptSubmitDelayMs: 1,
-          sessionId: {
-            create: { mode: "runner", args: [] },
-            capture: {
-              mode: "off",
-              statusCommand: "/status",
-              pattern: "x",
-              timeoutMs: 1,
-              pollIntervalMs: 1,
-            },
-            resume: { mode: "off", args: [] },
-          },
-        },
-        stream: {
-          captureLines: 1,
-          updateIntervalMs: 1,
-          idleTimeoutMs: 1,
-          noOutputTimeoutMs: 1,
-          maxRuntimeMin: 1,
-          maxMessageChars: 100,
-        },
-        session: {
-          createIfMissing: true,
-          staleAfterMinutes: 60,
-          name: "{sessionKey}",
-        },
-      },
-      list: [],
-    },
-    bindings: [],
-    control: {
-      configReload: { watch: false, watchDebounceMs: 250 },
-      sessionCleanup: { enabled: true, intervalMinutes: 5 },
-      loop: { maxRunsPerLoop: 20, maxActiveLoops: 10 },
-      runtimeMonitor: {
-        restartBackoff: {
-          fastRetry: {
-            delaySeconds: 10,
-            maxRestarts: 3,
-          },
-          stages: [
-            { delayMinutes: 15, maxRestarts: 4 },
-            { delayMinutes: 30, maxRestarts: 4 },
-          ],
-        },
-        ownerAlerts: { enabled: true, minIntervalMinutes: 30 },
-      },
-    },
-    channels: {
-      slack: {
-        enabled: false,
-        mode: "socket",
-        appToken: "",
-        botToken: "",
-        defaultAccount: "default",
-        accounts: {},
-        agentPrompt: { enabled: true, maxProgressMessages: 3, requireFinalResponse: true },
-        ackReaction: "",
-        typingReaction: "",
-        processingStatus: { enabled: true, status: "Working...", loadingMessages: [] },
-        allowBots: false,
-        replyToMode: "thread",
-        channelPolicy: "allowlist",
-        groupPolicy: "allowlist",
-        defaultAgentId: "default",
-        commandPrefixes: { slash: ["::"], bash: ["!"] },
-        streaming: "all",
-        response: "final",
-        responseMode: "message-tool",
-        additionalMessageMode: "steer",
-        followUp: { mode: "auto", participationTtlMin: 5 },
-        channels: {},
-        groups: {},
-        directMessages: { enabled: true, policy: "pairing", allowFrom: [], requireMention: false },
-      },
-      telegram: {
-        enabled: true,
-        mode: "polling",
-        botToken: "",
-        defaultAccount: "default",
-        accounts: {
-          default: {
-            enabled: true,
-            credentialType: "mem",
-            botToken: "",
-          },
-        },
-        agentPrompt: { enabled: true, maxProgressMessages: 3, requireFinalResponse: true },
-        allowBots: false,
-        groupPolicy: "allowlist",
-        defaultAgentId: "default",
-        commandPrefixes: { slash: ["::"], bash: ["!"] },
-        streaming: "all",
-        response: "final",
-        responseMode: "message-tool",
-        additionalMessageMode: "steer",
-        followUp: { mode: "auto", participationTtlMin: 5 },
-        polling: { timeoutSeconds: 20, retryDelayMs: 1000 },
-        groups: {},
-        directMessages: {
-          enabled: true,
-          policy: "pairing",
-          allowFrom: [],
-          requireMention: false,
-          allowBots: false,
-        },
-      },
-    },
+  const config = clisbotConfigSchema.parse(
+    JSON.parse(
+      renderDefaultConfigTemplate({
+        slackEnabled: false,
+        telegramEnabled: true,
+      }),
+    ),
+  );
+  config.bots.telegram.default = {
+    ...config.bots.telegram.default,
+    enabled: true,
+    credentialType: "mem",
+    botToken: "",
   };
+  return config;
 }
 
 describe("readRuntimeLog", () => {
@@ -317,8 +208,8 @@ describe("stopDetachedRuntime", () => {
     });
 
     const updated = JSON.parse(await Bun.file(configPath).text());
-    expect(updated.channels.telegram.enabled).toBe(false);
-    expect(updated.channels.telegram.accounts.default.enabled).toBe(false);
+    expect(updated.bots.telegram.defaults.enabled).toBe(false);
+    expect(updated.bots.telegram.default.enabled).toBe(false);
   });
 
   test("scopes stop cleanup to the explicit configPath instead of shell-level runtime env paths", async () => {
@@ -374,8 +265,8 @@ describe("stopDetachedRuntime", () => {
     expect(existsSync(siblingRuntimeCredentialsPath)).toBe(false);
     expect(existsSync(externalRuntimeCredentialsPath)).toBe(true);
     const updated = JSON.parse(await Bun.file(configPath).text());
-    expect(updated.channels.telegram.enabled).toBe(false);
-    expect(updated.channels.telegram.accounts.default.enabled).toBe(false);
+    expect(updated.bots.telegram.defaults.enabled).toBe(false);
+    expect(updated.bots.telegram.default.enabled).toBe(false);
   });
 
   test("treats a zombie pid as already stopped and still cleans up state", async () => {
@@ -410,8 +301,8 @@ describe("stopDetachedRuntime", () => {
     expect(await readRuntimePid(pidPath)).toBeNull();
     expect(existsSync(runtimeCredentialsPath)).toBe(false);
     const updated = JSON.parse(await Bun.file(configPath).text());
-    expect(updated.channels.telegram.enabled).toBe(false);
-    expect(updated.channels.telegram.accounts.default.enabled).toBe(false);
+    expect(updated.bots.telegram.defaults.enabled).toBe(false);
+    expect(updated.bots.telegram.default.enabled).toBe(false);
   });
 
   test("accepts a post-sigterm zombie transition as a clean stop", async () => {

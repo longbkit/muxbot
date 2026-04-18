@@ -10,6 +10,8 @@ export type ParsedCliCommand =
   | { name: "stop"; hard: boolean }
   | { name: "status" }
   | { name: "logs"; lines: number }
+  | { name: "bots"; args: string[] }
+  | { name: "routes"; args: string[] }
   | { name: "channels"; args: string[] }
   | { name: "accounts"; args: string[] }
   | { name: "loops"; args: string[] }
@@ -60,6 +62,20 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
     return {
       name: "logs",
       lines: parseLineCount(args.slice(1)),
+    };
+  }
+
+  if (command === "bots") {
+    return {
+      name: "bots",
+      args: args.slice(1),
+    };
+  }
+
+  if (command === "routes") {
+    return {
+      name: "routes",
+      args: args.slice(1),
     };
   }
 
@@ -174,8 +190,8 @@ export function renderCliHelp() {
     "  clisbot status",
     "  clisbot version",
     "  clisbot logs [--lines N]",
-    "  clisbot channels <subcommand>",
-    "  clisbot accounts <subcommand>",
+    "  clisbot bots <subcommand>",
+    "  clisbot routes <subcommand>",
     "  clisbot loops <subcommand>",
     "  clisbot message <subcommand>",
     "  clisbot agents <subcommand>",
@@ -197,27 +213,24 @@ export function renderCliHelp() {
     "  status             Show runtime process, config, log, tmux socket status, and recent runner sessions.",
     "  version            Show the installed clisbot version.",
     "  logs               Print the most recent clisbot log lines.",
-    "  channels           Manage channel enablement, routes, and token references in config.",
-    "                     enable|disable <slack|telegram>",
-    "                     add telegram-group <chatId> [--topic <topicId>] [--require-mention true|false]",
-    "                     remove telegram-group <chatId> [--topic <topicId>]",
-    "                     add slack-channel <channelId> [--require-mention true|false]",
-    "                     remove slack-channel <channelId>",
-    "                     add slack-group <groupId> [--require-mention true|false]",
-    "                     remove slack-group <groupId>",
-    "                     bind slack-account|telegram-account --agent <id> [--account <accountId>]",
-    "                     bind slack-channel|slack-group|slack-dm|telegram-group|telegram-dm ... --agent <id>",
-    "                     unbind slack-account|telegram-account [--account <accountId>]",
-    "                     unbind slack-channel|slack-group|slack-dm|telegram-group|telegram-dm ...",
-    "                     set-token <slack-app|slack-bot|telegram-bot> <value>",
-    "                     clear-token <slack-app|slack-bot|telegram-bot>",
-    "                     See `clisbot channels --help` for the preferred add-then-bind flow and route policy notes.",
-    "  accounts           Manage Slack and Telegram provider accounts plus persistence state.",
-    "                     add telegram --account <id> (--token|--telegram-bot-token) <ENV_NAME|${ENV_NAME}|literal> [--persist]",
-    "                     add slack --account <id> (--app-token|--slack-app-token) <ENV_NAME|${ENV_NAME}|literal> (--bot-token|--slack-bot-token) <ENV_NAME|${ENV_NAME}|literal> [--persist]",
-    "                     persist --channel <slack|telegram> --account <id>",
-    "                     persist --all",
-    "                     See `clisbot accounts --help` for env-vs-mem-vs-persist behavior.",
+    "  bots               Manage provider bot identities, credentials, and bot-level fallback settings.",
+    "                     list|add|get|enable|disable|remove|get-default|set-default",
+    "                     get-agent|set-agent|clear-agent",
+    "                     get-credentials-source|set-credentials",
+    "                     get-dm-policy|set-dm-policy",
+    "                     get-group-policy|set-group-policy",
+    "                     get-channel-policy|set-channel-policy (Slack only)",
+    "                     See `clisbot bots --help` for examples and credential behavior.",
+    "  routes             Manage admitted inbound surfaces under each bot.",
+    "                     list|add|get|enable|disable|remove",
+    "                     get-agent|set-agent|clear-agent",
+    "                     get-policy|set-policy",
+    "                     get-require-mention|set-require-mention",
+    "                     get-allow-bots|set-allow-bots",
+    "                     add/remove allow-user|block-user",
+    "                     get/set follow-up mode and ttl",
+    "                     get/set/clear response mode and additional-message mode",
+    "                     See `clisbot routes --help` for route ids and examples.",
     "  loops              Inspect or cancel managed recurring loops persisted by `/loop`.",
     "                     list|status",
     "                     cancel <id>",
@@ -225,8 +238,8 @@ export function renderCliHelp() {
     "                     See `clisbot loops --help` for behavior notes.",
     "  message            Run provider message actions such as send, react, read, edit, delete, and pins.",
     "                     See `clisbot message --help` for channel-specific syntax.",
-    "  agents             Manage configured agents and top-level bindings.",
-    "                     See `clisbot agents --help` for focused add/bootstrap/binding help.",
+    "  agents             Manage configured agents, workspaces, bootstrap files, and per-agent mode overrides.",
+    "                     See `clisbot agents --help` for focused add/bootstrap help.",
     "  auth               Manage app and agent auth roles, principals, and permissions in config. See `clisbot auth --help`.",
     "  runner             Inspect tmux-backed runner sessions and validate runner smoke contracts.",
     "                     list|inspect <session-name>|watch <session-name>|watch --latest|watch --next|smoke ...",

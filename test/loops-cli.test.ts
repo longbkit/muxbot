@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 import { runLoopsCli } from "../src/control/loops-cli.ts";
 
 function buildConfig(params: {
@@ -9,160 +11,43 @@ function buildConfig(params: {
   storePath: string;
   workspaceTemplate: string;
 }) {
-  return {
-    tmux: {
-      socketPath: params.socketPath,
+  const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
+  config.app.session.storePath = params.storePath;
+  config.agents.defaults.workspace = params.workspaceTemplate;
+  config.agents.defaults.runner.defaults.tmux.socketPath = params.socketPath;
+  config.agents.defaults.runner.defaults.trustWorkspace = false;
+  config.agents.defaults.runner.defaults.startupDelayMs = 1;
+  config.agents.defaults.runner.defaults.promptSubmitDelayMs = 1;
+  config.agents.defaults.runner.defaults.stream.captureLines = 80;
+  config.agents.defaults.runner.defaults.stream.updateIntervalMs = 1000;
+  config.agents.defaults.runner.defaults.stream.idleTimeoutMs = 60_000;
+  config.agents.defaults.runner.defaults.stream.noOutputTimeoutMs = 60_000;
+  config.agents.defaults.runner.defaults.stream.maxRuntimeSec = 900;
+  config.agents.defaults.runner.defaults.stream.maxRuntimeMin = undefined;
+  config.agents.defaults.runner.defaults.stream.maxMessageChars = 4000;
+  config.agents.defaults.runner.codex.sessionId = {
+    create: {
+      mode: "runner",
+      args: [],
     },
-    session: {
-      mainKey: "main",
-      dmScope: "main",
-      identityLinks: {},
-      storePath: params.storePath,
+    capture: {
+      mode: "status-command",
+      statusCommand: "/status",
+      pattern: "session id:\\s*(.+)",
+      timeoutMs: 10,
+      pollIntervalMs: 1,
     },
-    agents: {
-      defaults: {
-        workspace: params.workspaceTemplate,
-        runner: {
-          command: "codex",
-          args: ["-C", "{workspace}"],
-          trustWorkspace: false,
-          startupDelayMs: 1,
-          promptSubmitDelayMs: 1,
-          sessionId: {
-            create: {
-              mode: "runner",
-              args: [],
-            },
-            capture: {
-              mode: "status-command",
-              statusCommand: "/status",
-              pattern: "session id:\\s*(.+)",
-              timeoutMs: 10,
-              pollIntervalMs: 1,
-            },
-            resume: {
-              mode: "command",
-              args: ["resume", "{sessionId}"],
-            },
-          },
-        },
-        stream: {
-          captureLines: 80,
-          updateIntervalMs: 1000,
-          idleTimeoutMs: 60_000,
-          noOutputTimeoutMs: 60_000,
-          maxRuntimeSec: 900,
-          maxMessageChars: 4000,
-        },
-        session: {
-          createIfMissing: true,
-          staleAfterMinutes: 60,
-          name: "{sessionKey}",
-        },
-      },
-      list: [{ id: "default" }],
-    },
-    bindings: [],
-    control: {
-      configReload: {
-        watch: false,
-        watchDebounceMs: 250,
-      },
-      sessionCleanup: {
-        enabled: false,
-        intervalMinutes: 5,
-      },
-      loop: {
-        maxRunsPerLoop: 20,
-        maxActiveLoops: 10,
-      },
-    },
-    channels: {
-      slack: {
-        enabled: false,
-        mode: "socket",
-        appToken: "app-token",
-        botToken: "bot-token",
-        defaultAccount: "default",
-        accounts: {
-          default: {
-            appToken: "app-token",
-            botToken: "bot-token",
-          },
-        },
-        agentPrompt: {
-          enabled: true,
-          maxProgressMessages: 3,
-          requireFinalResponse: true,
-        },
-        ackReaction: "",
-        typingReaction: "",
-        processingStatus: {
-          enabled: true,
-          status: "Working...",
-          loadingMessages: [],
-        },
-        allowBots: false,
-        replyToMode: "thread",
-        channelPolicy: "allowlist",
-        groupPolicy: "allowlist",
-        defaultAgentId: "default",
-        commandPrefixes: {
-          slash: ["::", "\\"],
-          bash: ["!"],
-        },
-        streaming: "all",
-        response: "final",
-        followUp: {
-          mode: "auto",
-          participationTtlMin: 5,
-        },
-        channels: {},
-        groups: {},
-        directMessages: {
-          enabled: true,
-          requireMention: false,
-          allowBots: false,
-          agentId: "default",
-        },
-      },
-      telegram: {
-        enabled: false,
-        mode: "polling",
-        botToken: "telegram-token",
-        defaultAccount: "default",
-        accounts: {
-          default: {
-            botToken: "telegram-token",
-          },
-        },
-        allowBots: false,
-        groupPolicy: "allowlist",
-        defaultAgentId: "default",
-        commandPrefixes: {
-          slash: ["::", "\\"],
-          bash: ["!"],
-        },
-        streaming: "all",
-        response: "final",
-        followUp: {
-          mode: "auto",
-          participationTtlMin: 5,
-        },
-        polling: {
-          timeoutSeconds: 20,
-          retryDelayMs: 1000,
-        },
-        groups: {},
-        directMessages: {
-          enabled: true,
-          requireMention: false,
-          allowBots: false,
-          agentId: "default",
-        },
-      },
+    resume: {
+      mode: "command",
+      args: ["resume", "{sessionId}"],
     },
   };
+  config.agents.list = [{ id: "default" }];
+  config.app.control.configReload.watch = false;
+  config.app.control.sessionCleanup.enabled = false;
+  config.bots.slack.defaults.enabled = false;
+  config.bots.telegram.defaults.enabled = false;
+  return config;
 }
 
 describe("loops cli", () => {

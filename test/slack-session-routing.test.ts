@@ -2,213 +2,69 @@ import { describe, expect, test } from "bun:test";
 import { resolveSlackConversationRoute } from "../src/channels/slack/route-config.ts";
 import { resolveSlackConversationTarget } from "../src/channels/slack/session-routing.ts";
 import type { LoadedConfig } from "../src/config/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 function createLoadedConfig(): LoadedConfig {
+  const config = clisbotConfigSchema.parse(
+    JSON.parse(
+      renderDefaultConfigTemplate({
+        slackEnabled: true,
+        telegramEnabled: false,
+      }),
+    ),
+  );
+  config.bots.defaults.dmScope = "per-channel-peer";
+  config.bots.slack.defaults.allowBots = false;
+  config.bots.slack.defaults.channelPolicy = "allowlist";
+  config.bots.slack.defaults.groupPolicy = "allowlist";
+  config.bots.slack.defaults.streaming = "all";
+  config.bots.slack.defaults.response = "final";
+  config.bots.slack.defaults.responseMode = "message-tool";
+  config.bots.slack.defaults.additionalMessageMode = "steer";
+  config.bots.slack.defaults.verbose = "minimal";
+  config.bots.slack.defaults.followUp = {
+    mode: "auto",
+    participationTtlMin: 5,
+  };
+  config.bots.slack.defaults.timezone = "UTC";
+  config.bots.slack.defaults.ackReaction = ":heavy_check_mark:";
+  config.bots.slack.defaults.processingStatus = {
+    enabled: true,
+    status: "Working...",
+    loadingMessages: [],
+  };
+  config.bots.slack.default = {
+    ...config.bots.slack.default,
+    enabled: true,
+    appToken: "app-token",
+    botToken: "bot-token",
+    directMessages: {
+      "dm:*": {
+        enabled: true,
+        policy: "open",
+        allowUsers: [],
+        blockUsers: [],
+        requireMention: false,
+        allowBots: false,
+        timezone: "America/Los_Angeles",
+      },
+    },
+    groups: {},
+  };
+
   return {
     configPath: "/tmp/clisbot.json",
     processedEventsPath: "/tmp/processed.json",
     stateDir: "/tmp",
     raw: {
-      meta: {
-        schemaVersion: 1,
-      },
-      tmux: {
-        socketPath: "~/.clisbot/state/clisbot.sock",
-      },
+      ...config,
       session: {
-        mainKey: "main",
-        dmScope: "per-channel-peer",
-        identityLinks: {},
-        storePath: "/tmp/sessions.json",
+        ...config.app.session,
+        dmScope: config.bots.defaults.dmScope,
       },
-      app: {
-        auth: {
-          ownerClaimWindowMinutes: 30,
-          defaultRole: "member",
-          roles: {
-            owner: { allow: ["configManage"], users: [] },
-            admin: { allow: ["configManage"], users: [] },
-            member: { allow: [], users: [] },
-          },
-        },
-      },
-      agents: {
-        defaults: {
-          workspace: "~/.clisbot/workspaces/{agentId}",
-          auth: {
-            defaultRole: "member",
-            roles: {
-              admin: { allow: ["shellExecute"], users: [] },
-              member: { allow: ["sendMessage"], users: [] },
-            },
-          },
-          runner: {
-            command: "codex",
-            args: ["-C", "{workspace}"],
-            trustWorkspace: true,
-            startupDelayMs: 1,
-            startupRetryCount: 2,
-            startupRetryDelayMs: 0,
-            promptSubmitDelayMs: 1,
-            sessionId: {
-              create: {
-                mode: "runner",
-                args: [],
-              },
-              capture: {
-                mode: "off",
-                statusCommand: "/status",
-                pattern:
-                  "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
-                timeoutMs: 1000,
-                pollIntervalMs: 100,
-              },
-              resume: {
-                mode: "off",
-                args: ["resume", "{sessionId}", "-C", "{workspace}"],
-              },
-            },
-          },
-          stream: {
-            captureLines: 10,
-            updateIntervalMs: 10,
-            idleTimeoutMs: 10,
-            noOutputTimeoutMs: 10,
-            maxRuntimeSec: 10,
-            maxMessageChars: 100,
-          },
-          session: {
-            createIfMissing: true,
-            staleAfterMinutes: 60,
-            name: "{sessionKey}",
-          },
-        },
-        list: [{ id: "default" }],
-      },
-      bindings: [],
-      control: {
-        configReload: {
-          watch: false,
-          watchDebounceMs: 250,
-        },
-        sessionCleanup: {
-          enabled: true,
-          intervalMinutes: 5,
-        },
-        loop: {
-          maxRunsPerLoop: 20,
-          maxActiveLoops: 10,
-        },
-        runtimeMonitor: {
-          restartBackoff: {
-            fastRetry: { delaySeconds: 10, maxRestarts: 3 },
-            stages: [
-              { delayMinutes: 15, maxRestarts: 4 },
-              { delayMinutes: 30, maxRestarts: 4 },
-            ],
-          },
-          ownerAlerts: { enabled: true, minIntervalMinutes: 30 },
-        },
-      },
-      channels: {
-        slack: {
-          enabled: true,
-          mode: "socket",
-          appToken: "app-token",
-          botToken: "bot-token",
-          defaultAccount: "default",
-          accounts: {
-            default: {
-              appToken: "app-token",
-              botToken: "bot-token",
-            },
-          },
-          agentPrompt: {
-            enabled: true,
-            maxProgressMessages: 3,
-            requireFinalResponse: true,
-          },
-          ackReaction: ":heavy_check_mark:",
-          typingReaction: "",
-          processingStatus: {
-            enabled: true,
-            status: "Working...",
-            loadingMessages: [],
-          },
-          allowBots: false,
-          replyToMode: "thread",
-          channelPolicy: "allowlist",
-          groupPolicy: "allowlist",
-          defaultAgentId: "default",
-          commandPrefixes: {
-            slash: ["::", "\\"],
-            bash: ["!"],
-          },
-          streaming: "all",
-          response: "final",
-          responseMode: "message-tool",
-          additionalMessageMode: "steer",
-          verbose: "minimal",
-          followUp: {
-            mode: "auto",
-            participationTtlMin: 5,
-          },
-          timezone: "UTC",
-          channels: {},
-          groups: {},
-          directMessages: {
-            enabled: true,
-            policy: "open",
-            allowFrom: [],
-            requireMention: false,
-            timezone: "America/Los_Angeles",
-          },
-        },
-        telegram: {
-          enabled: false,
-          mode: "polling",
-          botToken: "telegram-token",
-          defaultAccount: "default",
-          accounts: {
-            default: {
-              botToken: "telegram-token",
-            },
-          },
-          agentPrompt: {
-            enabled: true,
-            maxProgressMessages: 3,
-            requireFinalResponse: true,
-          },
-          allowBots: false,
-          groupPolicy: "allowlist",
-          defaultAgentId: "default",
-          commandPrefixes: {
-            slash: ["::", "\\"],
-            bash: ["!"],
-          },
-          streaming: "all",
-          response: "final",
-          responseMode: "message-tool",
-          additionalMessageMode: "steer",
-          verbose: "minimal",
-          followUp: {
-            mode: "auto",
-            participationTtlMin: 5,
-          },
-          polling: {
-            timeoutSeconds: 20,
-            retryDelayMs: 1000,
-          },
-          groups: {},
-          directMessages: {
-            enabled: true,
-            policy: "open",
-            allowFrom: [],
-            requireMention: false,
-            allowBots: false,
-          },
-        },
-      },
+      control: config.app.control,
+      tmux: config.agents.defaults.runner.defaults.tmux,
     },
   };
 }
@@ -232,9 +88,12 @@ describe("Slack conversation target routing", () => {
 
   test("resolves timezone overrides from route config", () => {
     const config = createLoadedConfig();
-    config.raw.channels.slack.channels.C123 = {
+    config.raw.bots.slack.default.groups["channel:C123"] = {
+      enabled: true,
       requireMention: true,
       allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
       timezone: "Asia/Ho_Chi_Minh",
     };
 
@@ -248,11 +107,14 @@ describe("Slack conversation target routing", () => {
 
   test("inherits route verbose from channel defaults and supports overrides", () => {
     const inheritedConfig = createLoadedConfig();
-    inheritedConfig.raw.channels.slack.channelPolicy = "open";
+    inheritedConfig.raw.bots.slack.defaults.channelPolicy = "open";
     const config = createLoadedConfig();
-    config.raw.channels.slack.channels.C123 = {
+    config.raw.bots.slack.default.groups["channel:C123"] = {
+      enabled: true,
       requireMention: true,
       allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
       verbose: "off",
     };
 
@@ -271,9 +133,12 @@ describe("Slack conversation target routing", () => {
 
   test("defaults explicit slack channel routes to no mention requirement", () => {
     const config = createLoadedConfig();
-    config.raw.channels.slack.channels.C123 = {
+    config.raw.bots.slack.default.groups["channel:C123"] = {
+      enabled: true,
       requireMention: false,
       allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
     };
 
     const resolved = resolveSlackConversationRoute(
@@ -338,9 +203,12 @@ describe("Slack conversation target routing", () => {
 
   test("no longer exposes route-local privilege command config", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.channels.slack.channels.C123 = {
+    loadedConfig.raw.bots.slack.default.groups["channel:C123"] = {
+      enabled: true,
       requireMention: true,
       allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
     };
 
     const channelRoute = resolveSlackConversationRoute(loadedConfig, {
@@ -357,17 +225,10 @@ describe("Slack conversation target routing", () => {
     expect("privilegeCommands" in (dmRoute.route ?? {})).toBe(false);
   });
 
-  test("uses top-level slack binding when route agent is not overridden", () => {
+  test("uses bot fallback agent when route agent is not overridden", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.channels.slack.channelPolicy = "open";
-    loadedConfig.raw.bindings = [
-      {
-        match: {
-          channel: "slack",
-        },
-        agentId: "bound-agent",
-      },
-    ];
+    loadedConfig.raw.bots.slack.defaults.channelPolicy = "open";
+    loadedConfig.raw.bots.slack.default.agentId = "bound-agent";
 
     const channelRoute = resolveSlackConversationRoute(loadedConfig, {
       channel_type: "channel",
@@ -379,7 +240,7 @@ describe("Slack conversation target routing", () => {
 
   test("uses agent responseMode when the route does not override it", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.channels.slack.channelPolicy = "open";
+    loadedConfig.raw.bots.slack.defaults.channelPolicy = "open";
     loadedConfig.raw.agents.list = [
       {
         id: "default",
@@ -397,7 +258,7 @@ describe("Slack conversation target routing", () => {
 
   test("uses agent additionalMessageMode when the route does not override it", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.channels.slack.channelPolicy = "open";
+    loadedConfig.raw.bots.slack.defaults.channelPolicy = "open";
     loadedConfig.raw.agents.list = [
       {
         id: "default",
@@ -413,18 +274,17 @@ describe("Slack conversation target routing", () => {
     expect(channelRoute.route?.additionalMessageMode).toBe("queue");
   });
 
-  test("uses account-specific slack binding when the bound account id is provided", () => {
+  test("uses account-specific slack bot fallback when the bot id is provided", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.channels.slack.channelPolicy = "open";
-    loadedConfig.raw.bindings = [
-      {
-        match: {
-          channel: "slack",
-          accountId: "ops",
-        },
-        agentId: "ops-agent",
-      },
-    ];
+    loadedConfig.raw.bots.slack.defaults.channelPolicy = "open";
+    loadedConfig.raw.bots.slack.ops = {
+      enabled: true,
+      appToken: "ops-app-token",
+      botToken: "ops-bot-token",
+      agentId: "ops-agent",
+      groups: {},
+      directMessages: {},
+    };
 
     const channelRoute = resolveSlackConversationRoute(
       loadedConfig,

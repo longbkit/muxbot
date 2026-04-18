@@ -1,5 +1,9 @@
 import { type LoadedConfig } from "../../config/load-config.ts";
 import {
+  resolveSlackBotConfig,
+  resolveSlackDirectMessageConfig,
+} from "../../config/channel-accounts.ts";
+import {
   buildSharedChannelRoute,
   type SharedChannelRoute,
   type SharedChannelRouteOverride,
@@ -17,12 +21,19 @@ export type SlackResolvedRoute = {
 
 type SlackRouteOverride = SharedChannelRouteOverride;
 
+function isAdmittedRoute(route: SlackRouteOverride | undefined | null) {
+  return !!route && route.enabled !== false && route.policy !== "disabled";
+}
+
 function buildRoute(loadedConfig: LoadedConfig, params: {
   route?: SlackRouteOverride | null;
   requireMention: boolean;
   accountId?: string;
 }): SlackRoute {
-  const slackConfig = loadedConfig.raw.channels.slack;
+  const slackConfig = resolveSlackBotConfig(
+    loadedConfig.raw.bots.slack,
+    params.accountId,
+  );
   return {
     ...buildSharedChannelRoute({
       loadedConfig,
@@ -41,9 +52,9 @@ function resolveChannelRoute(
   channelId: string,
   accountId?: string,
 ): SlackRoute | null {
-  const slackConfig = loadedConfig.raw.channels.slack;
-  const route = slackConfig.channels[channelId] ?? slackConfig.channels["*"];
-  if (route) {
+  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, accountId);
+  const route = slackConfig.groups[`channel:${channelId}`] ?? slackConfig.groups["*"];
+  if (isAdmittedRoute(route)) {
     return buildRoute(loadedConfig, {
       route,
       requireMention: false,
@@ -66,9 +77,9 @@ function resolveGroupRoute(
   channelId: string,
   accountId?: string,
 ): SlackRoute | null {
-  const slackConfig = loadedConfig.raw.channels.slack;
-  const route = slackConfig.groups[channelId] ?? slackConfig.groups["*"];
-  if (route) {
+  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, accountId);
+  const route = slackConfig.groups[`group:${channelId}`] ?? slackConfig.groups["*"];
+  if (isAdmittedRoute(route)) {
     return buildRoute(loadedConfig, {
       route,
       requireMention: false,
@@ -88,15 +99,17 @@ function resolveGroupRoute(
 
 function resolveDirectMessageRoute(
   loadedConfig: LoadedConfig,
+  userId?: string,
   accountId?: string,
 ): SlackRoute | null {
-  const slackConfig = loadedConfig.raw.channels.slack;
-  if (!slackConfig.directMessages.enabled) {
+  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, accountId);
+  const route = resolveSlackDirectMessageConfig(slackConfig, userId);
+  if (!isAdmittedRoute(route)) {
     return null;
   }
 
   return buildRoute(loadedConfig, {
-    route: slackConfig.directMessages,
+    route,
     requireMention: false,
     accountId,
   });
@@ -115,7 +128,11 @@ export function resolveSlackConversationRoute(
   if (channelType === "im") {
     return {
       conversationKind: "dm",
-      route: resolveDirectMessageRoute(loadedConfig, options.accountId),
+      route: resolveDirectMessageRoute(
+        loadedConfig,
+        typeof event.user === "string" ? event.user.trim().toUpperCase() : undefined,
+        options.accountId,
+      ),
     };
   }
 

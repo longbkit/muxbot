@@ -182,7 +182,9 @@ If `session.dmScope` is too broad, different people can share one DM context.
 
 The default `dmScope: "main"` is continuity-first, not privacy-first.
 
-That is convenient for one-user setups but risky for shared inboxes.
+That is convenient for one-user personal bot setups, where Slack DM, Telegram DM, and similar direct surfaces intentionally feel like one ongoing conversation with the same owner.
+
+It is risky for shared inboxes, multi-user bots, or multi-account DM surfaces.
 
 ### 2. Workspace leak
 

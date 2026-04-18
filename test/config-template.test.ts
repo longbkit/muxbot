@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { readEditableConfig } from "../src/config/config-file.ts";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 describe("renderDefaultConfigTemplate", () => {
@@ -9,161 +11,48 @@ describe("renderDefaultConfigTemplate", () => {
     process.env.CLISBOT_HOME = originalClisbotHome;
   });
 
-  test("does not preseed sample slack or telegram routes", () => {
-    const config = JSON.parse(renderDefaultConfigTemplate()) as {
-      app: {
-        auth: {
-          defaultRole: string;
-        };
-      };
-      agents: {
-        defaults: {
-          auth: {
-            defaultRole: string;
-          };
-        };
-      };
-      channels: {
-        slack: {
-          enabled: boolean;
-          appToken: string;
-          botToken: string;
-          streaming: string;
-          verbose: string;
-          channels: Record<string, unknown>;
-          groups: Record<string, unknown>;
-          accounts: {
-            default: {
-              appToken: string;
-              botToken: string;
-            };
-          };
-        };
-        telegram: {
-          enabled: boolean;
-          botToken: string;
-          streaming: string;
-          verbose: string;
-          groups: Record<string, unknown>;
-          accounts: {
-            default: {
-              botToken: string;
-            };
-          };
-        };
-      };
-    };
+  test("renders the new app, bots, and agents shape without sample routes", () => {
+    const config = JSON.parse(renderDefaultConfigTemplate()) as ReturnType<
+      typeof clisbotConfigSchema.parse
+    >;
 
-    expect(config.channels.slack.enabled).toBe(false);
-    expect(config.channels.telegram.enabled).toBe(false);
-    expect(config.channels.slack.streaming).toBe("off");
-    expect(config.channels.telegram.streaming).toBe("off");
-    expect(config.channels.slack.verbose).toBe("minimal");
-    expect(config.channels.telegram.verbose).toBe("minimal");
-    expect(config.channels.slack.appToken).toBe("");
-    expect(config.channels.slack.botToken).toBe("");
-    expect(config.channels.telegram.botToken).toBe("");
-    expect(config.channels.slack.accounts.default.appToken).toBe("${SLACK_APP_TOKEN}");
-    expect(config.channels.slack.accounts.default.botToken).toBe("${SLACK_BOT_TOKEN}");
-    expect(config.channels.telegram.accounts.default.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
-    expect(config.channels.slack.channels).toEqual({});
-    expect(config.channels.slack.groups).toEqual({});
-    expect(config.channels.telegram.groups).toEqual({});
+    expect("channels" in config).toBe(false);
     expect(config.app.auth.defaultRole).toBe("member");
+    expect(config.app.control.configReload.watch).toBe(true);
+    expect(config.bots.slack.defaults.enabled).toBe(false);
+    expect(config.bots.telegram.defaults.enabled).toBe(false);
+    expect(config.bots.slack.default.appToken).toBe("${SLACK_APP_TOKEN}");
+    expect(config.bots.slack.default.botToken).toBe("${SLACK_BOT_TOKEN}");
+    expect(config.bots.telegram.default.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
+    expect(config.bots.slack.default.directMessages).toEqual({});
+    expect(config.bots.slack.default.groups).toEqual({});
+    expect(config.bots.telegram.default.directMessages).toEqual({});
+    expect(config.bots.telegram.default.groups).toEqual({});
+    expect(config.agents.defaults.defaultAgentId).toBe("default");
     expect(config.agents.defaults.auth.defaultRole).toBe("member");
     expect(JSON.stringify(config)).not.toContain("privilegeCommands");
   });
 
-  test("can enable only the available default channels", () => {
+  test("can enable only the selected providers and preserve explicit env placeholders", () => {
     const config = JSON.parse(
       renderDefaultConfigTemplate({
         slackEnabled: true,
         telegramEnabled: false,
-      }),
-    ) as {
-      channels: {
-        slack: {
-          enabled: boolean;
-          appToken: string;
-          botToken: string;
-          streaming: string;
-          accounts: {
-            default: {
-              appToken: string;
-              botToken: string;
-            };
-          };
-        };
-        telegram: {
-          enabled: boolean;
-          botToken: string;
-          streaming: string;
-          accounts: {
-            default: {
-              botToken: string;
-            };
-          };
-        };
-      };
-    };
-
-    expect(config.channels.slack.enabled).toBe(true);
-    expect(config.channels.telegram.enabled).toBe(false);
-    expect(config.channels.slack.streaming).toBe("off");
-    expect(config.channels.telegram.streaming).toBe("off");
-    expect(config.channels.slack.appToken).toBe("");
-    expect(config.channels.slack.botToken).toBe("");
-    expect(config.channels.telegram.botToken).toBe("");
-    expect(config.channels.slack.accounts.default.appToken).toBe("${SLACK_APP_TOKEN}");
-    expect(config.channels.slack.accounts.default.botToken).toBe("${SLACK_BOT_TOKEN}");
-    expect(config.channels.telegram.accounts.default.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
-  });
-
-  test("preserves custom token env placeholders as literals", () => {
-    const config = JSON.parse(
-      renderDefaultConfigTemplate({
-        slackEnabled: true,
-        telegramEnabled: true,
         slackAppTokenRef: "${CUSTOM_SLACK_APP_TOKEN}",
         slackBotTokenRef: "${CUSTOM_SLACK_BOT_TOKEN}",
-        telegramBotTokenRef: "${CUSTOM_TELEGRAM_BOT_TOKEN}",
       }),
-    ) as {
-      channels: {
-        slack: {
-          enabled: boolean;
-          appToken: string;
-          botToken: string;
-          accounts: {
-            default: {
-              appToken: string;
-              botToken: string;
-            };
-          };
-        };
-        telegram: {
-          enabled: boolean;
-          botToken: string;
-          accounts: {
-            default: {
-              botToken: string;
-            };
-          };
-        };
-      };
-    };
+    ) as ReturnType<typeof clisbotConfigSchema.parse>;
 
-    expect(config.channels.slack.enabled).toBe(true);
-    expect(config.channels.telegram.enabled).toBe(true);
-    expect(config.channels.slack.appToken).toBe("");
-    expect(config.channels.slack.botToken).toBe("");
-    expect(config.channels.telegram.botToken).toBe("");
-    expect(config.channels.slack.accounts.default.appToken).toBe("${CUSTOM_SLACK_APP_TOKEN}");
-    expect(config.channels.slack.accounts.default.botToken).toBe("${CUSTOM_SLACK_BOT_TOKEN}");
-    expect(config.channels.telegram.accounts.default.botToken).toBe("${CUSTOM_TELEGRAM_BOT_TOKEN}");
+    expect(config.bots.slack.defaults.enabled).toBe(true);
+    expect(config.bots.slack.default.enabled).toBe(true);
+    expect(config.bots.telegram.defaults.enabled).toBe(false);
+    expect(config.bots.telegram.default.enabled).toBe(false);
+    expect(config.bots.slack.default.appToken).toBe("${CUSTOM_SLACK_APP_TOKEN}");
+    expect(config.bots.slack.default.botToken).toBe("${CUSTOM_SLACK_BOT_TOKEN}");
+    expect(config.bots.telegram.default.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
   });
 
-  test("normalizes bare custom env names into placeholders", () => {
+  test("normalizes bare env names into placeholders", () => {
     const config = JSON.parse(
       renderDefaultConfigTemplate({
         slackEnabled: true,
@@ -172,69 +61,43 @@ describe("renderDefaultConfigTemplate", () => {
         slackBotTokenRef: "CUSTOM_SLACK_BOT_TOKEN",
         telegramBotTokenRef: "CUSTOM_TELEGRAM_BOT_TOKEN",
       }),
-    ) as {
-      channels: {
-        slack: {
-          appToken: string;
-          botToken: string;
-          accounts: {
-            default: {
-              appToken: string;
-              botToken: string;
-            };
-          };
-        };
-        telegram: {
-          botToken: string;
-          accounts: {
-            default: {
-              botToken: string;
-            };
-          };
-        };
-      };
-    };
+    ) as ReturnType<typeof clisbotConfigSchema.parse>;
 
-    expect(config.channels.slack.appToken).toBe("");
-    expect(config.channels.slack.botToken).toBe("");
-    expect(config.channels.telegram.botToken).toBe("");
-    expect(config.channels.slack.accounts.default.appToken).toBe("${CUSTOM_SLACK_APP_TOKEN}");
-    expect(config.channels.slack.accounts.default.botToken).toBe("${CUSTOM_SLACK_BOT_TOKEN}");
-    expect(config.channels.telegram.accounts.default.botToken).toBe("${CUSTOM_TELEGRAM_BOT_TOKEN}");
+    expect(config.bots.slack.default.appToken).toBe("${CUSTOM_SLACK_APP_TOKEN}");
+    expect(config.bots.slack.default.botToken).toBe("${CUSTOM_SLACK_BOT_TOKEN}");
+    expect(config.bots.telegram.default.botToken).toBe("${CUSTOM_TELEGRAM_BOT_TOKEN}");
   });
 
-  test("renders default paths from CLISBOT_HOME", () => {
+  test("renders path defaults from CLISBOT_HOME", () => {
     process.env.CLISBOT_HOME = "~/.clisbot-dev";
 
-    const template = JSON.parse(renderDefaultConfigTemplate());
+    const config = JSON.parse(renderDefaultConfigTemplate()) as ReturnType<
+      typeof clisbotConfigSchema.parse
+    >;
 
-    expect(template.tmux.socketPath).toBe("~/.clisbot-dev/state/clisbot.sock");
-    expect(template.session.storePath).toBe("~/.clisbot-dev/state/sessions.json");
-    expect(template.agents.defaults.workspace).toBe("~/.clisbot-dev/workspaces/{agentId}");
+    expect(config.app.session.storePath).toBe("~/.clisbot-dev/state/sessions.json");
+    expect(config.agents.defaults.runner.defaults.tmux.socketPath).toBe(
+      "~/.clisbot-dev/state/clisbot.sock",
+    );
+    expect(config.agents.defaults.workspace).toBe("~/.clisbot-dev/workspaces/{agentId}");
   });
 
-  test("matches config/clisbot.json.template after normalizing dynamic fields", () => {
-    delete process.env.CLISBOT_HOME;
+  test("official config template validates and stays on the new top-level mental model", async () => {
+    const text = readFileSync(
+      new URL("../config/clisbot.json.template", import.meta.url),
+      "utf8",
+    );
+    const parsed = JSON.parse(text);
+    const config = clisbotConfigSchema.parse(parsed);
 
-    const generated = JSON.parse(
-      renderDefaultConfigTemplate({
-        slackEnabled: false,
-        telegramEnabled: false,
-      }),
-    ) as Record<string, unknown>;
-    const staticTemplate = JSON.parse(
-      readFileSync(new URL("../config/clisbot.json.template", import.meta.url), "utf8"),
-    ) as Record<string, unknown>;
+    expect(config.meta.schemaVersion).toBe("0.1.39");
+    expect(Object.keys(config)).toEqual(["meta", "app", "bots", "agents"]);
+    expect(config.bots.slack.defaults.defaultBotId).toBe("default");
+    expect(config.bots.telegram.defaults.defaultBotId).toBe("default");
 
-    (generated.meta as { lastTouchedAt: string }).lastTouchedAt =
-      "2026-04-15T00:00:00.000Z";
-    (staticTemplate.meta as { lastTouchedAt: string }).lastTouchedAt =
-      "2026-04-15T00:00:00.000Z";
-    ((generated.control as { loop: { defaultTimezone: string } }).loop).defaultTimezone =
-      "UTC";
-    ((staticTemplate.control as { loop: { defaultTimezone: string } }).loop).defaultTimezone =
-      "UTC";
-
-    expect(staticTemplate).toEqual(generated);
+    const editable = await readEditableConfig(
+      new URL("../config/clisbot.json.template", import.meta.url).pathname,
+    );
+    expect(editable.config.meta.schemaVersion).toBe("0.1.39");
   });
 });

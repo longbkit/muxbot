@@ -8,6 +8,8 @@ If `BOOTSTRAP.md` exists, that's your birth certificate. Follow it, figure out w
 
 Remove this `## First Run` section in AGENTS.md after finishing and removed `BOOTSRAP.md`
 
+If you are asked to code in any repo and that repo or one of its subfolders has `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`, pick the one that applies to the current folder scope and follow it strictly.
+
 ## Every Session
 
 Before doing anything else:

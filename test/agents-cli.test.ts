@@ -45,29 +45,18 @@ describe("agents cli", () => {
       agents: {
         list: Array<{
           id: string;
-          cliTool?: string;
-          startupOptions?: string[];
-          bootstrap?: { mode: string };
+          cli?: string;
+          bootstrap?: { botType: string };
           runner?: { command: string; args: string[] };
         }>;
       };
-      bindings: Array<{ match: { channel: string }; agentId: string }>;
     };
 
     expect(rawConfig.agents.list).toHaveLength(1);
     expect(rawConfig.agents.list[0]?.id).toBe("default");
-    expect(rawConfig.agents.list[0]?.cliTool).toBe("codex");
-    expect(rawConfig.agents.list[0]?.startupOptions).toBeUndefined();
-    expect(rawConfig.agents.list[0]?.runner).toBeUndefined();
-    expect(rawConfig.agents.list[0]?.bootstrap?.mode).toBe("personal-assistant");
-    expect(rawConfig.bindings).toEqual([
-      {
-        match: {
-          channel: "slack",
-        },
-        agentId: "default",
-      },
-    ]);
+    expect(rawConfig.agents.list[0]?.cli).toBe("codex");
+    expect(rawConfig.agents.list[0]?.runner?.command).toBe("codex");
+    expect(rawConfig.agents.list[0]?.bootstrap?.botType).toBe("personal-assistant");
     expect(existsSync(join(tempDir, "workspaces", "default", "BOOTSTRAP.md"))).toBe(true);
     expect(existsSync(join(tempDir, "workspaces", "default", "AGENTS.md"))).toBe(true);
     expect(existsSync(join(tempDir, "workspaces", "default", "LOOP.md"))).toBe(true);
@@ -88,7 +77,7 @@ describe("agents cli", () => {
     expect(text).toContain("clisbot agents");
     expect(text).toContain("clisbot agents help");
     expect(text).toContain("clisbot agents add <id> --cli <codex|claude|gemini>");
-    expect(text).toContain("explicit route `agentId` on Slack or Telegram still wins");
+    expect(text).toContain("`agents add` is the lower-level manual surface");
   });
 
   test("team-assistant bootstrap overrides base USER.md with the team template", async () => {
@@ -130,15 +119,13 @@ describe("agents cli", () => {
       agents: {
         list: Array<{
           id: string;
-          cliTool?: string;
-          startupOptions?: string[];
+          cli?: string;
           runner?: { command: string; args: string[] };
         }>;
       };
     };
 
-    expect(rawConfig.agents.list[0]?.cliTool).toBe("claude");
-    expect(rawConfig.agents.list[0]?.startupOptions).toBeUndefined();
+    expect(rawConfig.agents.list[0]?.cli).toBe("claude");
     expect(rawConfig.agents.list[0]?.runner?.command).toBe("claude");
     expect(rawConfig.agents.list[0]?.runner?.args).toEqual(["--dangerously-skip-permissions"]);
   });
@@ -164,7 +151,7 @@ describe("agents cli", () => {
     ) as {
       agents: {
         list: Array<{
-          cliTool?: string;
+          cli?: string;
           runner?: {
             command: string;
             args: string[];
@@ -178,7 +165,7 @@ describe("agents cli", () => {
       };
     };
 
-    expect(rawConfig.agents.list[0]?.cliTool).toBe("gemini");
+    expect(rawConfig.agents.list[0]?.cli).toBe("gemini");
     expect(rawConfig.agents.list[0]?.runner?.command).toBe("gemini");
     expect(rawConfig.agents.list[0]?.runner?.args).toEqual([
       "--approval-mode=yolo",
@@ -227,16 +214,19 @@ describe("agents cli", () => {
     ) as {
       agents: {
         list: Array<{
-          startupOptions?: string[];
+          cli?: string;
           runner?: { command: string; args: string[] };
         }>;
       };
     };
 
-    expect(rawConfig.agents.list[0]?.startupOptions).toEqual([
+    expect(rawConfig.agents.list[0]?.cli).toBe("codex");
+    expect(rawConfig.agents.list[0]?.runner?.args).toEqual([
       "--dangerously-bypass-approvals-and-sandbox",
       "--model",
       "gpt-5",
+      "-C",
+      "{workspace}",
     ]);
     expect(rawConfig.agents.list[0]?.runner?.args).toEqual([
       "--dangerously-bypass-approvals-and-sandbox",
@@ -260,7 +250,7 @@ describe("agents cli", () => {
     output.length = 0;
     await runAgentsCli(["bindings"]);
 
-    expect(output.join("\n")).toContain("telegram -> work");
+    expect(output.join("\n")).toContain("Agent bindings are no longer managed here.");
   });
 
   test("sets, shows, and clears agent responseMode", async () => {

@@ -56,9 +56,9 @@ function resolveTelegramReplyTarget(params: {
 
 export const telegramChannelPlugin: ChannelPlugin = {
   id: "telegram",
-  isEnabled: (loadedConfig) => loadedConfig.raw.channels.telegram.enabled,
+  isEnabled: (loadedConfig) => loadedConfig.raw.bots.telegram.defaults.enabled,
   listAccounts: (loadedConfig) =>
-    listTelegramAccounts(loadedConfig.raw.channels.telegram).map(({ accountId, config }) => ({
+    listTelegramAccounts(loadedConfig.raw.bots.telegram).map(({ accountId, config }) => ({
       accountId,
       config,
     })),
@@ -87,7 +87,7 @@ export const telegramChannelPlugin: ChannelPlugin = {
   markStartupFailure: (store, error) => store.markTelegramFailure(error),
   runMessageCommand: async (loadedConfig, command) => {
     const account = resolveTelegramAccountConfig(
-      loadedConfig.raw.channels.telegram,
+      loadedConfig.raw.bots.telegram,
       command.account,
     );
     const shared = {

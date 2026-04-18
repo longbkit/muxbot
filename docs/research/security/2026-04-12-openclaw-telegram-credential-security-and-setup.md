@@ -58,7 +58,7 @@ This note does not propose final implementation details for `clisbot` beyond res
 - `openclaw-private/docs/start/setup.md`
 - `openclaw-private/deploy/docs/add-telegram-bot-guide.md`
 - `openclaw-private/appcast.xml`
-- `clisbot/config/clisbot.json.template`
+- `clisbot/config/clisbot.json.v0.1.0.template`
 - `clisbot/docs/user-guide/channel-accounts.md`
 - `clisbot/docs/user-guide/channels.md`
 

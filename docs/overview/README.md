@@ -14,6 +14,7 @@ This folder should answer:
 
 - [human-requirements.md](human-requirements.md): raw human-provided requirements and notes
 - [launch-mvp-path.md](launch-mvp-path.md): current launch order, market packaging, and expansion sequence
+- [prioritization.md](prioritization.md): current task-prioritization lens across stability, speed, extension readiness, native chat UX, end-to-end leverage, and AI workflow improvement
 - [specs-review-checklist-draft.md](specs-review-checklist-draft.md): experimental short checklist for reviewing specs before implementation hardens
 
 ## Project Goal

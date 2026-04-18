@@ -6,17 +6,37 @@ export function renderChannelsHelp() {
   return [
     "clisbot channels",
     "",
+    "Mental model:",
+    "  - current runtime name: `channels`",
+    "  - think of this as the current route surface plus provider enablement",
+    "  - use `accounts add ...` for long-term bot credential management",
+    "  - `channels set-token` and `channels clear-token` are legacy credential shortcuts",
+    "",
     "Usage:",
     "  clisbot channels",
     "  clisbot channels --help",
     "  clisbot channels enable <slack|telegram>",
     "  clisbot channels disable <slack|telegram>",
-    "  clisbot channels add telegram-group <chatId> [--topic <topicId>] [--agent <id>] [--require-mention true|false]",
+    "  clisbot channels add telegram-group <chatId> [--topic <topicId>] [--require-mention true|false]",
     "  clisbot channels remove telegram-group <chatId> [--topic <topicId>]",
-    "  clisbot channels add slack-channel <channelId> [--agent <id>] [--require-mention true|false]",
+    "  clisbot channels add slack-channel <channelId> [--require-mention true|false]",
     "  clisbot channels remove slack-channel <channelId>",
-    "  clisbot channels add slack-group <groupId> [--agent <id>] [--require-mention true|false]",
+    "  clisbot channels add slack-group <groupId> [--require-mention true|false]",
     "  clisbot channels remove slack-group <groupId>",
+    "  clisbot channels bind slack-account --agent <id> [--account <accountId>]",
+    "  clisbot channels bind telegram-account --agent <id> [--account <accountId>]",
+    "  clisbot channels bind slack-channel <channelId> --agent <id>",
+    "  clisbot channels bind slack-group <groupId> --agent <id>",
+    "  clisbot channels bind slack-dm --agent <id>",
+    "  clisbot channels bind telegram-group <chatId> [--topic <topicId>] --agent <id>",
+    "  clisbot channels bind telegram-dm --agent <id>",
+    "  clisbot channels unbind slack-account [--account <accountId>]",
+    "  clisbot channels unbind telegram-account [--account <accountId>]",
+    "  clisbot channels unbind slack-channel <channelId>",
+    "  clisbot channels unbind slack-group <groupId>",
+    "  clisbot channels unbind slack-dm",
+    "  clisbot channels unbind telegram-group <chatId> [--topic <topicId>]",
+    "  clisbot channels unbind telegram-dm",
     "  clisbot channels response-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]",
     "  clisbot channels response-mode set <capture-pane|message-tool> --channel <slack|telegram> [--target <target>] [--topic <topicId>]",
     "  clisbot channels additional-message-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]",
@@ -33,6 +53,9 @@ export function renderChannelsHelp() {
     "  - Telegram forum topics need channels.telegram.groups.<chatId>.topics.<topicId>",
     "  - route adds for Slack channels, Slack groups, Telegram groups, and Telegram topics default to `requireMention: true` unless you pass `--require-mention false`",
     "  - Adding a route puts that surface on the allowlist; other channels, groups, or topics still need to be added explicitly",
+    "  - preferred mapping: `channels add ...` for route admission, `channels bind ...` for agent routing, `agents bind ...` only for account fallback compatibility",
+    "  - `channels add ... --agent <id>` is still accepted as a compatibility shorthand, but `channels bind ... --agent <id>` is the canonical routing command now",
+    "  - `bind slack-account` and `bind telegram-account` are still fallback bot-binding commands even though the runtime family name is `channels`",
     "  - Tune route settings such as requireMention and followUp in clisbot.json when a surface should behave differently",
     `  - Manage routed auth and /bash access in ${AUTH_USER_GUIDE_DOC_PATH}`,
     "  - Response delivery can be tuned with responseMode: `capture-pane` or `message-tool`",
@@ -132,6 +155,9 @@ export function renderRouteAddGuidance(params: {
       "  - new Slack channel/group routes default to `requireMention: true` unless you passed `--require-mention false`",
     );
     console.log(
+      `  - bind an agent with \`clisbot channels bind slack-${routeLabel} ${params.routeId} --agent <id>\``,
+    );
+    console.log(
       "  - if you want pairing-style access control for DMs, set channels.slack.directMessages.policy to `pairing`",
     );
     console.log(
@@ -154,6 +180,11 @@ export function renderRouteAddGuidance(params: {
     );
     console.log(
       "  - new Telegram group/topic routes default to `requireMention: true` unless you passed `--require-mention false`",
+    );
+    console.log(
+      params.kind === "topic"
+        ? `  - bind an agent with \`clisbot channels bind telegram-group ${chatId} --topic ${topicId} --agent <id>\``
+        : `  - bind an agent with \`clisbot channels bind telegram-group ${params.routeId} --agent <id>\``,
     );
     console.log(
       "  - if you want pairing-style access control for DMs, set channels.telegram.directMessages.policy to `pairing`",

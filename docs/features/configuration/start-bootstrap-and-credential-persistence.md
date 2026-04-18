@@ -62,9 +62,9 @@ Preferred persistence order:
 - explicit config state that tells the operator which credential source is active
 - status surfaces that explain which credential source is active
 - default credentials-directory `.gitignore` guidance
-- `clisbot accounts persist` and `clisbot start --persist`
+- `clisbot bots add ... --persist`, `clisbot bots set-credentials ... --persist`, and `clisbot start --persist`
 - repeated account blocks inside one `start` command
-- `clisbot accounts add` with the same token-input rules as `start`
+- `clisbot bots add` with the same token-input rules as `start`
 - config examples for one default account and multiple accounts
 
 ## Why
@@ -351,7 +351,7 @@ Implementation note:
 - cold `clisbot start` injects raw mem credentials into the spawned runtime process environment instead of writing them to disk
 - mem credentials are process-scoped and do not survive `stop`, `restart`, or a fresh runtime launch without new explicit input
 - `clisbot stop` and the next cold `clisbot start` both sanitize expired mem accounts by disabling them in config so stale mem state does not fail startup
-- hot raw-token account updates for an already-running runtime remain a separate control-plane problem; phase 1 keeps `accounts add` raw-token support tied to the active runtime only
+- hot raw-token bot updates for an already-running runtime remain a separate control-plane problem; phase 1 keeps `bots add` raw-token support tied to the active runtime only
 
 Important behavior:
 

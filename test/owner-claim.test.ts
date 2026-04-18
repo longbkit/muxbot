@@ -10,155 +10,19 @@ import {
   resetOwnerClaimRuntimeForTests,
 } from "../src/auth/owner-claim.ts";
 import { readEditableConfig, writeEditableConfig } from "../src/config/config-file.ts";
-import type { ClisbotConfig } from "../src/config/schema.ts";
+import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 function createConfig(): ClisbotConfig {
-  return {
-    meta: { schemaVersion: 1 },
-    tmux: { socketPath: "~/.clisbot/state/clisbot.sock" },
-    session: {
-      mainKey: "main",
-      dmScope: "main",
-      identityLinks: {},
-      storePath: "~/.clisbot/state/sessions.json",
-    },
-    app: {
-      auth: {
-        ownerClaimWindowMinutes: 30,
-        defaultRole: "member",
-        roles: {
-          owner: { allow: ["configManage"], users: [] },
-          admin: { allow: ["configManage", "appAuthManage"], users: [] },
-          member: { allow: [], users: [] },
-        },
-      },
-    },
-    agents: {
-      defaults: {
-        workspace: "~/.clisbot/workspaces/{agentId}",
-        auth: {
-          defaultRole: "member",
-          roles: {
-            admin: { allow: ["sendMessage", "shellExecute"], users: [] },
-            member: { allow: ["sendMessage"], users: [] },
-          },
-        },
-        runner: {
-          command: "codex",
-          args: ["-C", "{workspace}"],
-          trustWorkspace: true,
-          startupDelayMs: 1,
-          startupRetryCount: 2,
-          startupRetryDelayMs: 0,
-          promptSubmitDelayMs: 1,
-          sessionId: {
-            create: { mode: "runner", args: [] },
-            capture: {
-              mode: "off",
-              statusCommand: "/status",
-              pattern: "x",
-              timeoutMs: 1,
-              pollIntervalMs: 1,
-            },
-            resume: { mode: "off", args: [] },
-          },
-        },
-        stream: {
-          captureLines: 1,
-          updateIntervalMs: 1,
-          idleTimeoutMs: 1,
-          noOutputTimeoutMs: 1,
-          maxRuntimeMin: 1,
-          maxMessageChars: 100,
-        },
-        session: {
-          createIfMissing: true,
-          staleAfterMinutes: 60,
-          name: "{sessionKey}",
-        },
-      },
-      list: [{ id: "default" }],
-    },
-    bindings: [],
-    control: {
-      configReload: { watch: false, watchDebounceMs: 250 },
-      sessionCleanup: { enabled: true, intervalMinutes: 5 },
-      loop: { maxRunsPerLoop: 20, maxActiveLoops: 10 },
-      runtimeMonitor: {
-        restartBackoff: {
-          fastRetry: { delaySeconds: 10, maxRestarts: 3 },
-          stages: [
-            { delayMinutes: 15, maxRestarts: 4 },
-            { delayMinutes: 30, maxRestarts: 4 },
-          ],
-        },
-        ownerAlerts: { enabled: true, minIntervalMinutes: 30 },
-      },
-    },
-    channels: {
-      slack: {
-        enabled: false,
-        mode: "socket",
-        appToken: "",
-        botToken: "",
-        defaultAccount: "default",
-        accounts: {},
-        agentPrompt: { enabled: true, maxProgressMessages: 3, requireFinalResponse: true },
-        allowBots: false,
-        ackReaction: "",
-        typingReaction: "",
-        processingStatus: { enabled: true, status: "Working...", loadingMessages: [] },
-        replyToMode: "thread",
-        channelPolicy: "allowlist",
-        groupPolicy: "allowlist",
-        defaultAgentId: "default",
-        commandPrefixes: { slash: ["::", "\\"], bash: ["!"] },
-        streaming: "all",
-        response: "final",
-        responseMode: "message-tool",
-        additionalMessageMode: "steer",
-        verbose: "minimal",
-        followUp: { mode: "auto", participationTtlMin: 5 },
-        channels: {},
-        groups: {},
-        directMessages: {
-          enabled: true,
-          policy: "pairing",
-          allowFrom: [],
-          requireMention: false,
-          agentId: "default",
-        },
-      },
-      telegram: {
-        enabled: false,
-        mode: "polling",
-        botToken: "",
-        defaultAccount: "default",
-        accounts: {},
-        agentPrompt: { enabled: true, maxProgressMessages: 3, requireFinalResponse: true },
-        allowBots: false,
-        groupPolicy: "allowlist",
-        defaultAgentId: "default",
-        commandPrefixes: { slash: ["::", "\\"], bash: ["!"] },
-        streaming: "all",
-        response: "final",
-        responseMode: "message-tool",
-        additionalMessageMode: "steer",
-        verbose: "minimal",
-        followUp: { mode: "auto", participationTtlMin: 5 },
-        polling: { timeoutSeconds: 20, retryDelayMs: 1000 },
-        groups: {},
-        directMessages: {
-          enabled: true,
-          policy: "pairing",
-          allowFrom: [],
-          requireMention: false,
-          allowBots: false,
-          agentId: "default",
-        },
-      },
-    },
-  };
+  const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
+  config.app.auth.roles.admin.allow = ["configManage", "appAuthManage"];
+  config.agents.defaults.auth.roles.admin.allow = ["sendMessage", "shellExecute"];
+  config.agents.defaults.auth.roles.member.allow = ["sendMessage"];
+  config.agents.list = [{ id: "default" }];
+  config.app.control.configReload.watch = false;
+  config.bots.slack.defaults.enabled = false;
+  config.bots.telegram.defaults.enabled = false;
+  return config;
 }
 
 describe("owner claim", () => {

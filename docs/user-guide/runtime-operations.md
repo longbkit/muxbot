@@ -336,7 +336,7 @@ Operational behavior:
 
 Safe way to verify:
 
-1. change a visible Slack setting such as `channels.slack.ackReaction`
+1. change a visible Slack setting such as `bots.slack.defaults.ackReaction`
 2. save the config file
 3. confirm the reload log appears
 4. send a Slack test message
@@ -355,10 +355,10 @@ Useful fields are:
 
 Current default follow-up window is 5 minutes:
 
-- `channels.slack.followUp.participationTtlMin: 5`
-- `channels.telegram.followUp.participationTtlMin: 5`
+- `bots.slack.defaults.followUp.participationTtlMin: 5`
+- `bots.telegram.defaults.followUp.participationTtlMin: 5`
 
 Optional second-based tuning is also supported:
 
-- `channels.slack.followUp.participationTtlSec`
-- `channels.telegram.followUp.participationTtlSec`
+- `bots.slack.defaults.followUp.participationTtlSec`
+- `bots.telegram.defaults.followUp.participationTtlSec`

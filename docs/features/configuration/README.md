@@ -4,7 +4,7 @@
 
 Configuration is the local control plane for `clisbot`.
 
-It defines how channels, auth, Agents, runners, and control are wired together.
+It defines how app behavior, bots, agents, runners, and control are wired together.
 
 It also defines how runner-owned AI CLI session ids are created, captured, resumed, and persisted.
 
@@ -51,6 +51,34 @@ The system needs one explicit place to define:
 - persisted auth policy such as `app.auth` and `agents.<id>.auth`
 
 Without that, the implementation will drift into hidden defaults and hand-wired behavior.
+
+## Current Runtime Vs Target Shape
+
+Two truths need to stay visible at the same time:
+
+1. current runtime config and CLI still use many legacy names such as `channels`, `accounts`, and top-level binding language
+2. the target operator mental model is now:
+   - `app`
+   - `bots`
+   - `agents`
+
+The docs for this feature should therefore do both:
+
+- describe the current runtime truthfully
+- describe the target shape truthfully
+- never blur the two into one ambiguous contract
+
+Current target direction for the template and migration work:
+
+- top-level ownership should read `app -> bots -> agents`
+- provider-specific bot config should live under `bots.slack.<botId>` and `bots.telegram.<botId>`
+- provider-local nodes should use provider-local ids where the provider is already obvious
+  - Slack examples: `U_OWNER`, `channel:C_GENERAL`, `group:G_SUPPORT_PRIVATE`
+  - Telegram examples: `1276408333`, `-1003455688247`
+- fully qualified prefixes such as `slack:U_OWNER` and `telegram:1276408333` should stay for cross-channel lists only, such as `app.auth.roles.<role>.users`
+- `directMessages` should move toward the same flat-map mental model as `groups`, with `"*"` as the fallback entry
+- DM-specific sender filters should live under `directMessages`, not as ambiguous bot-root keys
+- Slack should keep `channelPolicy` and `groupPolicy` visibly separate because current code still distinguishes them
 
 Current policy meaning:
 
@@ -108,7 +136,17 @@ Current policy meaning:
 
 ## Current Focus
 
-Keep the current local JSON model, but expand it so the system can truthfully express routes, policies, runner choice, default chat rendering, explicit transcript request commands, and the persisted policy inputs used by the auth system.
+Keep the current local JSON model truthful while preparing the migration toward the clearer target shape:
+
+- `app`
+- `bots`
+- `agents`
+
+That means:
+
+- current runtime docs must still describe implemented `channels.*` and `accounts.*` behavior correctly
+- target docs and templates must make the intended ownership model clear enough that future migration does not require another conceptual rewrite
+- any concept already supported in code should be surfaced explicitly in config docs and templates unless it is intentionally being removed
 
 Current Slack defaults should favor visibility:
 
@@ -126,6 +164,9 @@ Current session defaults should favor OpenClaw compatibility:
 - `session.storePath: "~/.clisbot/state/sessions.json"`
 - `agents.defaults.workspace: "~/.clisbot/workspaces/{agentId}"`
 - `agents.defaults.session.name: "{sessionKey}"`
+- `session.dmScope: "main"` is still a valid convenience mode for a single-user personal bot when continuity matters more than DM isolation
+- any shared inbox, multi-user bot, or multi-account DM surface should prefer `per-channel-peer` or `per-account-channel-peer`
+- in the target shape, `mainKey`, `identityLinks`, and `storePath` stay under `app.session`, while `dmScope` belongs closer to inbound bot behavior
 
 Current workspace config should stay agent-centric:
 
@@ -176,6 +217,15 @@ Current Slack route defaults should stay explicit:
 - `commandPrefixes.bash: ["!"]`
 - channel and group routes default to `requireMention: true` unless a route overrides it
 - Telegram groups and topics added through the CLI also default to `requireMention: true`
+- current runtime still uses legacy DM allowlist wording such as `allowFrom`
+- target shape work should move that meaning into the DM route map itself with `directMessages."*".allowUsers` and per-DM override entries when the migration lands
+
+Target shape direction for route maps should stay explicit too:
+
+- `groups` and `directMessages` should read as sibling route maps, not as two unrelated concepts
+- `directMessages."*"` should be the DM fallback route entry
+- provider-local route maps should use local ids inside provider-rooted nodes
+- bot-root config should avoid ambiguous sender filters that can be misread as applying to every surface
 
 Current auth-model rule:
 

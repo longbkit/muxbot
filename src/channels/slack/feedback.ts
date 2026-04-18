@@ -35,9 +35,9 @@ export function renderSlackRouteChoiceMessage(params: {
   return [
     "clisbot: this Slack channel is not configured yet.",
     "",
-    "Ask the bot owner to choose one of these:",
-    `- \`clisbot channels add slack-channel ${params.channelId}\``,
-    `- \`clisbot channels add slack-channel ${params.channelId} --agent <id>\``,
+    "Ask the bot owner to do these:",
+    `- \`clisbot routes add --channel slack channel:${params.channelId} --bot default\``,
+    `- \`clisbot routes set-agent --channel slack channel:${params.channelId} --bot default --agent <id>\``,
     "",
     `After that, ${botReference} and send \`\\start\` or \`\\status\` here.`,
   ].join("\n");

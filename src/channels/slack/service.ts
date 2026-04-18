@@ -71,6 +71,10 @@ import {
   type SlackPostedMessageChunk,
 } from "./transport.ts";
 import type { SlackAccountConfig } from "../../config/channel-accounts.ts";
+import {
+  resolveSlackBotConfig,
+  resolveSlackDirectMessageConfig,
+} from "../../config/channel-accounts.ts";
 import { logLatencyDebug } from "../../control/latency-debug.ts";
 import { buildTokenHint } from "../runtime-identity.ts";
 
@@ -137,6 +141,14 @@ export class SlackSocketService {
       },
     });
     this.registerEvents();
+  }
+
+  private getBotConfig() {
+    return resolveSlackBotConfig(this.loadedConfig.raw.bots.slack, this.accountId);
+  }
+
+  private getDirectMessageConfig(userId?: string) {
+    return resolveSlackDirectMessageConfig(this.getBotConfig(), userId);
   }
 
   private getSlackMaxChars(agentId: string) {
@@ -301,7 +313,7 @@ export class SlackSocketService {
     if (params.conversationKind === "dm") {
       const directUserId =
         typeof event.user === "string" ? event.user.trim() : "";
-      const dmConfig = this.loadedConfig.raw.channels.slack.directMessages;
+      const dmConfig = this.getDirectMessageConfig(directUserId);
       const dmIdentity = {
         platform: "slack" as const,
         conversationKind: params.conversationKind,
@@ -356,7 +368,7 @@ export class SlackSocketService {
       if (dmConfig.policy !== "open" && !auth.mayBypassPairing) {
         const storedAllowFrom = await readChannelAllowFromStore("slack");
         const allowed = isSlackSenderAllowed({
-          allowFrom: [...dmConfig.allowFrom, ...storedAllowFrom],
+          allowFrom: [...dmConfig.allowUsers, ...storedAllowFrom],
           userId: directUserId,
         });
         if (!allowed) {
@@ -543,7 +555,9 @@ export class SlackSocketService {
       timestamp: messageTs,
     };
     let responseChunks: SlackPostedMessageChunk[] = [];
-    const cliTool = getAgentEntry(this.loadedConfig, params.route.agentId)?.cliTool;
+    const cliTool =
+      getAgentEntry(this.loadedConfig, params.route.agentId)?.cli ??
+      this.loadedConfig.raw.agents.defaults.cli;
     const identity = {
       platform: "slack" as const,
       accountId: this.accountId,
@@ -564,7 +578,7 @@ export class SlackSocketService {
     const agentPromptText = buildAgentPromptText({
       text: enrichPromptText(text),
       identity,
-      config: this.loadedConfig.raw.channels.slack.agentPrompt,
+      config: this.getBotConfig().agentPrompt,
       cliTool,
       responseMode: params.route.responseMode,
       streaming: params.route.streaming,
@@ -586,7 +600,7 @@ export class SlackSocketService {
     const ackReactionTask = waitForBackgroundSlackTask(
       addConfiguredReaction(
         this.app.client,
-        this.loadedConfig.raw.channels.slack.ackReaction,
+        this.getBotConfig().ackReaction,
         reactionTarget,
       ),
     );
@@ -597,19 +611,19 @@ export class SlackSocketService {
           addReaction: () =>
             addConfiguredReaction(
               this.app.client,
-              this.loadedConfig.raw.channels.slack.typingReaction,
+              this.getBotConfig().typingReaction,
               reactionTarget,
             ),
           removeReaction: () =>
             removeConfiguredReaction(
               this.app.client,
-              this.loadedConfig.raw.channels.slack.typingReaction,
+              this.getBotConfig().typingReaction,
               reactionTarget,
             ),
           setStatus: () =>
             setSlackAssistantThreadStatus(
               this.app.client,
-              this.loadedConfig.raw.channels.slack.processingStatus,
+              this.getBotConfig().processingStatus,
               {
                 channel: channelId,
                 threadTs,
@@ -642,7 +656,7 @@ export class SlackSocketService {
           buildAgentPromptText({
             text: enrichPromptText(nextText),
             identity,
-            config: this.loadedConfig.raw.channels.slack.agentPrompt,
+            config: this.getBotConfig().agentPrompt,
             cliTool,
             responseMode: params.route.responseMode,
             streaming: params.route.streaming,
@@ -734,11 +748,11 @@ export class SlackSocketService {
       if (!route) {
         if (
           isBotOriginatedSlackEvent(normalizedEvent) &&
-          !this.loadedConfig.raw.channels.slack.allowBots
+          !this.getBotConfig().allowBots
         ) {
           debugSlackEvent("drop-unrouted-bot-mention", {
             eventId: body.event_id,
-            allowBots: this.loadedConfig.raw.channels.slack.allowBots,
+            allowBots: this.getBotConfig().allowBots,
           });
           return;
         }
@@ -795,12 +809,12 @@ export class SlackSocketService {
             text: normalizedEvent.text ?? "",
             botUserId: this.botUserId,
             botUsername: this.botLabel,
-            commandPrefixes: this.loadedConfig.raw.channels.slack.commandPrefixes,
+            commandPrefixes: this.getBotConfig().commandPrefixes,
           }),
           wasMentioned: hasBotMention(normalizedEvent.text ?? "", this.botUserId),
           isBotOriginated:
             isBotOriginatedSlackEvent(normalizedEvent) &&
-            !this.loadedConfig.raw.channels.slack.allowBots,
+            !this.getBotConfig().allowBots,
         });
         if (shouldGuide) {
           try {

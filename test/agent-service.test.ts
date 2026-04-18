@@ -6,6 +6,8 @@ import { AgentService } from "../src/agents/agent-service.ts";
 import { ClearedQueuedTaskError } from "../src/agents/job-queue.ts";
 import { resolveAgentTarget } from "../src/agents/resolved-target.ts";
 import { loadConfig, resolveSessionStorePath } from "../src/config/load-config.ts";
+import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 import { AgentSessionState } from "../src/agents/session-state.ts";
 import { SessionStore } from "../src/agents/session-store.ts";
 import { RunnerService } from "../src/agents/runner-service.ts";
@@ -374,7 +376,7 @@ function buildConfig(params: {
   workspaceTemplate: string;
   runnerCommand: string;
   runnerArgs: string[];
-  sessionId: object;
+  sessionId: NonNullable<ClisbotConfig["agents"]["defaults"]["runner"]["codex"]["sessionId"]>;
   trustWorkspace?: boolean;
   startupDelayMs?: number;
   startupRetryCount?: number;
@@ -392,111 +394,79 @@ function buildConfig(params: {
     maxMessageChars: number;
   }>;
 }) {
-  return {
-    tmux: {
-      socketPath: params.socketPath,
-    },
-    session: {
-      mainKey: "main",
-      dmScope: "main",
-      identityLinks: {},
-      storePath: params.storePath,
-    },
-    agents: {
-      defaults: {
-        workspace: params.workspaceTemplate,
-        runner: {
-          command: params.runnerCommand,
-          args: params.runnerArgs,
-          trustWorkspace: params.trustWorkspace ?? false,
-          startupDelayMs: params.startupDelayMs ?? 1,
-          startupRetryCount: params.startupRetryCount ?? 2,
-          startupRetryDelayMs: params.startupRetryDelayMs ?? 0,
-          promptSubmitDelayMs: 1,
-          ...(params.startupReadyPattern
-            ? { startupReadyPattern: params.startupReadyPattern }
-            : {}),
-          sessionId: params.sessionId,
-        },
-        stream: {
-          captureLines: 80,
-          updateIntervalMs: 1,
-          idleTimeoutMs: 5,
-          noOutputTimeoutMs: 100,
-          maxRuntimeSec: 1,
-          maxMessageChars: 2000,
-          ...(params.streamOverrides ?? {}),
-        },
-        session: {
-          createIfMissing: true,
-          staleAfterMinutes: params.staleAfterMinutes ?? 60,
-          name: "{sessionKey}",
-        },
-      },
-      list: [{ id: "default" }],
-    },
-    control: {
-      configReload: {
-        watch: false,
-        watchDebounceMs: 250,
-      },
-      sessionCleanup: {
-        enabled: params.cleanupEnabled ?? true,
-        intervalMinutes: params.cleanupIntervalMinutes ?? 5,
-      },
-    },
-    channels: {
-      slack: {
-        enabled: false,
-        mode: "socket",
-        appToken: "app-token",
-        botToken: "bot-token",
-        ackReaction: ":heavy_check_mark:",
-        typingReaction: "",
-        processingStatus: {
-          enabled: true,
-          status: "Working...",
-          loadingMessages: [],
-        },
-        channels: {},
-        groups: {},
-        directMessages: {
-          enabled: true,
-          requireMention: false,
-          agentId: "default",
-        },
-      },
-      telegram: {
-        enabled: false,
-        mode: "polling",
-        botToken: "telegram-token",
-        allowBots: false,
-        groupPolicy: "allowlist",
-        defaultAgentId: "default",
-        commandPrefixes: {
-          slash: ["::", "\\"],
-          bash: ["!"],
-        },
-        streaming: "all",
-        response: "final",
-        followUp: {
-          mode: "auto",
-          participationTtlMin: 5,
-        },
-        polling: {
-          timeoutSeconds: 20,
-          retryDelayMs: 1000,
-        },
-        groups: {},
-        directMessages: {
-          enabled: true,
-          requireMention: false,
-          allowBots: false,
-          agentId: "default",
-        },
-      },
-    },
+  const cli =
+    params.runnerCommand === "codex" ||
+      params.runnerCommand === "claude" ||
+      params.runnerCommand === "gemini"
+      ? params.runnerCommand
+      : "codex";
+  const stream = {
+    captureLines: 80,
+    updateIntervalMs: 1,
+    idleTimeoutMs: 5,
+    noOutputTimeoutMs: 100,
+    maxRuntimeSec: 1,
+    maxMessageChars: 2000,
+    ...(params.streamOverrides ?? {}),
   };
+  const config = clisbotConfigSchema.parse(
+    JSON.parse(
+      renderDefaultConfigTemplate({
+        slackEnabled: false,
+        telegramEnabled: false,
+      }),
+    ),
+  );
+
+  config.app.session.mainKey = "main";
+  config.app.session.storePath = params.storePath;
+  config.app.control.configReload.watch = false;
+  config.app.control.configReload.watchDebounceMs = 250;
+  config.app.control.sessionCleanup.enabled = params.cleanupEnabled ?? true;
+  config.app.control.sessionCleanup.intervalMinutes = params.cleanupIntervalMinutes ?? 5;
+
+  config.bots.defaults.dmScope = "main";
+  config.bots.slack.defaults.enabled = false;
+  config.bots.telegram.defaults.enabled = false;
+  config.bots.slack.defaults.defaultBotId = "default";
+  config.bots.telegram.defaults.defaultBotId = "default";
+  config.bots.slack.default.enabled = false;
+  config.bots.telegram.default.enabled = false;
+  config.bots.slack.default.agentId = "default";
+  config.bots.telegram.default.agentId = "default";
+  config.bots.slack.default.appToken = "app-token";
+  config.bots.slack.default.botToken = "bot-token";
+  config.bots.telegram.default.botToken = "telegram-token";
+  config.bots.slack.default.groups = {};
+  config.bots.telegram.default.groups = {};
+
+  config.agents.defaults.defaultAgentId = "default";
+  config.agents.defaults.workspace = params.workspaceTemplate;
+  config.agents.defaults.cli = cli;
+  config.agents.defaults.runner.defaults.tmux.socketPath = params.socketPath;
+  config.agents.defaults.runner.defaults.trustWorkspace = params.trustWorkspace ?? false;
+  config.agents.defaults.runner.defaults.startupDelayMs = params.startupDelayMs ?? 1;
+  config.agents.defaults.runner.defaults.startupRetryCount = params.startupRetryCount ?? 2;
+  config.agents.defaults.runner.defaults.startupRetryDelayMs = params.startupRetryDelayMs ?? 0;
+  config.agents.defaults.runner.defaults.promptSubmitDelayMs = 1;
+  config.agents.defaults.runner.defaults.stream = stream;
+  config.agents.defaults.runner.defaults.session = {
+    createIfMissing: true,
+    staleAfterMinutes: params.staleAfterMinutes ?? 60,
+    name: "{sessionKey}",
+  };
+  config.agents.defaults.runner[cli] = {
+    ...config.agents.defaults.runner[cli],
+    command: params.runnerCommand,
+    args: params.runnerArgs,
+    ...(params.startupReadyPattern
+      ? { startupReadyPattern: params.startupReadyPattern }
+      : {}),
+    ...(params.sessionId ? { sessionId: params.sessionId } : {}),
+  };
+  config.agents.list = [{ id: "default", cli }];
+
+  return config;
 }
 
 describe("AgentService session identity", () => {
@@ -1239,9 +1209,9 @@ describe("AgentService session identity", () => {
         ),
       );
       const loaded = await loadConfig(configPath);
-      loaded.raw.agents.defaults.runner.startupReadyPattern =
+      loaded.raw.agents.defaults.runner.codex.startupReadyPattern =
         "Type your message or @path/to/file";
-      loaded.raw.agents.defaults.runner.startupBlockers = [
+      loaded.raw.agents.defaults.runner.codex.startupBlockers = [
         {
           pattern: "Please visit the following URL to authorize the application",
           message: "Gemini auth required before clisbot can drive the session.",
@@ -1318,8 +1288,9 @@ describe("AgentService session identity", () => {
         ),
       );
       const loaded = await loadConfig(configPath);
-      loaded.raw.agents.defaults.runner.startupDelayMs = 50;
-      loaded.raw.agents.defaults.runner.startupReadyPattern = "Type your message or @path/to/file";
+      loaded.raw.agents.defaults.runner.defaults.startupDelayMs = 50;
+      loaded.raw.agents.defaults.runner.codex.startupReadyPattern =
+        "Type your message or @path/to/file";
       const tmux = new FakeTmuxClient();
       let newSessionCount = 0;
       const originalNewSession = tmux.newSession.bind(tmux);
@@ -1391,7 +1362,8 @@ describe("AgentService session identity", () => {
         ),
       );
       const loaded = await loadConfig(configPath);
-      loaded.raw.agents.defaults.runner.startupReadyPattern = "Type your message or @path/to/file";
+      loaded.raw.agents.defaults.runner.codex.startupReadyPattern =
+        "Type your message or @path/to/file";
       const tmux = new FakeTmuxClient();
       let newSessionCount = 0;
       const originalNewSession = tmux.newSession.bind(tmux);
@@ -1662,10 +1634,13 @@ describe("AgentService session identity", () => {
     );
 
     const loadedConfig = await loadConfig(configPath);
-    loadedConfig.raw.channels.slack.agentPrompt.enabled = true;
-    loadedConfig.raw.channels.slack.channels["c4"] = {
+    loadedConfig.raw.bots.slack.defaults.agentPrompt.enabled = true;
+    loadedConfig.raw.bots.slack.default.groups["channel:c4"] = {
+      enabled: true,
       requireMention: true,
       allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
       responseMode: "message-tool",
       streaming: "off",
     };
@@ -1741,9 +1716,12 @@ describe("AgentService session identity", () => {
     );
 
     const loadedConfig = await loadConfig(configPath);
-    loadedConfig.raw.channels.slack.channels["c4"] = {
+    loadedConfig.raw.bots.slack.default.groups["channel:c4"] = {
+      enabled: true,
       requireMention: true,
       allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
       surfaceNotifications: {
         queueStart: "brief",
         loopStart: "brief",
@@ -2975,8 +2953,15 @@ describe("AgentService session identity", () => {
       const second = service.enqueuePrompt(target, "ping", {
         onUpdate: () => undefined,
       });
-      await Bun.sleep(20);
-      const currentRun = sessionService.activeRuns.get(target.sessionKey);
+      const deadline = Date.now() + 1_000;
+      let currentRun = sessionService.activeRuns.get(target.sessionKey);
+      while (
+        (!currentRun || currentRun.runId === previousRun.runId) &&
+        Date.now() < deadline
+      ) {
+        await Bun.sleep(20);
+        currentRun = sessionService.activeRuns.get(target.sessionKey);
+      }
       expect(currentRun?.runId).toBeDefined();
       expect(currentRun?.runId).not.toBe(previousRun.runId);
 

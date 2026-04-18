@@ -16,6 +16,8 @@ If implementation conflicts with those docs:
 
 Do not silently drift away from the architecture docs.
 
+If you are asked to code in any repo and that repo or one of its subfolders has `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`, pick the one that applies to the current folder scope and follow it strictly.
+
 ## First Read Order
 Load context in this order unless the task is obviously narrower:
 1. `README.md`
@@ -63,7 +65,7 @@ Prefer these repo-standard commands:
 - local dev status: `bun run status`
 - local dev logs: `bun run logs`
 - package build: `bun run build`
-- publish: follow `docs/development/README.md`
+- publish: run `npm login`, then run exactly `npm publish --access public`
 
 Do not invent ad hoc verification flows when one of these commands already fits.
 
@@ -121,6 +123,7 @@ Naming rules:
 - one name should refer to one concept
 - reuse established product and architecture terms where they already fit
 - do not invent a new naming convention when the repo already has one
+- for public CLI flags, use kebab-case only on the command line, keep aliases explicit, and do not introduce camelCase flags
 
 Refactor when you see:
 - duplicated logic or duplicated file purpose

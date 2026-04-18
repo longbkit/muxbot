@@ -1,5 +1,9 @@
 import { type LoadedConfig } from "../../config/load-config.ts";
 import {
+  resolveTelegramBotConfig,
+  resolveTelegramDirectMessageConfig,
+} from "../../config/channel-accounts.ts";
+import {
   buildSharedChannelRoute,
   type SharedChannelRoute,
   type SharedChannelRouteOverride,
@@ -15,6 +19,10 @@ export type TelegramResolvedRoute = {
 
 type TelegramRouteOverride = SharedChannelRouteOverride;
 
+function isAdmittedRoute(route: TelegramRouteOverride | undefined | null) {
+  return !!route && route.enabled !== false && route.policy !== "disabled";
+}
+
 function buildRoute(
   loadedConfig: LoadedConfig,
   params: {
@@ -23,7 +31,10 @@ function buildRoute(
     accountId?: string;
   },
 ): TelegramRoute {
-  const telegramConfig = loadedConfig.raw.channels.telegram;
+  const telegramConfig = resolveTelegramBotConfig(
+    loadedConfig.raw.bots.telegram,
+    params.accountId,
+  );
   return buildSharedChannelRoute({
     loadedConfig,
     channel: "telegram",
@@ -40,12 +51,12 @@ function resolveGroupRoute(
   topicId?: number,
   accountId?: string,
 ): TelegramRoute | null {
-  const telegramConfig = loadedConfig.raw.channels.telegram;
+  const telegramConfig = resolveTelegramBotConfig(loadedConfig.raw.bots.telegram, accountId);
   const groupRoute = telegramConfig.groups[String(chatId)] ?? telegramConfig.groups["*"];
   const topicRoute =
     topicId != null ? groupRoute?.topics?.[String(topicId)] : undefined;
 
-  if (groupRoute || topicRoute) {
+  if (isAdmittedRoute(topicRoute) || isAdmittedRoute(groupRoute)) {
     return buildRoute(loadedConfig, {
       route: {
         ...groupRoute,
@@ -66,14 +77,19 @@ function resolveGroupRoute(
   return null;
 }
 
-function resolveDirectMessageRoute(loadedConfig: LoadedConfig, accountId?: string) {
-  const telegramConfig = loadedConfig.raw.channels.telegram;
-  if (!telegramConfig.directMessages.enabled) {
+function resolveDirectMessageRoute(
+  loadedConfig: LoadedConfig,
+  senderId?: number,
+  accountId?: string,
+) {
+  const telegramConfig = resolveTelegramBotConfig(loadedConfig.raw.bots.telegram, accountId);
+  const route = resolveTelegramDirectMessageConfig(telegramConfig, senderId);
+  if (!isAdmittedRoute(route)) {
     return null;
   }
 
   return buildRoute(loadedConfig, {
-    route: telegramConfig.directMessages,
+    route,
     requireMention: false,
     accountId,
   });
@@ -90,7 +106,7 @@ export function resolveTelegramConversationRoute(params: {
   if (params.chatType === "private") {
     return {
       conversationKind: "dm" as const,
-      route: resolveDirectMessageRoute(params.loadedConfig, params.accountId),
+      route: resolveDirectMessageRoute(params.loadedConfig, params.chatId, params.accountId),
     };
   }
 

@@ -227,17 +227,19 @@ That means clisbot still captures the pane in every case, but decides whether us
 Top-level Slack example:
 
 ```json
-"channels": {
+"bots": {
   "slack": {
-    "agentPrompt": {
-      "enabled": true,
-      "maxProgressMessages": 3,
-      "requireFinalResponse": true
-    },
-    "streaming": "off",
-    "response": "final",
-    "responseMode": "message-tool",
-    "additionalMessageMode": "steer"
+    "defaults": {
+      "agentPrompt": {
+        "enabled": true,
+        "maxProgressMessages": 3,
+        "requireFinalResponse": true
+      },
+      "streaming": "off",
+      "response": "final",
+      "responseMode": "message-tool",
+      "additionalMessageMode": "steer"
+    }
   }
 }
 ```
@@ -245,17 +247,15 @@ Top-level Slack example:
 Slack channel override example:
 
 ```json
-"channels": {
+"bots": {
   "slack": {
-    "streaming": "off",
-    "response": "final",
-    "responseMode": "message-tool",
-    "additionalMessageMode": "steer",
-    "channels": {
-      "C1234567890": {
-        "requireMention": true,
-        "responseMode": "capture-pane",
-        "additionalMessageMode": "queue"
+    "default": {
+      "groups": {
+        "channel:C1234567890": {
+          "requireMention": true,
+          "responseMode": "capture-pane",
+          "additionalMessageMode": "queue"
+        }
       }
     }
   }
@@ -265,21 +265,19 @@ Slack channel override example:
 Telegram group and topic override example:
 
 ```json
-"channels": {
+"bots": {
   "telegram": {
-    "streaming": "off",
-    "response": "final",
-    "responseMode": "message-tool",
-    "additionalMessageMode": "steer",
-    "groups": {
-      "-1001234567890": {
-        "requireMention": false,
-        "responseMode": "capture-pane",
-        "additionalMessageMode": "queue",
-        "topics": {
-          "42": {
-            "responseMode": "message-tool",
-            "additionalMessageMode": "steer"
+    "default": {
+      "groups": {
+        "-1001234567890": {
+          "requireMention": false,
+          "responseMode": "capture-pane",
+          "additionalMessageMode": "queue",
+          "topics": {
+            "42": {
+              "responseMode": "message-tool",
+              "additionalMessageMode": "steer"
+            }
           }
         }
       }
@@ -290,8 +288,8 @@ Telegram group and topic override example:
 
 Interpretation:
 
-- top-level `responseMode` is the provider default
-- top-level `additionalMessageMode` is the provider default for busy-session follow-up
+- `bots.<provider>.defaults.responseMode` is the provider default
+- `bots.<provider>.defaults.additionalMessageMode` is the provider default for busy-session follow-up
 - `agents.list[].responseMode` overrides the provider default for that one agent
 - `agents.list[].additionalMessageMode` overrides the provider default for that one agent
 - a Slack channel route can override it per channel
@@ -319,50 +317,50 @@ Agent override example:
 
 ## Operator Commands
 
-Channel or surface response-mode status:
+Bot or route response-mode status:
 
 ```bash
-clisbot channels response-mode status --channel slack
-clisbot channels response-mode status --channel slack --target channel:C1234567890
-clisbot channels response-mode status --channel slack --target group:G1234567890
-clisbot channels response-mode status --channel slack --target dm:D1234567890
-clisbot channels response-mode status --channel telegram --target -1001234567890
-clisbot channels response-mode status --channel telegram --target -1001234567890 --topic 42
-clisbot channels response-mode status --channel telegram --target 123456789
+clisbot bots get --channel slack --bot default
+clisbot routes get-response-mode --channel slack channel:C1234567890 --bot default
+clisbot routes get-response-mode --channel slack group:G1234567890 --bot default
+clisbot routes get-response-mode --channel slack dm:U1234567890 --bot default
+clisbot routes get-response-mode --channel telegram group:-1001234567890 --bot default
+clisbot routes get-response-mode --channel telegram topic:-1001234567890:42 --bot default
+clisbot routes get-response-mode --channel telegram dm:123456789 --bot default
 ```
 
-Channel or surface response-mode updates:
+Bot or route response-mode updates:
 
 ```bash
-clisbot channels response-mode set message-tool --channel slack --target channel:C1234567890
-clisbot channels response-mode set capture-pane --channel slack --target group:G1234567890
-clisbot channels response-mode set message-tool --channel slack --target dm:D1234567890
-clisbot channels response-mode set message-tool --channel telegram --target -1001234567890
-clisbot channels response-mode set capture-pane --channel telegram --target -1001234567890 --topic 42
-clisbot channels response-mode set message-tool --channel telegram --target 123456789
+clisbot routes set-response-mode --channel slack channel:C1234567890 --bot default --mode message-tool
+clisbot routes set-response-mode --channel slack group:G1234567890 --bot default --mode capture-pane
+clisbot routes set-response-mode --channel slack dm:U1234567890 --bot default --mode message-tool
+clisbot routes set-response-mode --channel telegram group:-1001234567890 --bot default --mode message-tool
+clisbot routes set-response-mode --channel telegram topic:-1001234567890:42 --bot default --mode capture-pane
+clisbot routes set-response-mode --channel telegram dm:123456789 --bot default --mode message-tool
 ```
 
-Channel or surface additional-message-mode status:
+Bot or route additional-message-mode status:
 
 ```bash
-clisbot channels additional-message-mode status --channel slack
-clisbot channels additional-message-mode status --channel slack --target channel:C1234567890
-clisbot channels additional-message-mode status --channel slack --target group:G1234567890
-clisbot channels additional-message-mode status --channel slack --target dm:D1234567890
-clisbot channels additional-message-mode status --channel telegram --target -1001234567890
-clisbot channels additional-message-mode status --channel telegram --target -1001234567890 --topic 42
-clisbot channels additional-message-mode status --channel telegram --target 123456789
+clisbot bots get --channel slack --bot default
+clisbot routes get-additional-message-mode --channel slack channel:C1234567890 --bot default
+clisbot routes get-additional-message-mode --channel slack group:G1234567890 --bot default
+clisbot routes get-additional-message-mode --channel slack dm:U1234567890 --bot default
+clisbot routes get-additional-message-mode --channel telegram group:-1001234567890 --bot default
+clisbot routes get-additional-message-mode --channel telegram topic:-1001234567890:42 --bot default
+clisbot routes get-additional-message-mode --channel telegram dm:123456789 --bot default
 ```
 
-Channel or surface additional-message-mode updates:
+Bot or route additional-message-mode updates:
 
 ```bash
-clisbot channels additional-message-mode set steer --channel slack --target channel:C1234567890
-clisbot channels additional-message-mode set queue --channel slack --target group:G1234567890
-clisbot channels additional-message-mode set steer --channel slack --target dm:D1234567890
-clisbot channels additional-message-mode set steer --channel telegram --target -1001234567890
-clisbot channels additional-message-mode set queue --channel telegram --target -1001234567890 --topic 42
-clisbot channels additional-message-mode set steer --channel telegram --target 123456789
+clisbot routes set-additional-message-mode --channel slack channel:C1234567890 --bot default --mode steer
+clisbot routes set-additional-message-mode --channel slack group:G1234567890 --bot default --mode queue
+clisbot routes set-additional-message-mode --channel slack dm:U1234567890 --bot default --mode steer
+clisbot routes set-additional-message-mode --channel telegram group:-1001234567890 --bot default --mode steer
+clisbot routes set-additional-message-mode --channel telegram topic:-1001234567890:42 --bot default --mode queue
+clisbot routes set-additional-message-mode --channel telegram dm:123456789 --bot default --mode steer
 ```
 
 Agent response-mode status and updates:

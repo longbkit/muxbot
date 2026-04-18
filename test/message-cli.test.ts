@@ -7,6 +7,96 @@ import { resolveTelegramConversationTarget } from "../src/channels/telegram/sess
 import type { ChannelPlugin } from "../src/channels/channel-plugin.ts";
 import type { ParsedMessageCommand } from "../src/channels/message-command.ts";
 import type { LoadConfigOptions, LoadedConfig } from "../src/config/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+
+function createRawConfig(): LoadedConfig["raw"] {
+  const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
+  config.app.session.storePath = "/tmp/sessions.json";
+  config.agents.defaults.workspace = "/tmp/{agentId}";
+  config.agents.defaults.runner.defaults.tmux.socketPath = "/tmp/clisbot.sock";
+  config.agents.defaults.runner.defaults.startupDelayMs = 1;
+  config.agents.defaults.runner.defaults.startupRetryCount = 2;
+  config.agents.defaults.runner.defaults.startupRetryDelayMs = 0;
+  config.agents.defaults.runner.defaults.promptSubmitDelayMs = 1;
+  config.agents.defaults.runner.codex.sessionId!.capture = {
+    mode: "off",
+    statusCommand: "/status",
+    pattern: "id",
+    timeoutMs: 1,
+    pollIntervalMs: 1,
+  };
+  config.agents.defaults.runner.defaults.stream.captureLines = 10;
+  config.agents.defaults.runner.defaults.stream.updateIntervalMs = 10;
+  config.agents.defaults.runner.defaults.stream.idleTimeoutMs = 10;
+  config.agents.defaults.runner.defaults.stream.noOutputTimeoutMs = 10;
+  config.agents.defaults.runner.defaults.stream.maxRuntimeSec = 10;
+  config.agents.defaults.runner.defaults.stream.maxRuntimeMin = undefined;
+  config.agents.defaults.runner.defaults.stream.maxMessageChars = 100;
+  config.agents.list = [{ id: "default" }];
+  config.app.control.configReload.watch = false;
+  config.bots.slack.defaults.enabled = true;
+  config.bots.slack.defaults.defaultBotId = "work";
+  config.bots.slack.defaults.channelPolicy = "allowlist";
+  config.bots.slack.defaults.groupPolicy = "allowlist";
+  config.bots.slack.work = {
+    ...config.bots.slack.default,
+    enabled: true,
+    name: "work",
+    groups: {
+      "channel:C123": {
+        enabled: true,
+        requireMention: true,
+        allowBots: false,
+        allowUsers: [],
+        blockUsers: [],
+      },
+    },
+  };
+  config.bots.slack.alerts = {
+    ...config.bots.slack.default,
+    enabled: true,
+    name: "alerts",
+    groups: {
+      "channel:C123": {
+        enabled: true,
+        requireMention: true,
+        allowBots: false,
+        allowUsers: [],
+        blockUsers: [],
+      },
+    },
+  };
+  delete config.bots.slack.default;
+  config.bots.telegram.defaults.enabled = true;
+  config.bots.telegram.defaults.defaultBotId = "ops";
+  config.bots.telegram.defaults.groupPolicy = "allowlist";
+  config.bots.telegram.ops = {
+    ...config.bots.telegram.default,
+    enabled: true,
+    name: "ops",
+    groups: {
+      "-1001234567890": {
+        enabled: true,
+        requireMention: false,
+        allowBots: false,
+        allowUsers: [],
+        blockUsers: [],
+        topics: {},
+      },
+    },
+  };
+  delete config.bots.telegram.default;
+  return {
+    ...config,
+    session: {
+      ...config.app.session,
+      dmScope: config.bots.defaults.dmScope,
+    },
+    control: config.app.control,
+    tmux: config.agents.defaults.runner.defaults.tmux,
+  };
+}
 
 function createDependencies() {
   const logs: string[] = [];
@@ -21,192 +111,7 @@ function createDependencies() {
     configPath: "/tmp/clisbot.json",
     processedEventsPath: "/tmp/processed-events.json",
     stateDir: "/tmp/clisbot-state",
-    raw: {
-      meta: {
-        schemaVersion: 1,
-      },
-      session: {
-        mainKey: "main",
-        dmScope: "main",
-        identityLinks: {},
-        storePath: "/tmp/sessions.json",
-      },
-      app: {
-        auth: {
-          ownerClaimWindowMinutes: 30,
-          defaultRole: "member",
-          roles: {
-            owner: { allow: ["configManage"], users: [] },
-            admin: { allow: ["configManage"], users: [] },
-            member: { allow: [], users: [] },
-          },
-        },
-      },
-      tmux: {
-        socketPath: "/tmp/clisbot.sock",
-      },
-      agents: {
-        defaults: {
-          workspace: "/tmp/{agentId}",
-          auth: {
-            defaultRole: "member",
-            roles: {
-              admin: { allow: ["shellExecute"], users: [] },
-              member: { allow: ["sendMessage"], users: [] },
-            },
-          },
-          runner: {
-            command: "codex",
-            args: ["-C", "{workspace}"],
-            trustWorkspace: true,
-            startupDelayMs: 1,
-            startupRetryCount: 2,
-            startupRetryDelayMs: 0,
-            promptSubmitDelayMs: 1,
-            sessionId: {
-              create: { mode: "runner", args: [] },
-              capture: {
-                mode: "off",
-                statusCommand: "/status",
-                pattern: "id",
-                timeoutMs: 1,
-                pollIntervalMs: 1,
-              },
-              resume: { mode: "off", args: [] },
-            },
-          },
-          stream: {
-            captureLines: 10,
-            updateIntervalMs: 10,
-            idleTimeoutMs: 10,
-            noOutputTimeoutMs: 10,
-            maxRuntimeSec: 10,
-            maxMessageChars: 100,
-          },
-          session: {
-            createIfMissing: true,
-            staleAfterMinutes: 60,
-            name: "{sessionKey}",
-          },
-        },
-        list: [{ id: "default" }],
-      },
-      bindings: [],
-      control: {
-        configReload: { watch: false, watchDebounceMs: 250 },
-        sessionCleanup: { enabled: true, intervalMinutes: 5 },
-        loop: { maxRunsPerLoop: 20, maxActiveLoops: 10 },
-        runtimeMonitor: {
-          restartBackoff: {
-            fastRetry: { delaySeconds: 10, maxRestarts: 3 },
-            stages: [
-              { delayMinutes: 15, maxRestarts: 4 },
-              { delayMinutes: 30, maxRestarts: 4 },
-            ],
-          },
-          ownerAlerts: { enabled: true, minIntervalMinutes: 30 },
-        },
-      },
-      channels: {
-        slack: {
-          defaultAccount: "work",
-          accounts: {},
-          enabled: true,
-          mode: "socket",
-          appToken: "",
-          botToken: "",
-          agentPrompt: {
-            enabled: true,
-            maxProgressMessages: 3,
-            requireFinalResponse: true,
-          },
-          ackReaction: "",
-          typingReaction: "",
-          processingStatus: {
-            enabled: true,
-            status: "Working...",
-            loadingMessages: [],
-          },
-          allowBots: false,
-          replyToMode: "thread",
-          channelPolicy: "allowlist",
-          groupPolicy: "allowlist",
-          defaultAgentId: "default",
-          commandPrefixes: {
-            slash: ["::", "\\"],
-            bash: ["!"],
-          },
-          streaming: "off",
-          response: "final",
-          responseMode: "message-tool",
-          additionalMessageMode: "steer",
-          verbose: "minimal",
-          followUp: {
-            mode: "auto",
-            participationTtlMin: 5,
-          },
-          channels: {
-            C123: {
-              requireMention: true,
-              allowBots: false,
-            },
-          },
-          groups: {},
-          directMessages: {
-            enabled: true,
-            policy: "pairing",
-            allowFrom: [],
-            requireMention: false,
-          },
-        },
-        telegram: {
-          defaultAccount: "ops",
-          accounts: {},
-          enabled: true,
-          mode: "polling",
-          botToken: "",
-          agentPrompt: {
-            enabled: true,
-            maxProgressMessages: 3,
-            requireFinalResponse: true,
-          },
-          allowBots: false,
-          groupPolicy: "allowlist",
-          defaultAgentId: "default",
-          commandPrefixes: {
-            slash: ["::", "\\"],
-            bash: ["!"],
-          },
-          streaming: "off",
-          response: "final",
-          responseMode: "message-tool",
-          additionalMessageMode: "steer",
-          verbose: "minimal",
-          followUp: {
-            mode: "auto",
-            participationTtlMin: 5,
-          },
-          polling: {
-            timeoutSeconds: 20,
-            retryDelayMs: 1000,
-          },
-          groups: {
-            "-1001234567890": {
-              requireMention: false,
-              allowBots: false,
-              topics: {},
-            },
-          },
-          directMessages: {
-            enabled: true,
-            policy: "pairing",
-            allowFrom: [],
-            requireMention: false,
-            allowBots: false,
-          },
-        },
-      },
-    },
+    raw: createRawConfig(),
   };
 
   const deps = {

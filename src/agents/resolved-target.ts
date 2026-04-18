@@ -4,6 +4,7 @@ import {
   type LoadedConfig,
   resolveMaxRuntimeMs,
 } from "../config/load-config.ts";
+import { clisbotConfigSchema } from "../config/schema.ts";
 import { applyTemplate } from "../shared/paths.ts";
 import { buildTmuxSessionName, normalizeMainKey } from "./session-key.ts";
 
@@ -33,6 +34,12 @@ export function resolveAgentTarget(
   return resolveAgentTargetInternal(loadedConfig, target);
 }
 
+const defaultRunnerConfig = clisbotConfigSchema.parse({
+  app: {},
+  bots: {},
+  agents: {},
+}).agents.defaults.runner;
+
 function resolveAgentTargetInternal(
   loadedConfig: LoadedConfig,
   target: AgentSessionTarget,
@@ -40,20 +47,33 @@ function resolveAgentTargetInternal(
   const defaults = loadedConfig.raw.agents.defaults;
   const override = getAgentEntry(loadedConfig, target.agentId);
   const workspaceTemplate = override?.workspace ?? defaults.workspace;
+  const resolvedCli = override?.cli ?? defaults.cli;
+  const runnerDefaults = defaults.runner.defaults;
+  const configuredRunnerFamily = defaults.runner[resolvedCli];
+  const runnerFamily = {
+    ...defaultRunnerConfig[resolvedCli],
+    ...configuredRunnerFamily,
+    sessionId:
+      configuredRunnerFamily.sessionId ??
+      defaultRunnerConfig[resolvedCli].sessionId,
+  };
+  const runnerSessionId = runnerFamily.sessionId!;
 
   const workspacePath = applyTemplate(workspaceTemplate, {
     agentId: target.agentId,
   });
   const sessionName = buildTmuxSessionName({
-    template: override?.session?.name ?? defaults.session.name,
+    template:
+      override?.runner?.defaults?.session?.name ??
+      runnerDefaults.session.name,
     agentId: target.agentId,
     workspacePath,
     sessionKey: target.sessionKey,
     mainKey: normalizeMainKey(loadedConfig.raw.session.mainKey),
   });
   const resolvedStream = {
-    ...defaults.stream,
-    ...(override?.stream ?? {}),
+    ...runnerDefaults.stream,
+    ...(override?.runner?.defaults?.stream ?? {}),
   };
 
   return {
@@ -64,21 +84,45 @@ function resolveAgentTargetInternal(
     sessionName,
     workspacePath,
     runner: {
-      ...defaults.runner,
-      ...(override?.runner ?? {}),
+      command: override?.runner?.command ?? runnerFamily.command,
+      args: override?.runner?.args ?? runnerFamily.args,
+      trustWorkspace:
+        override?.runner?.defaults?.trustWorkspace ??
+        runnerDefaults.trustWorkspace,
+      startupDelayMs:
+        override?.runner?.startupDelayMs ??
+        runnerFamily.startupDelayMs ??
+        runnerDefaults.startupDelayMs,
+      startupRetryCount:
+        override?.runner?.startupRetryCount ??
+        runnerFamily.startupRetryCount ??
+        runnerDefaults.startupRetryCount,
+      startupRetryDelayMs:
+        override?.runner?.startupRetryDelayMs ??
+        runnerFamily.startupRetryDelayMs ??
+        runnerDefaults.startupRetryDelayMs,
+      startupReadyPattern:
+        override?.runner?.startupReadyPattern ??
+        runnerFamily.startupReadyPattern,
+      startupBlockers:
+        override?.runner?.startupBlockers ??
+        runnerFamily.startupBlockers,
+      promptSubmitDelayMs:
+        override?.runner?.promptSubmitDelayMs ??
+        runnerFamily.promptSubmitDelayMs ??
+        runnerDefaults.promptSubmitDelayMs,
       sessionId: {
-        ...defaults.runner.sessionId,
-        ...(override?.runner?.sessionId ?? {}),
+        ...runnerSessionId,
         create: {
-          ...defaults.runner.sessionId.create,
+          ...runnerSessionId.create,
           ...(override?.runner?.sessionId?.create ?? {}),
         },
         capture: {
-          ...defaults.runner.sessionId.capture,
+          ...runnerSessionId.capture,
           ...(override?.runner?.sessionId?.capture ?? {}),
         },
         resume: {
-          ...defaults.runner.sessionId.resume,
+          ...runnerSessionId.resume,
           ...(override?.runner?.sessionId?.resume ?? {}),
         },
       },
@@ -92,8 +136,8 @@ function resolveAgentTargetInternal(
       maxRuntimeMs: resolveMaxRuntimeMs(resolvedStream),
     },
     session: {
-      ...defaults.session,
-      ...(override?.session ?? {}),
+      ...runnerDefaults.session,
+      ...(override?.runner?.defaults?.session ?? {}),
     },
   };
 }

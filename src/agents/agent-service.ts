@@ -56,6 +56,12 @@ import type { ChannelIdentity } from "../channels/channel-identity.ts";
 import type { StoredLoopSurfaceBinding } from "./loop-state.ts";
 import { applyTemplate } from "../shared/paths.ts";
 import type { StoredRecentConversationMessage } from "../shared/recent-message-context.ts";
+import {
+  resolveSlackBotConfig,
+  resolveSlackDirectMessageConfig,
+  resolveTelegramBotConfig,
+  resolveTelegramDirectMessageConfig,
+} from "../config/channel-accounts.ts";
 
 type StreamUpdate = RunUpdate;
 
@@ -605,8 +611,8 @@ export class AgentService {
   }
 
   getMaxMessageChars(agentId: string) {
-    const defaults = this.loadedConfig.raw.agents.defaults.stream;
-    const override = getAgentEntry(this.loadedConfig, agentId)?.stream;
+    const defaults = this.loadedConfig.raw.agents.defaults.runner.defaults.stream;
+    const override = getAgentEntry(this.loadedConfig, agentId)?.runner?.defaults?.stream;
     return {
       ...defaults,
       ...(override ?? {}),
@@ -768,23 +774,32 @@ export class AgentService {
 
   private resolveLoopSurfaceNotifications(identity: ChannelIdentity): SurfaceNotificationsConfig {
     if (identity.platform === "slack") {
-      const channelConfig = this.loadedConfig.raw.channels.slack;
+      const channelConfig = resolveSlackBotConfig(
+        this.loadedConfig.raw.bots.slack,
+        identity.accountId,
+      );
       let resolved: SurfaceNotificationsConfig = {
         queueStart: channelConfig.surfaceNotifications?.queueStart ?? "brief",
         loopStart: channelConfig.surfaceNotifications?.loopStart ?? "brief",
       };
 
       if (identity.conversationKind === "dm") {
+        const directMessageConfig = resolveSlackDirectMessageConfig(
+          channelConfig,
+          identity.senderId,
+        );
         return {
           ...resolved,
-          ...(channelConfig.directMessages.surfaceNotifications ?? {}),
+          ...(directMessageConfig?.surfaceNotifications ?? {}),
         };
       }
 
-      const routeCollection =
-        identity.conversationKind === "group" ? channelConfig.groups : channelConfig.channels;
+      const routeCollection = channelConfig.groups;
+      const routeKey = identity.conversationKind === "group"
+        ? identity.channelId ? `group:${identity.channelId}` : undefined
+        : identity.channelId ? `channel:${identity.channelId}` : undefined;
       const route = identity.channelId
-        ? routeCollection[identity.channelId] ?? routeCollection["*"]
+        ? routeCollection[routeKey ?? ""] ?? routeCollection["*"]
         : undefined;
       return {
         ...resolved,
@@ -792,16 +807,23 @@ export class AgentService {
       };
     }
 
-    const channelConfig = this.loadedConfig.raw.channels.telegram;
+    const channelConfig = resolveTelegramBotConfig(
+      this.loadedConfig.raw.bots.telegram,
+      identity.accountId,
+    );
     let resolved: SurfaceNotificationsConfig = {
       queueStart: channelConfig.surfaceNotifications?.queueStart ?? "brief",
       loopStart: channelConfig.surfaceNotifications?.loopStart ?? "brief",
     };
 
     if (identity.conversationKind === "dm") {
+      const directMessageConfig = resolveTelegramDirectMessageConfig(
+        channelConfig,
+        identity.senderId,
+      );
       return {
         ...resolved,
-        ...(channelConfig.directMessages.surfaceNotifications ?? {}),
+        ...(directMessageConfig?.surfaceNotifications ?? {}),
       };
     }
 
@@ -953,15 +975,15 @@ export class AgentService {
     const identity = this.buildLoopChannelIdentity(loop.surfaceBinding);
     const channelConfig =
       identity.platform === "slack"
-        ? this.loadedConfig.raw.channels.slack
-        : this.loadedConfig.raw.channels.telegram;
+        ? resolveSlackBotConfig(this.loadedConfig.raw.bots.slack, identity.accountId)
+        : resolveTelegramBotConfig(this.loadedConfig.raw.bots.telegram, identity.accountId);
     const { responseMode, streaming } = this.resolveLoopSurfaceModes(identity);
 
     return buildAgentPromptText({
       text: loop.canonicalPromptText,
       identity,
       config: channelConfig.agentPrompt,
-      cliTool: getAgentEntry(this.loadedConfig, agentId)?.cliTool,
+      cliTool: getAgentEntry(this.loadedConfig, agentId)?.cli,
       responseMode,
       streaming,
       protectedControlMutationRule: loop.protectedControlMutationRule,
@@ -981,17 +1003,41 @@ export class AgentService {
   }
 
   private resolveLoopSurfaceModes(identity: ChannelIdentity) {
-    const channelConfig =
-      identity.platform === "slack"
-        ? this.loadedConfig.raw.channels.slack
-        : this.loadedConfig.raw.channels.telegram;
+    let responseMode: "capture-pane" | "message-tool";
+    let streaming: "off" | "latest" | "all";
 
-    let responseMode = channelConfig.responseMode;
-    let streaming = channelConfig.streaming;
+    if (identity.platform === "slack") {
+      const channelConfig = resolveSlackBotConfig(
+        this.loadedConfig.raw.bots.slack,
+        identity.accountId,
+      );
+      responseMode = channelConfig.responseMode;
+      streaming = channelConfig.streaming;
 
-    if (identity.conversationKind === "dm") {
-      responseMode = channelConfig.directMessages.responseMode ?? responseMode;
-      streaming = channelConfig.directMessages.streaming ?? streaming;
+      if (identity.conversationKind === "dm") {
+        const directMessageConfig = resolveSlackDirectMessageConfig(
+          channelConfig,
+          identity.senderId,
+        );
+        responseMode = directMessageConfig?.responseMode ?? responseMode;
+        streaming = directMessageConfig?.streaming ?? streaming;
+      }
+    } else {
+      const channelConfig = resolveTelegramBotConfig(
+        this.loadedConfig.raw.bots.telegram,
+        identity.accountId,
+      );
+      responseMode = channelConfig.responseMode;
+      streaming = channelConfig.streaming;
+
+      if (identity.conversationKind === "dm") {
+        const directMessageConfig = resolveTelegramDirectMessageConfig(
+          channelConfig,
+          identity.senderId,
+        );
+        responseMode = directMessageConfig?.responseMode ?? responseMode;
+        streaming = directMessageConfig?.streaming ?? streaming;
+      }
     }
 
     try {

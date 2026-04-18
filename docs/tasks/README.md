@@ -14,6 +14,8 @@ This folder should answer, quickly:
 
 `backlog.md` is the canonical index.
 
+Task priority should follow the project lens in [docs/overview/prioritization.md](../overview/prioritization.md), not only the short `P0`/`P1` labels in the backlog table.
+
 ## Information Architecture
 
 Keep task docs easy to scan from generic to detail:

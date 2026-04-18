@@ -24,22 +24,71 @@ function getFirstAccountId(accounts: Array<{ accountId: string }>) {
   return accounts[0]?.accountId ?? "default";
 }
 
+function getEnabledBotIds(bots: Record<string, { enabled?: boolean }>) {
+  return Object.entries(bots)
+    .filter(([, bot]) => bot.enabled !== false)
+    .map(([botId]) => botId);
+}
+
+function getSlackBots(config: ClisbotConfig) {
+  const { defaults, ...bots } = config.bots.slack;
+  return bots;
+}
+
+function getTelegramBots(config: ClisbotConfig) {
+  const { defaults, ...bots } = config.bots.telegram;
+  return bots;
+}
+
+function reconcileSlackConfiguredAccounts(config: ClisbotConfig) {
+  const enabledBotIds = getEnabledBotIds(getSlackBots(config));
+  if (enabledBotIds.length === 0) {
+    config.bots.slack.defaults.enabled = false;
+    return;
+  }
+
+  if (
+    !config.bots.slack.defaults.defaultBotId ||
+    !enabledBotIds.includes(config.bots.slack.defaults.defaultBotId)
+  ) {
+    config.bots.slack.defaults.defaultBotId = enabledBotIds[0];
+  }
+}
+
+function reconcileTelegramConfiguredAccounts(config: ClisbotConfig) {
+  const enabledBotIds = getEnabledBotIds(getTelegramBots(config));
+  if (enabledBotIds.length === 0) {
+    config.bots.telegram.defaults.enabled = false;
+    return;
+  }
+
+  if (
+    !config.bots.telegram.defaults.defaultBotId ||
+    !enabledBotIds.includes(config.bots.telegram.defaults.defaultBotId)
+  ) {
+    config.bots.telegram.defaults.defaultBotId = enabledBotIds[0];
+  }
+}
+
 function applySlackAccountConfig(
-  config: ClisbotConfig["channels"]["slack"],
+  config: ClisbotConfig,
   account: ParsedSlackAccountFlags,
 ) {
   if (!account.appToken || !account.botToken) {
     throw new Error(`Slack account ${account.accountId} is incomplete`);
   }
 
-  config.accounts[account.accountId] = account.appToken.kind === "env" &&
+  const existing = config.bots.slack[account.accountId];
+  config.bots.slack[account.accountId] = account.appToken.kind === "env" &&
       account.botToken.kind === "env"
     ? {
+        ...existing,
         enabled: true,
         appToken: account.appToken.placeholder,
         botToken: account.botToken.placeholder,
       }
     : {
+        ...existing,
         enabled: true,
         credentialType: "mem",
         appToken: "",
@@ -48,72 +97,26 @@ function applySlackAccountConfig(
 }
 
 function applyTelegramAccountConfig(
-  config: ClisbotConfig["channels"]["telegram"],
+  config: ClisbotConfig,
   account: ParsedTelegramAccountFlags,
 ) {
   if (!account.botToken) {
     throw new Error(`Telegram account ${account.accountId} is incomplete`);
   }
 
-  config.accounts[account.accountId] = account.botToken.kind === "env"
+  const existing = config.bots.telegram[account.accountId];
+  config.bots.telegram[account.accountId] = account.botToken.kind === "env"
     ? {
+        ...existing,
         enabled: true,
         botToken: account.botToken.placeholder,
       }
     : {
+        ...existing,
         enabled: true,
         credentialType: "mem",
         botToken: "",
       };
-}
-
-function clearSlackRootTokens(
-  config: ClisbotConfig["channels"]["slack"],
-) {
-  config.appToken = "";
-  config.botToken = "";
-}
-
-function clearTelegramRootToken(
-  config: ClisbotConfig["channels"]["telegram"],
-) {
-  config.botToken = "";
-}
-
-function getEnabledAccountIds(accounts: Record<string, { enabled?: boolean }>) {
-  return Object.entries(accounts)
-    .filter(([, account]) => account.enabled !== false)
-    .map(([accountId]) => accountId);
-}
-
-function reconcileSlackConfiguredAccounts(
-  config: ClisbotConfig["channels"]["slack"],
-) {
-  const enabledAccountIds = getEnabledAccountIds(config.accounts);
-  if (enabledAccountIds.length === 0) {
-    config.enabled = false;
-    clearSlackRootTokens(config);
-    return;
-  }
-  if (!config.defaultAccount || !enabledAccountIds.includes(config.defaultAccount)) {
-    config.defaultAccount = enabledAccountIds[0];
-  }
-  clearSlackRootTokens(config);
-}
-
-function reconcileTelegramConfiguredAccounts(
-  config: ClisbotConfig["channels"]["telegram"],
-) {
-  const enabledAccountIds = getEnabledAccountIds(config.accounts);
-  if (enabledAccountIds.length === 0) {
-    config.enabled = false;
-    clearTelegramRootToken(config);
-    return;
-  }
-  if (!config.defaultAccount || !enabledAccountIds.includes(config.defaultAccount)) {
-    config.defaultAccount = enabledAccountIds[0];
-  }
-  clearTelegramRootToken(config);
 }
 
 export function buildBootstrapRuntimeMemEnv(
@@ -148,7 +151,7 @@ export function deactivateExpiredMemAccounts(
   const activeSlackMemAccounts = activeMemAccounts.slack ?? new Set<string>();
   const activeTelegramMemAccounts = activeMemAccounts.telegram ?? new Set<string>();
 
-  for (const [accountId, account] of Object.entries(config.channels.slack.accounts)) {
+  for (const [accountId, account] of Object.entries(getSlackBots(config))) {
     if (account.credentialType !== "mem" || activeSlackMemAccounts.has(accountId)) {
       continue;
     }
@@ -158,7 +161,7 @@ export function deactivateExpiredMemAccounts(
     account.enabled = false;
   }
 
-  for (const [accountId, account] of Object.entries(config.channels.telegram.accounts)) {
+  for (const [accountId, account] of Object.entries(getTelegramBots(config))) {
     if (account.credentialType !== "mem" || activeTelegramMemAccounts.has(accountId)) {
       continue;
     }
@@ -168,8 +171,8 @@ export function deactivateExpiredMemAccounts(
     account.enabled = false;
   }
 
-  reconcileSlackConfiguredAccounts(config.channels.slack);
-  reconcileTelegramConfiguredAccounts(config.channels.telegram);
+  reconcileSlackConfiguredAccounts(config);
+  reconcileTelegramConfiguredAccounts(config);
 
   return summaries;
 }
@@ -182,41 +185,39 @@ export function applyBootstrapAccountsToConfig(
   },
 ) {
   if (options.firstRun) {
-    config.channels.slack.enabled = accounts.slackAccounts.length > 0;
-    config.channels.slack.accounts = {};
-    config.channels.slack.appToken = "";
-    config.channels.slack.botToken = "";
-    config.channels.slack.defaultAccount = getFirstAccountId(accounts.slackAccounts);
+    config.bots.slack.defaults.enabled = accounts.slackAccounts.length > 0;
+    for (const botId of Object.keys(getSlackBots(config))) {
+      delete config.bots.slack[botId];
+    }
+    config.bots.slack.defaults.defaultBotId = getFirstAccountId(accounts.slackAccounts);
 
-    config.channels.telegram.enabled = accounts.telegramAccounts.length > 0;
-    config.channels.telegram.accounts = {};
-    config.channels.telegram.botToken = "";
-    config.channels.telegram.defaultAccount = getFirstAccountId(accounts.telegramAccounts);
+    config.bots.telegram.defaults.enabled = accounts.telegramAccounts.length > 0;
+    for (const botId of Object.keys(getTelegramBots(config))) {
+      delete config.bots.telegram[botId];
+    }
+    config.bots.telegram.defaults.defaultBotId = getFirstAccountId(accounts.telegramAccounts);
   }
 
   if (accounts.slackAccounts.length > 0) {
-    config.channels.slack.enabled = true;
-    if (!config.channels.slack.defaultAccount || !(config.channels.slack.defaultAccount in config.channels.slack.accounts)) {
-      config.channels.slack.defaultAccount = getFirstAccountId(accounts.slackAccounts);
+    config.bots.slack.defaults.enabled = true;
+    if (!config.bots.slack.defaults.defaultBotId) {
+      config.bots.slack.defaults.defaultBotId = getFirstAccountId(accounts.slackAccounts);
     }
     for (const account of accounts.slackAccounts) {
-      applySlackAccountConfig(config.channels.slack, account);
+      applySlackAccountConfig(config, account);
     }
-    reconcileSlackConfiguredAccounts(config.channels.slack);
+    reconcileSlackConfiguredAccounts(config);
   }
 
   if (accounts.telegramAccounts.length > 0) {
-    config.channels.telegram.enabled = true;
-    if (
-      !config.channels.telegram.defaultAccount ||
-      !(config.channels.telegram.defaultAccount in config.channels.telegram.accounts)
-    ) {
-      config.channels.telegram.defaultAccount = getFirstAccountId(accounts.telegramAccounts);
+    config.bots.telegram.defaults.enabled = true;
+    if (!config.bots.telegram.defaults.defaultBotId) {
+      config.bots.telegram.defaults.defaultBotId = getFirstAccountId(accounts.telegramAccounts);
     }
     for (const account of accounts.telegramAccounts) {
-      applyTelegramAccountConfig(config.channels.telegram, account);
+      applyTelegramAccountConfig(config, account);
     }
-    reconcileTelegramConfiguredAccounts(config.channels.telegram);
+    reconcileTelegramConfiguredAccounts(config);
   }
 }
 
@@ -259,13 +260,13 @@ export function persistBootstrapMemCredentials(
     if (account.appToken?.kind !== "mem" || account.botToken?.kind !== "mem") {
       continue;
     }
-    const paths = persistSlackCredential({
+    persistSlackCredential({
       accountId: account.accountId,
       appToken: account.appToken.secret,
       botToken: account.botToken.secret,
     });
-    config.channels.slack.accounts[account.accountId] = {
-      ...(config.channels.slack.accounts[account.accountId] ?? {}),
+    config.bots.slack[account.accountId] = {
+      ...(config.bots.slack[account.accountId] ?? {}),
       enabled: true,
       credentialType: "tokenFile",
       appToken: "",
@@ -277,21 +278,19 @@ export function persistBootstrapMemCredentials(
       accountId: account.accountId,
       runtimeCredentialsPath,
     });
-    summaries.push(
-      `Persisted slack/${account.accountId} to ${paths.appPath} and ${paths.botPath}.`,
-    );
+    summaries.push(`Persisted slack/${account.accountId} to credential file.`);
   }
 
   for (const account of accounts.telegramAccounts) {
     if (account.botToken?.kind !== "mem") {
       continue;
     }
-    const path = persistTelegramCredential({
+    persistTelegramCredential({
       accountId: account.accountId,
       botToken: account.botToken.secret,
     });
-    config.channels.telegram.accounts[account.accountId] = {
-      ...(config.channels.telegram.accounts[account.accountId] ?? {}),
+    config.bots.telegram[account.accountId] = {
+      ...(config.bots.telegram[account.accountId] ?? {}),
       enabled: true,
       credentialType: "tokenFile",
       botToken: "",
@@ -301,11 +300,11 @@ export function persistBootstrapMemCredentials(
       accountId: account.accountId,
       runtimeCredentialsPath,
     });
-    summaries.push(`Persisted telegram/${account.accountId} to ${path}.`);
+    summaries.push(`Persisted telegram/${account.accountId} to credential file.`);
   }
 
-  clearSlackRootTokens(config.channels.slack);
-  clearTelegramRootToken(config.channels.telegram);
+  reconcileSlackConfiguredAccounts(config);
+  reconcileTelegramConfiguredAccounts(config);
 
   return summaries;
 }

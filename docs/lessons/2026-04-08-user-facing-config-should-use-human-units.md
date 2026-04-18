@@ -6,7 +6,7 @@ summary: User-facing config and status output should prefer minutes and seconds 
 related:
   - docs/features/configuration/README.md
   - docs/user-guide/README.md
-  - config/clisbot.json.template
+  - config/clisbot.json.v0.1.0.template
   - src/config/schema.ts
   - src/config/load-config.ts
   - src/config/duration.ts

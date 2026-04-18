@@ -1,0 +1,40 @@
+# Workflow
+
+## Purpose
+
+Use `docs/workflow/` for AI-assisted product and engineering workflow design that is broader than one feature, but not yet a stable architecture contract.
+
+This folder should capture:
+
+- workflow north stars
+- review-loop design
+- task-readiness flow
+- AI-agent operating patterns that improve delivery quality in this repo
+
+## Current Files
+
+- [brainstorm-and-ideas.md](brainstorm-and-ideas.md): current brainstorming notes for shortest-review-first output, review-loop checklists, and task-readiness specialization
+- [working-prompts.md](working-prompts.md): reusable prompts that are showing good results in real `clisbot` workflow loops
+
+## Current Direction
+
+The current workflow direction is:
+
+- AI should produce the shortest, easiest-to-review artifact first
+- review loops should walk the same high-leverage checklist repeatedly until the artifact is truly clear
+- tasks should be shaped into `Ready` quality before they are handed to autonomous execution flows
+
+## Boundaries
+
+Use this folder for workflow thinking such as:
+
+- how AI should stage work
+- how review loops should converge
+- how readiness should be judged
+- how human and AI handoff should become lower-friction over time
+
+Do not use this folder for:
+
+- stable product contracts that already belong in `docs/features/`
+- system ownership rules that already belong in `docs/architecture/`
+- task-by-task tracking that belongs in `docs/tasks/`

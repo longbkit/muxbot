@@ -1,28 +1,76 @@
 # CLI Commands
 
-## Status
+This page is the operator-facing user guide for the `clisbot` CLI.
 
-Current runtime command inventory.
+It answers two questions:
 
-This page is the canonical overview for operator CLI surfaces and a quick reference for auth and permission planning.
+- what command family does this job
+- what that command family does in practice
 
-CLI flag convention: use kebab-case only on the command line, and support aliases only when they are declared explicitly.
+## Principles
 
-## Source Of Truth
+- use kebab-case for all public flags
+- one noun maps to one concept
+- use `list`, `add`, `remove`, `enable`, `disable`, `get-<key>`, `set-<key>`, and `clear-<key>` consistently
+- `add` creates a new object only
+- when `add` would overwrite existing state, it fails and points to the right `set-<key>` command
 
-- Top-level parse and help: `src/cli.ts`
-- Runtime dispatch: `src/main.ts`
-- Subcommand families:
-  - `src/control/channels-cli.ts`
-  - `src/control/accounts-cli.ts`
-  - `src/control/loops-cli.ts`
-  - `src/control/runner-cli.ts`
-  - `src/control/message-cli.ts`
-  - `src/control/agents-cli.ts`
-  - `src/control/auth-cli.ts`
-  - `src/channels/pairing/cli.ts`
+## Mental Model
 
-If this page and runtime ever disagree, runtime wins.
+- `app`: global runtime behavior
+- `bots`: provider bot identities, credentials, and provider-level defaults
+- `routes`: admitted inbound surfaces under a bot
+- `agents`: execution identity, workspace, and runner behavior
+
+## Resolution Order
+
+When more than one level is configured:
+
+- route agent wins over bot fallback agent
+- bot fallback agent wins over app default agent
+- route settings inherit from the bot first, then route-specific settings override them
+
+## Happy Paths
+
+Start from what you want to do.
+
+- Start from zero:
+  - `clisbot start ...`
+- Add one more bot identity:
+  - `clisbot bots add ...`
+- Add one more channel, group, topic, or DM surface under a bot:
+  - `clisbot routes add ...`
+- Route one specific surface to one specific agent:
+  - `clisbot routes set-agent ...`
+- Set one fallback agent for one whole bot:
+  - `clisbot bots set-agent ...`
+- Set the app-wide default agent:
+  - `clisbot agents set-default ...`
+- Inspect current bot or route state:
+  - `clisbot bots list ...`
+  - `clisbot routes list ...`
+  - `clisbot bots get-<key> ...`
+  - `clisbot routes get-<key> ...`
+
+## Common Flags
+
+- `--channel <slack|telegram>`
+- `--bot <id>`
+- `--agent <id>`
+- `--json`
+- `--persist`
+
+Use `--bot` as the bot selector.
+
+Bot id rules:
+
+- with `--channel`, use the provider-local bot id
+  - `--channel slack --bot default`
+  - `--channel telegram --bot support`
+- without `--channel` on a bot-specific command, use the fully qualified form
+  - `--bot slack:default`
+  - `--bot telegram:support`
+- when a bot-specific command targets one provider and `--bot` is omitted, it defaults to `default`
 
 ## Top-Level
 
@@ -32,184 +80,242 @@ If this page and runtime ever disagree, runtime wins.
 - `clisbot status`
 - `clisbot version`
 - `clisbot logs`
-- `clisbot runner ...`
-- `clisbot channels ...`
-- `clisbot accounts ...`
-- `clisbot loops ...`
-- `clisbot message ...`
+- `clisbot bots ...`
+- `clisbot routes ...`
 - `clisbot agents ...`
 - `clisbot auth ...`
+- `clisbot message ...`
+- `clisbot runner ...`
 - `clisbot pairing ...`
+- `clisbot loops ...`
 - `clisbot init`
 
 ## Service Lifecycle
 
-- `clisbot start [bootstrap flags...]`: seed config if needed and start the detached runtime
+- `clisbot start [first-run flags...]`: bootstrap config if needed and start the detached runtime
 - `clisbot restart`: stop then start again
 - `clisbot stop [--hard]`: stop runtime, optionally clean all tmux sessions on the clisbot socket
 - `clisbot status`: inspect runtime, config, log, tmux state, and the five most recent runner sessions
 - `clisbot logs [--lines N]`: print recent logs
-- `clisbot runner list`: list current tmux runner sessions
-- `clisbot runner inspect <session-name> [--lines N]`: capture one pane snapshot
-- `clisbot runner watch <session-name> [--lines N] [--interval <duration>]`: poll one named tmux session
-- `clisbot runner watch --latest [--lines N] [--interval <duration>] [--timeout <duration>]`: watch the session that most recently admitted a new prompt
-- `clisbot runner watch --next [--lines N] [--interval <duration>] [--timeout <duration>]`: wait for the next newly admitted prompt, then watch that session
-- `clisbot init [bootstrap flags...]`: seed config and optionally first agent without starting runtime
+- `clisbot init [first-run flags...]`: bootstrap config and optional first agent without starting runtime
 
 Focused help:
 
-- `clisbot start --help`: bootstrap-first help for first-run flags, token input, and examples
-- `clisbot init --help`: same bootstrap-focused help, but for config-only setup without starting runtime
+- `clisbot start --help`: first-run help for tokens, bot bootstrap, and examples
+- `clisbot init --help`: same bootstrap help without starting the runtime
 
-## Channels
+## Bots
 
-- `clisbot channels enable <slack|telegram>`
-- `clisbot channels disable <slack|telegram>`
-- `clisbot channels add telegram-group <chatId> [--topic <topicId>] [--require-mention true|false]`
-- `clisbot channels remove telegram-group <chatId> [--topic <topicId>]`
-- `clisbot channels add slack-channel <channelId> [--require-mention true|false]`
-- `clisbot channels remove slack-channel <channelId>`
-- `clisbot channels add slack-group <groupId> [--require-mention true|false]`
-- `clisbot channels remove slack-group <groupId>`
-- `clisbot channels bind slack-account --agent <id> [--account <accountId>]`
-- `clisbot channels bind telegram-account --agent <id> [--account <accountId>]`
-- `clisbot channels bind slack-channel <channelId> --agent <id>`
-- `clisbot channels bind slack-group <groupId> --agent <id>`
-- `clisbot channels bind slack-dm --agent <id>`
-- `clisbot channels bind telegram-group <chatId> [--topic <topicId>] --agent <id>`
-- `clisbot channels bind telegram-dm --agent <id>`
-- `clisbot channels unbind slack-account [--account <accountId>]`
-- `clisbot channels unbind telegram-account [--account <accountId>]`
-- `clisbot channels unbind slack-channel <channelId>`
-- `clisbot channels unbind slack-group <groupId>`
-- `clisbot channels unbind slack-dm`
-- `clisbot channels unbind telegram-group <chatId> [--topic <topicId>]`
-- `clisbot channels unbind telegram-dm`
-- `clisbot channels response-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
-- `clisbot channels response-mode set <capture-pane|message-tool> --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
-- `clisbot channels additional-message-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
-- `clisbot channels additional-message-mode set <queue|steer> --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
-- `clisbot channels set-token <slack-app|slack-bot|telegram-bot> <value>`
-- `clisbot channels clear-token <slack-app|slack-bot|telegram-bot>`
-
-Important behavior:
-
-- route adds for Slack channels, Slack groups, Telegram groups, and Telegram topics default to `requireMention: true`
-- pass `--require-mention false` only when that surface should accept plain non-mention follow-up immediately
-- preferred mapping is:
-  - `accounts add` for credentials
-  - `channels add` for route admission
-  - `channels bind` for specific route and DM agent routing
-  - `agents bind` for account-level fallback compatibility
-
-## Accounts
-
-- `clisbot accounts add telegram --account <id> (--token | --telegram-bot-token) <ENV_NAME|${ENV_NAME}|literal> [--persist]`
-- `clisbot accounts add slack --account <id> (--app-token | --slack-app-token) <ENV_NAME|${ENV_NAME}|literal> (--bot-token | --slack-bot-token) <ENV_NAME|${ENV_NAME}|literal> [--persist]`
-- `clisbot accounts persist --channel <slack|telegram> --account <id>`
-- `clisbot accounts persist --all`
-
-Important behavior:
-
-- `clisbot accounts help` and `clisbot accounts --help` both work
-- env-style values keep the account env-backed
-- `accounts add` accepts both the short account-local flags and the bootstrap-style token flags
-- literal token values without `--persist` stay runtime-only and require a running clisbot runtime
-- `--persist` writes canonical token files for later plain starts
-
-## Loops
-
-- `clisbot loops list`
-- `clisbot loops status`
-- `clisbot loops cancel <id>`
-- `clisbot loops cancel --all`
+One bot is one provider identity.
 
 Examples:
 
-- recurring loops are created from chat with `/loop 5m check CI` or `/loop every day at 07:00 check CI`
-- use `clisbot loops ...` only to inspect or cancel persisted loops later from the operator CLI
+- a Slack bot entry stores one app token source and one bot token source
+- a Telegram bot entry stores one bot token source
 
-## Runner Debugging
+A bot can define:
 
-- `clisbot runner list`
-- `clisbot runner inspect <session-name> [--lines <n>]`
-- `clisbot runner watch <session-name> [--lines <n>] [--interval <duration>]`
-- `clisbot runner watch --latest [--lines <n>] [--interval <duration>] [--timeout <duration>]`
-- `clisbot runner watch --next [--lines <n>] [--interval <duration>] [--timeout <duration>]`
-- `clisbot runner smoke ...`
+- one bot-specific fallback agent
+- conversation admission defaults for direct messages, groups, and Slack channels
+- provider credential sources
+
+Core commands:
+
+- `clisbot bots list [--channel <slack|telegram>] [--json]`
+- `clisbot bots add --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`
+- `clisbot bots add --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`
+- `clisbot bots enable --channel <slack|telegram> [--bot <id>]`
+- `clisbot bots disable --channel <slack|telegram> [--bot <id>]`
+- `clisbot bots remove --channel <slack|telegram> [--bot <id>]`
+- `clisbot bots get --channel <slack|telegram> [--bot <id>] [--json]`
+- `clisbot bots get-agent --channel <slack|telegram> [--bot <id>]`
+- `clisbot bots set-agent --channel <slack|telegram> [--bot <id>] --agent <id>`
+- `clisbot bots clear-agent --channel <slack|telegram> [--bot <id>]`
+- `clisbot bots get-default --channel <slack|telegram>`
+- `clisbot bots set-default --channel <slack|telegram> --bot <id>`
+- `clisbot bots get-credentials-source --channel <slack|telegram> [--bot <id>]`
+- `clisbot bots set-credentials --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
+- `clisbot bots set-credentials --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
+- `clisbot bots get-dm-policy --channel <slack|telegram> [--bot <id>]`
+- `clisbot bots set-dm-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|pairing|allowlist|open>`
+- `clisbot bots get-group-policy --channel <slack|telegram> [--bot <id>]`
+- `clisbot bots set-group-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|allowlist|open>`
+- `clisbot bots get-channel-policy --channel slack [--bot <id>]`
+- `clisbot bots set-channel-policy --channel slack [--bot <id>] --policy <disabled|allowlist|open>`
+
+Token aliases:
+
+- Slack app token: `--app-token`, `--slack-app-token`
+- Slack bot token: `--bot-token`, `--slack-bot-token`
+- Telegram bot token: `--bot-token`, `--telegram-bot-token`
 
 Important behavior:
 
-- main help now promotes `clisbot runner list` and `clisbot runner watch --latest` as the fastest tmux debug entry points
-- `clisbot status` includes the newest five runner sessions by default; if there are more, it prints `(n) sessions more`
-- `watch --latest` means the session with the newest admitted prompt, not the newest tmux spawn
-- `watch --next` waits for the first newly admitted prompt after the command starts, then sticks to that session
-- `--lines` controls the pane tail window for both `inspect` and `watch`
-- `--interval` controls polling cadence for `watch`
-- use raw tmux only when you need lower-level actions beyond this control surface
+- `bots add` creates a new bot only
+- `bots add` does not admit any routes by itself
+- if the bot already exists, `bots add` fails and points to `set-agent`, `set-credentials`, or another matching `set-<key>` command
+- `disable` keeps the bot in config but stops using it for now
+- `remove` deletes the bot from config
+- `bots enable` and `bots disable` are the fast toggle when you want to keep config but stop or resume handling
+- `bots remove` fails while any route still references that bot
+- `bots set-agent` defines the bot-specific fallback agent
+- if no bot-specific fallback agent is set, routing falls back to the app default agent
+- if `--agent` is passed on `bots add`, it binds an existing agent
+- if `--cli` and `--bot-type` are passed on `bots add`, the command creates and bootstraps a new agent for that bot
+- `bots add` rejects ambiguous input such as passing both `--agent` and `--cli`
 
-## Message Tooling
+## Routes
 
-- `clisbot message send ...`
-- `clisbot message poll ...`
-- `clisbot message react ...`
-- `clisbot message reactions ...`
-- `clisbot message read ...`
-- `clisbot message edit ...`
-- `clisbot message delete ...`
-- `clisbot message pin ...`
-- `clisbot message unpin ...`
-- `clisbot message pins ...`
-- `clisbot message search ...`
+One route is one inbound surface under one bot.
+
+It inherits bot defaults first, then overrides only what needs to differ for that one surface.
+
+Examples:
+
+- one Slack public channel under one Slack bot
+- one Slack private group or MPIM under one Slack bot
+- one Slack DM fallback or one specific Slack DM peer under one Slack bot
+- one Telegram group under one Telegram bot
+- one Telegram topic inside one Telegram group under one Telegram bot
+- one Telegram DM fallback or one specific Telegram DM peer under one Telegram bot
+
+Notes:
+
+- a Slack thread inside a channel uses the parent channel route
+- a Telegram topic is its own route because topics are explicit sub-surfaces inside a group
+
+Route ids:
+
+- Slack public channel: `channel:C123456`
+- Slack private group or MPIM: `group:G123456`
+- Slack direct message fallback: `dm:*`
+- Slack specific DM peer: `dm:U123456`
+- Telegram group: `group:-1001234567890`
+- Telegram topic: `topic:-1001234567890:42`
+- Telegram direct message fallback: `dm:*`
+- Telegram specific DM peer: `dm:1276408333`
+
+Core commands:
+
+- `clisbot routes list [--channel <slack|telegram>] [--bot <id>] [--json]`
+- `clisbot routes add --channel slack <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
+- `clisbot routes add --channel telegram <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
+- `clisbot routes enable --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes disable --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes remove --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes get --channel <slack|telegram> <route-id> [--bot <id>] [--json]`
+- `clisbot routes get-agent --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes set-agent --channel <slack|telegram> <route-id> [--bot <id>] --agent <id>`
+- `clisbot routes clear-agent --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes get-policy --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes set-policy --channel <slack|telegram> <route-id> [--bot <id>] --policy <...>`
+- `clisbot routes get-require-mention --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes set-require-mention --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>`
+- `clisbot routes get-allow-bots --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes set-allow-bots --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>`
+- `clisbot routes add-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes remove-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes add-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes remove-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes get-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes set-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <auto|mention-only|paused>`
+- `clisbot routes get-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes set-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>] --minutes <n>`
+- `clisbot routes get-response-mode --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes set-response-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <capture-pane|message-tool>`
+- `clisbot routes clear-response-mode --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes get-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes set-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <queue|steer>`
+- `clisbot routes clear-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]`
+
+Policy rules:
+
+- for Slack public channels, Slack groups, Telegram groups, and Telegram topics, route policy is one of:
+  - `disabled`
+  - `allowlist`
+  - `open`
+- for direct-message routes, route policy is one of:
+  - `disabled`
+  - `pairing`
+  - `allowlist`
+  - `open`
 
 Important behavior:
 
-- `message send` and `message edit` now accept:
-  - `--input <plain|md|html|mrkdwn|blocks>`
-  - `--render <native|none|html|mrkdwn|blocks>`
-  - `--body-file <path>` as an alternative to `--message`
-  - `--message-file <path>` as a compatibility alias for `--body-file`
-- default behavior is intentionally short and stable:
-  - `--input md`
-  - `--render native`
-- `native` means channel-owned rendering:
-  - Telegram currently resolves to Telegram-safe HTML
-  - Slack currently resolves to Slack `mrkdwn`
-- use `--render none` when the content is already in the destination-native format
-  - Telegram example: `--input html --render none`
-  - Slack example: `--input mrkdwn --render none`
-  - Slack raw Block Kit example: `--input blocks --render none`
-- use `--render blocks` when you want Slack Block Kit output from markdown input
-- for the full contract, channel matrix, and current renderer behavior, see [Message Command Formatting And Render Modes](../features/channels/message-command-formatting-and-render-modes.md)
+- `routes add` fails if the target bot does not exist
+- `routes add` fails if the same route already exists under that bot and points to `set-agent` or another `set-<key>` command
+- `disable` keeps the route in config but stops using it for now
+- `remove` deletes the route from config
+- `routes enable` and `routes disable` are the fast toggle when you want to keep the route definition but stop or resume handling
+- `routes set-agent` answers the operator question: which agent should handle this surface?
+- an explicit route agent always wins over the bot-specific fallback agent
+- `allowUsers` and `blockUsers` apply to who may talk to the bot on that route, not to which groups or channels exist
+
+Examples:
+
+- `clisbot routes add --channel slack channel:C_GENERAL`
+- `clisbot routes add --channel slack group:G_SUPPORT --bot support --require-mention false`
+- `clisbot routes add --channel slack dm:U_OWNER --policy allowlist`
+- `clisbot routes add --channel telegram group:-1001234567890`
+- `clisbot routes add --channel telegram topic:-1001234567890:42 --bot support --require-mention false`
+- `clisbot routes set-agent --channel slack channel:C_GENERAL --agent product`
+- `clisbot routes set-require-mention --channel telegram topic:-1001234567890:42 --value false`
+- `clisbot routes add-allow-user --channel slack dm:U_OWNER --user U_OWNER`
+- `clisbot routes add-block-user --channel telegram group:-1001234567890 --user 1276408333`
 
 ## Agents
 
-- `clisbot agents help`
-- `clisbot agents list`
-- `clisbot agents list --bindings`
-- `clisbot agents list --json`
-- `clisbot agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>] [--bind <channel[:accountId]>]...`
+One agent is one execution identity.
+
+The most important mental model is:
+
+- one workspace
+- one identity and instruction set
+- one CLI tool family
+- one set of runner startup and runtime overrides
+
+Examples:
+
+- one Codex work agent with its own workspace and memory
+- one Claude support agent with another workspace and different guidance
+- one Gemini personal agent for one specific bot or route
+
+Core commands:
+
+- `clisbot agents list [--json]`
+- `clisbot agents get <id> [--json]`
+- `clisbot agents add <id> --cli <codex|claude|gemini> --bot-type <personal|team> [--workspace <path>] [--startup-option <arg>]...`
+- `clisbot agents enable <id>`
+- `clisbot agents disable <id>`
+- `clisbot agents remove <id>`
+- `clisbot agents get-default`
+- `clisbot agents set-default <id>`
 - `clisbot agents bootstrap <id> --bot-type <personal|team> [--force]`
-- `clisbot agents bindings [--agent <id>] [--json]`
-- `clisbot agents bind --agent <id> --bind <channel[:accountId]>`
-- `clisbot agents unbind --agent <id> [--bind <channel[:accountId]> | --all]`
-- `clisbot agents response-mode status --agent <id>`
-- `clisbot agents response-mode set <capture-pane|message-tool> --agent <id>`
-- `clisbot agents response-mode clear --agent <id>`
-- `clisbot agents additional-message-mode status --agent <id>`
-- `clisbot agents additional-message-mode set <queue|steer> --agent <id>`
-- `clisbot agents additional-message-mode clear --agent <id>`
+- `clisbot agents get-response-mode --agent <id>`
+- `clisbot agents set-response-mode --agent <id> --mode <capture-pane|message-tool>`
+- `clisbot agents clear-response-mode --agent <id>`
+- `clisbot agents get-additional-message-mode --agent <id>`
+- `clisbot agents set-additional-message-mode --agent <id> --mode <queue|steer>`
+- `clisbot agents clear-additional-message-mode --agent <id>`
 
 Important behavior:
 
-- `clisbot agents --help` and `clisbot agents help` both work
-- `agents add` is the lower-level manual surface; first-run `clisbot start` and `clisbot init` can bootstrap the first `default` agent for you
-- explicit route `agentId` still wins before top-level fallback bindings
+- `agents add` creates a new execution identity only
+- `agents add` fails if the agent already exists
+- `disable` keeps the agent in config but stops exposing it through routing
+- `remove` deletes the agent from config
+- `agents enable` and `agents disable` are the fast toggle when you want to keep the agent but stop or resume exposing it
+- `agents remove` fails while any bot or route still references that agent
+- `agents set-default` defines the global fallback agent when a more specific bot or route choice is absent
+- `--workspace` is optional; a sensible default workspace path exists
+- `agents bootstrap` is the template refresh or upgrade path
+- without `--force`, `agents bootstrap` shows what files would change before overwriting them
+- when practical, `agents bootstrap` shows a diff or at least a file-by-file overwrite plan
 
 ## Auth
 
 - `clisbot auth list [--json]`
-- `clisbot auth show <app|agent-defaults|agent> [--agent <id>] [--json]`
+- `clisbot auth get <app|agent-defaults|agent> [--agent <id>] [--json]`
 - `clisbot auth add-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]`
 - `clisbot auth remove-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]`
 - `clisbot auth add-permission <app|agent-defaults|agent> --role <role> --permission <permission> [--agent <id>]`
@@ -229,16 +335,193 @@ Important behavior:
 - `clisbot auth --help` is the detailed operator help surface for scopes, examples, and permission names
 - app `owner` and `admin` principals bypass DM pairing automatically once granted
 
+## Message Tooling
+
+- `clisbot message send ...`
+- `clisbot message poll ...`
+- `clisbot message react ...`
+- `clisbot message reactions ...`
+- `clisbot message read ...`
+- `clisbot message edit ...`
+- `clisbot message delete ...`
+- `clisbot message pin ...`
+- `clisbot message unpin ...`
+- `clisbot message pins ...`
+- `clisbot message search ...`
+
+Quick guide:
+
+- use `send` to post a new message
+- use `edit` to update one existing message
+- use `react` or `reactions` for emoji reactions
+- use `read` or `search` to inspect message history
+- use `pin`, `unpin`, or `pins` for pinned messages
+- use `poll` to create a poll
+
+Required vs optional:
+
+- `message send` requires `--channel`, `--target`, and one of `--message` or `--body-file`
+- `message edit` requires `--channel`, `--target`, `--message-id`, and one of `--message` or `--body-file`
+- `message react` requires `--channel`, `--target`, `--message-id`, and `--emoji`
+- `message poll` requires `--channel`, `--target`, `--poll-question`, and at least one `--poll-option`
+- `message search` requires `--channel`, `--target`, and `--query`
+
+Important behavior:
+
+- `--account` chooses which bot account sends or edits the message; if omitted, the provider default bot is used
+- `--target` is the destination:
+  - Slack uses destination ids such as channels, groups, or DM destinations
+  - Telegram uses the numeric chat id
+- `--thread-id` chooses the thread or topic container:
+  - Slack uses it for thread replies
+  - Telegram uses it for forum topics
+- `--reply-to` replies to one specific message inside that destination
+- `message send` and `message edit` accept:
+  - `--input <plain|md|html|mrkdwn|blocks>`
+  - `--render <native|none|html|mrkdwn|blocks>`
+  - `--body-file <path>` as an alternative to `--message`
+  - `--message-file <path>` as a compatibility alias for `--body-file`
+- default behavior is intentionally short and stable:
+  - `--input md`
+  - `--render native`
+- `native` means channel-owned rendering:
+  - Telegram currently resolves to Telegram-safe HTML
+  - Slack currently resolves to Slack `mrkdwn`
+- use `--render none` when the content is already in the destination-native format
+  - Telegram example: `--input html --render none`
+  - Slack example: `--input mrkdwn --render none`
+  - Slack raw Block Kit example: `--input blocks --render none`
+- use `--render blocks` when you want Slack Block Kit output from markdown input
+- invalid combinations fail fast:
+  - `--message` and `--body-file` cannot be used together
+  - `--body-file` and `--message-file` are aliases; use only one
+  - Telegram does not use `mrkdwn` or `blocks`
+  - Slack does not use `html`
+  - `--progress` and `--final` cannot be used together
+- `--progress` and `--final` are conversation-tracking signals for agent flow; they are not body formatting options
+- for the full contract, channel matrix, and current renderer behavior, see [Message Command Formatting And Render Modes](../features/channels/message-command-formatting-and-render-modes.md)
+
+## Runner Debugging
+
+- `clisbot runner list`
+- `clisbot runner inspect <session-name> [--lines <n>]`
+- `clisbot runner watch <session-name> [--lines <n>] [--interval <duration>]`
+- `clisbot runner watch --latest [--lines <n>] [--interval <duration>] [--timeout <duration>]`
+- `clisbot runner watch --next [--lines <n>] [--interval <duration>] [--timeout <duration>]`
+- `clisbot runner smoke ...`
+
+Important behavior:
+
+- main help promotes `clisbot runner list` and `clisbot runner watch --latest` as the fastest tmux debug entry points
+- `clisbot status` includes the newest five runner sessions by default; if there are more, it prints `(n) sessions more`
+- `watch --latest` means the session with the newest admitted prompt, not the newest tmux spawn
+- `watch --next` waits for the first newly admitted prompt after the command starts, then sticks to that session
+- `--lines` controls the pane tail window for both `inspect` and `watch`
+- `--interval` controls polling cadence for `watch`
+- use raw tmux only when you need lower-level actions beyond this control surface
+
 ## Pairing
 
-- `clisbot pairing help`
 - `clisbot pairing list <slack|telegram> [--json]`
 - `clisbot pairing approve <slack|telegram> <code>`
 - `clisbot pairing reject <slack|telegram> <code>`
 - `clisbot pairing clear <slack|telegram>`
 
-## Notes
+Important behavior:
 
-- This page is inventory-first by design
-- It is meant to answer “what commands exist” before answering “how each one behaves”
-- For current route and channel operating details, see `docs/user-guide/channels.md`
+- pairing is only relevant for direct-message routes that use `policy=pairing`
+- `list` shows pending pairing requests for one provider at a time
+- `approve` and `reject` operate on one pairing code
+- `clear` removes pending pairing requests for one provider
+
+## Loops
+
+- `clisbot loops list`
+- `clisbot loops status`
+- `clisbot loops cancel <id>`
+- `clisbot loops cancel --all`
+
+Examples:
+
+- recurring loops are created from chat with `/loop 5m check CI` or `/loop every day at 07:00 check CI`
+- use `clisbot loops ...` to inspect or cancel persisted loops later from the operator CLI
+
+## First-Run Flows
+
+### Start From Zero
+
+Telegram personal bot:
+
+```bash
+clisbot start \
+  --channel telegram \
+  --bot-token TELEGRAM_BOT_TOKEN \
+  --cli codex \
+  --bot-type personal \
+  --persist
+```
+
+Slack team bot:
+
+```bash
+clisbot start \
+  --channel slack \
+  --app-token SLACK_APP_TOKEN \
+  --bot-token SLACK_BOT_TOKEN \
+  --cli claude \
+  --bot-type team \
+  --persist
+```
+
+### Add One More Route To The Existing Default Bot
+
+Slack channel to the same default agent:
+
+```bash
+clisbot routes add --channel slack channel:C_GENERAL
+```
+
+Telegram topic to the same default agent:
+
+```bash
+clisbot routes add --channel telegram topic:-1001234567890:42
+```
+
+If that route should use another agent:
+
+```bash
+clisbot routes set-agent --channel telegram topic:-1001234567890:42 --agent alerts
+```
+
+### Add One New Bot With One New Agent
+
+Slack support bot with a fresh Claude team agent:
+
+```bash
+clisbot bots add \
+  --channel slack \
+  --bot support \
+  --app-token SLACK_SUPPORT_APP_TOKEN \
+  --bot-token SLACK_SUPPORT_BOT_TOKEN \
+  --cli claude \
+  --bot-type team \
+  --persist
+
+clisbot routes add --channel slack channel:C_SUPPORT --bot support --require-mention false
+```
+
+Telegram alerts bot with a fresh Gemini personal agent:
+
+```bash
+clisbot bots add \
+  --channel telegram \
+  --bot alerts \
+  --bot-token TELEGRAM_ALERTS_BOT_TOKEN \
+  --cli gemini \
+  --bot-type personal \
+  --persist
+
+clisbot routes add --channel telegram dm:* --bot alerts
+clisbot bots set-dm-policy --channel telegram --bot alerts --policy allowlist
+clisbot routes add-allow-user --channel telegram dm:* --bot alerts --user 1276408333
+```

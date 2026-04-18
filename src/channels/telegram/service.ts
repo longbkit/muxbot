@@ -46,6 +46,11 @@ import { resolveTelegramMessageContent } from "./content.ts";
 import { resolveTelegramAttachmentPaths } from "./attachments.ts";
 import { sleep } from "../../shared/process.ts";
 import type { TelegramAccountConfig } from "../../config/channel-accounts.ts";
+import {
+  resolveTelegramBotConfig,
+  resolveTelegramDirectMessageConfig,
+} from "../../config/channel-accounts.ts";
+import type { ResolvedTelegramBotConfig } from "../../config/channel-accounts.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
 import { buildMentionOnlyFollowUpPrompt } from "../mention-follow-up.ts";
 import { prependRecentConversationContext } from "../../shared/recent-message-context.ts";
@@ -163,7 +168,7 @@ export function renderTelegramUnroutedRouteMessage(params: {
 }
 
 export function buildTelegramCommandRegistrations(
-  telegramConfig: LoadedConfig["raw"]["channels"]["telegram"],
+  telegramConfig: ResolvedTelegramBotConfig,
 ): TelegramCommandRegistration[] {
   const groupChatScopes = Object.keys(telegramConfig.groups)
     .map((chatId) => Number(chatId))
@@ -260,6 +265,14 @@ export class TelegramPollingService {
     });
   }
 
+  private getBotConfig() {
+    return resolveTelegramBotConfig(this.loadedConfig.raw.bots.telegram, this.accountId);
+  }
+
+  private getDirectMessageConfig(senderId?: string | number) {
+    return resolveTelegramDirectMessageConfig(this.getBotConfig(), senderId);
+  }
+
   async start() {
     const me = await callTelegramApi<TelegramGetMeResult>(
       this.accountConfig.botToken,
@@ -299,7 +312,7 @@ export class TelegramPollingService {
   }
 
   private async pollLoop() {
-    const telegramConfig = this.loadedConfig.raw.channels.telegram;
+    const telegramConfig = this.getBotConfig();
     while (this.running) {
       try {
         const controller = new AbortController();
@@ -383,7 +396,7 @@ export class TelegramPollingService {
     const rawText = `${message.text ?? message.caption ?? ""}`.trim();
     const slashCommand = parseAgentCommand(rawText, {
       botUsername: this.botUsername,
-      commandPrefixes: this.loadedConfig.raw.channels.telegram.commandPrefixes,
+      commandPrefixes: this.getBotConfig().commandPrefixes,
     });
     const routeInfo = resolveRouteAndTarget({
       loadedConfig: this.loadedConfig,
@@ -441,8 +454,8 @@ export class TelegramPollingService {
     }
 
     if (routeInfo.conversationKind === "dm") {
-      const directMessages = this.loadedConfig.raw.channels.telegram.directMessages;
       const senderId = message.from?.id != null ? String(message.from.id) : "";
+      const directMessages = this.getDirectMessageConfig(senderId);
       const senderUsername = message.from?.username;
       const dmIdentity = {
         platform: "telegram" as const,
@@ -499,7 +512,7 @@ export class TelegramPollingService {
       if (directMessages.policy !== "open" && !auth.mayBypassPairing) {
         const storedAllowFrom = await readChannelAllowFromStore("telegram");
         const allowed = isTelegramSenderAllowed({
-          allowFrom: [...directMessages.allowFrom, ...storedAllowFrom],
+          allowFrom: [...directMessages.allowUsers, ...storedAllowFrom],
           userId: senderId,
           username: senderUsername,
         });
@@ -652,7 +665,9 @@ export class TelegramPollingService {
         topicId:
           routeInfo.topicId != null ? String(routeInfo.topicId) : undefined,
       };
-      const cliTool = getAgentEntry(this.loadedConfig, routeInfo.route.agentId)?.cliTool;
+      const cliTool =
+        getAgentEntry(this.loadedConfig, routeInfo.route.agentId)?.cli ??
+        this.loadedConfig.raw.agents.defaults.cli;
       const auth = resolveChannelAuth({
         config: this.loadedConfig.raw,
         agentId: routeInfo.route.agentId,
@@ -664,7 +679,7 @@ export class TelegramPollingService {
       const agentPromptText = buildAgentPromptText({
         text: enrichPromptText(text),
         identity,
-        config: this.loadedConfig.raw.channels.telegram.agentPrompt,
+        config: this.getBotConfig().agentPrompt,
         cliTool,
         responseMode: routeInfo.route.responseMode,
         streaming: routeInfo.route.streaming,
@@ -711,7 +726,7 @@ export class TelegramPollingService {
             buildAgentPromptText({
               text: enrichPromptText(nextText),
               identity,
-              config: this.loadedConfig.raw.channels.telegram.agentPrompt,
+              config: this.getBotConfig().agentPrompt,
               cliTool,
               responseMode: routeInfo.route.responseMode,
               streaming: routeInfo.route.streaming,
@@ -798,7 +813,7 @@ export class TelegramPollingService {
     const token = this.accountConfig.botToken;
     try {
       for (const registration of buildTelegramCommandRegistrations(
-        this.loadedConfig.raw.channels.telegram,
+        this.getBotConfig(),
       )) {
         await callTelegramApi(token, "setMyCommands", registration.scope
           ? {
@@ -815,7 +830,7 @@ export class TelegramPollingService {
   }
 
   private async initializeOffset() {
-    const telegramConfig = this.loadedConfig.raw.channels.telegram;
+    const telegramConfig = this.getBotConfig();
     const updates = await retryTelegramPollingConflict({
       operation: () =>
         callTelegramApi<TelegramGetUpdatesResult>(

@@ -63,9 +63,9 @@ export function hasAnyDefaultChannelToken(
 
 export function renderDisabledConfiguredChannelWarningLines(
   config: {
-    channels: {
-      slack: { enabled: boolean };
-      telegram: { enabled: boolean };
+    bots: {
+      slack: { defaults: { enabled: boolean } };
+      telegram: { defaults: { enabled: boolean } };
     };
   },
   availability: DefaultChannelAvailability,
@@ -73,21 +73,21 @@ export function renderDisabledConfiguredChannelWarningLines(
   const lines: string[] = [];
   const configPath = collapseHomePath(getDefaultConfigPath());
 
-  if (availability.slack && !config.channels.slack.enabled) {
+  if (availability.slack && !config.bots.slack.defaults.enabled) {
     lines.push(
-      "warning default Slack tokens are available in SLACK_APP_TOKEN and SLACK_BOT_TOKEN, but channels.slack.enabled is false in the existing config.",
+      "warning default Slack tokens are available in SLACK_APP_TOKEN and SLACK_BOT_TOKEN, but bots.slack.defaults.enabled is false in the existing config.",
     );
     lines.push(
-      `Run \`clisbot channels enable slack\` to enable Slack quickly, or update ${configPath} manually.`,
+      `Run \`clisbot bots enable --channel slack --bot default\` to enable Slack quickly, or update ${configPath} manually.`,
     );
   }
 
-  if (availability.telegram && !config.channels.telegram.enabled) {
+  if (availability.telegram && !config.bots.telegram.defaults.enabled) {
     lines.push(
-      "warning default Telegram token is available in TELEGRAM_BOT_TOKEN, but channels.telegram.enabled is false in the existing config.",
+      "warning default Telegram token is available in TELEGRAM_BOT_TOKEN, but bots.telegram.defaults.enabled is false in the existing config.",
     );
     lines.push(
-      `Run \`clisbot channels enable telegram\` to enable Telegram quickly, or update ${configPath} manually.`,
+      `Run \`clisbot bots enable --channel telegram --bot default\` to enable Telegram quickly, or update ${configPath} manually.`,
     );
   }
 
@@ -144,7 +144,7 @@ export function renderMissingTokenWarningLines(
 
 export function renderConfiguredChannelTokenIssueLines(
   config: {
-    channels: {
+    bots: {
       slack: any;
       telegram: any;
     };
@@ -153,9 +153,9 @@ export function renderConfiguredChannelTokenIssueLines(
 ) {
   const lines: string[] = [];
   try {
-    if (config.channels.slack.enabled) {
+    if (config.bots.slack.defaults.enabled) {
       describeSlackCredentialSource({
-        config: config.channels.slack,
+        config: config.bots.slack,
         env,
       });
     }
@@ -164,9 +164,9 @@ export function renderConfiguredChannelTokenIssueLines(
   }
 
   try {
-    if (config.channels.telegram.enabled) {
+    if (config.bots.telegram.defaults.enabled) {
       describeTelegramCredentialSource({
-        config: config.channels.telegram,
+        config: config.bots.telegram,
         env,
       });
     }
@@ -188,7 +188,7 @@ export function renderConfiguredChannelTokenIssueLines(
 
 export function renderConfiguredChannelTokenStatusLines(
   config: {
-    channels: {
+    bots: {
       slack: any;
       telegram: any;
     };
@@ -197,11 +197,11 @@ export function renderConfiguredChannelTokenStatusLines(
 ) {
   const lines: string[] = [];
 
-  if (config.channels.slack.enabled) {
-    const accountId = config.channels.slack.defaultAccount || "default";
+  if (config.bots.slack.defaults.enabled) {
+    const accountId = config.bots.slack.defaults.defaultBotId || "default";
     try {
       const source = describeSlackCredentialSource({
-        config: config.channels.slack,
+        config: config.bots.slack,
         env,
       });
       lines.push(`Slack account ${accountId}: ${source.detail}`);
@@ -212,11 +212,11 @@ export function renderConfiguredChannelTokenStatusLines(
     }
   }
 
-  if (config.channels.telegram.enabled) {
-    const accountId = config.channels.telegram.defaultAccount || "default";
+  if (config.bots.telegram.defaults.enabled) {
+    const accountId = config.bots.telegram.defaults.defaultBotId || "default";
     try {
       const source = describeTelegramCredentialSource({
-        config: config.channels.telegram,
+        config: config.bots.telegram,
         env,
       });
       lines.push(`Telegram account ${accountId}: ${source.detail}`);

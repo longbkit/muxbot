@@ -90,7 +90,7 @@ function appendChannelNextStepLines(
 
   if (!hasEnabledChannel) {
     lines.push(
-      `${prefix}- run \`clisbot channels enable <slack|telegram>\` for the first channel you want to expose`,
+      `${prefix}- run \`clisbot bots add --channel <slack|telegram> ...\` for the first provider bot you want to expose`,
     );
     return;
   }
@@ -107,10 +107,10 @@ function appendChannelNextStepLines(
     `${prefix}- after DM works, add the bot to the target Slack channel or Telegram group/topic`,
   );
   lines.push(
-    `${prefix}- add the route with \`clisbot channels add slack-channel <channelId>\` or \`clisbot channels add telegram-group <chatId>\``,
+    `${prefix}- add the route with \`clisbot routes add --channel slack channel:<channelId> --bot default\` or \`clisbot routes add --channel telegram group:<chatId> --bot default\``,
   );
   lines.push(
-    `${prefix}- bind the agent with \`clisbot channels bind slack-channel <channelId> --agent <id>\` or \`clisbot channels bind telegram-group <chatId> --agent <id>\``,
+    `${prefix}- bind the agent with \`clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent <id>\` or \`clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>\``,
   );
 
   if (telegramEnabled) {
@@ -313,13 +313,17 @@ function appendChannelSetupNote(
     lines.push(
       `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
     );
-    lines.push(`${prefix}    add group: \`clisbot channels add telegram-group <chatId>\``);
-    lines.push(`${prefix}    bind group: \`clisbot channels bind telegram-group <chatId> --agent <id>\``);
     lines.push(
-      `${prefix}    add topic: \`clisbot channels add telegram-group <chatId> --topic <topicId>\``,
+      `${prefix}    add group: \`clisbot routes add --channel telegram group:<chatId> --bot default\``,
     );
     lines.push(
-      `${prefix}    bind topic: \`clisbot channels bind telegram-group <chatId> --topic <topicId> --agent <id>\``,
+      `${prefix}    bind group: \`clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>\``,
+    );
+    lines.push(
+      `${prefix}    add topic: \`clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default\``,
+    );
+    lines.push(
+      `${prefix}    bind topic: \`clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>\``,
     );
     lines.push(
       `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,
@@ -332,10 +336,18 @@ function appendChannelSetupNote(
     `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
   );
   lines.push(`${prefix}    groups: ${channel.groupPolicy ?? "n/a"}`);
-  lines.push(`${prefix}    add channel: \`clisbot channels add slack-channel <channelId>\``);
-  lines.push(`${prefix}    bind channel: \`clisbot channels bind slack-channel <channelId> --agent <id>\``);
-  lines.push(`${prefix}    add group: \`clisbot channels add slack-group <groupId>\``);
-  lines.push(`${prefix}    bind group: \`clisbot channels bind slack-group <groupId> --agent <id>\``);
+  lines.push(
+    `${prefix}    add channel: \`clisbot routes add --channel slack channel:<channelId> --bot default\``,
+  );
+  lines.push(
+    `${prefix}    bind channel: \`clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent <id>\``,
+  );
+  lines.push(
+    `${prefix}    add group: \`clisbot routes add --channel slack group:<groupId> --bot default\``,
+  );
+  lines.push(
+    `${prefix}    bind group: \`clisbot routes set-agent --channel slack group:<groupId> --bot default --agent <id>\``,
+  );
   lines.push(
     `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,
   );

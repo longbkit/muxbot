@@ -9,7 +9,6 @@ import {
 import { type ClisbotConfig } from "../config/schema.ts";
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
 import { applyBootstrapTemplate, getBootstrapWorkspaceState } from "../agents/bootstrap.ts";
-import { formatBinding } from "../config/bindings.ts";
 import { parseBotType } from "./channel-bootstrap-flags.ts";
 import type {
   AdditionalMessageMode,
@@ -73,12 +72,9 @@ function renderAgentsHelp() {
     "Usage:",
     "  clisbot agents --help",
     "  clisbot agents help",
-    "  clisbot agents list [--bindings] [--json]",
-    "  clisbot agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>] [--bind <channel[:accountId]>]...",
+    "  clisbot agents list [--json]",
+    "  clisbot agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>]",
     "  clisbot agents bootstrap <id> --bot-type <personal|team> [--force]",
-    "  clisbot agents bindings [--agent <id>] [--json]",
-    "  clisbot agents bind --agent <id> --bind <channel[:accountId]>",
-    "  clisbot agents unbind --agent <id> [--bind <channel[:accountId]> | --all]",
     "  clisbot agents response-mode <status|set|clear> --agent <id> [capture-pane|message-tool]",
     "  clisbot agents additional-message-mode <status|set|clear> --agent <id> [queue|steer]",
     "",
@@ -86,8 +82,6 @@ function renderAgentsHelp() {
     "  - `agents add` is the lower-level manual surface; first-run `clisbot start` and `clisbot init` can bootstrap the first `default` agent for you",
     "  - `--cli` is required on `agents add`; supported tools are `codex`, `claude`, and `gemini`",
     "  - omit `--startup-option` to inherit the built-in startup args for the selected CLI tool",
-    "  - `--bind slack`, `--bind telegram`, or `--bind <channel>:<accountId>` creates top-level fallback bindings",
-    "  - explicit route `agentId` on Slack or Telegram still wins before these fallback bindings",
     "  - `response-mode` and `additional-message-mode` mutate per-agent overrides under `agents.list[]`",
   ].join("\n");
 }
@@ -151,7 +145,6 @@ export type AddAgentParams = {
   workspace?: string;
   startupOptions?: string[];
   bootstrap?: AgentBootstrapMode;
-  bindings?: AgentBindingTarget[];
 };
 
 function ensureAgentMissing(config: ClisbotConfig, agentId: string) {
@@ -175,7 +168,7 @@ function ensureAgentExists(config: ClisbotConfig, agentId: string) {
 
 function resolveAgentTool(config: ClisbotConfig, agentId: string) {
   const entry = ensureAgentExists(config, agentId);
-  const cliTool = entry.cliTool ?? inferAgentCliToolId(entry.runner?.command);
+  const cliTool = entry.cli ?? inferAgentCliToolId(entry.runner?.command);
   if (!cliTool) {
     throw new Error(`Unable to infer CLI tool for agent: ${agentId}`);
   }
@@ -183,80 +176,28 @@ function resolveAgentTool(config: ClisbotConfig, agentId: string) {
   return cliTool;
 }
 
-function upsertBinding(config: ClisbotConfig, agentId: string, target: AgentBindingTarget) {
-  const existingIndex = config.bindings.findIndex((binding) => {
-    return (
-      binding.match.channel === target.channel &&
-      (binding.match.accountId ?? "") === (target.accountId ?? "")
-    );
-  });
-
-  if (existingIndex >= 0) {
-    config.bindings[existingIndex] = {
-      match: {
-        channel: target.channel,
-        accountId: target.accountId,
-      },
-      agentId,
-    };
-    return;
-  }
-
-  config.bindings.push({
-    match: {
-      channel: target.channel,
-      accountId: target.accountId,
-    },
-    agentId,
-  });
-}
-
-function removeBinding(config: ClisbotConfig, agentId: string, target?: AgentBindingTarget) {
-  config.bindings = config.bindings.filter((binding) => {
-    if (binding.agentId !== agentId) {
-      return true;
-    }
-
-    if (!target) {
-      return false;
-    }
-
-    return !(
-      binding.match.channel === target.channel &&
-      (binding.match.accountId ?? "") === (target.accountId ?? "")
-    );
-  });
-}
-
 async function listAgents(args: string[]) {
   const { config } = await readEditableConfig(getEditableConfigPath());
   const printJson = hasFlag(args, "--json");
-  const includeBindings = hasFlag(args, "--bindings");
 
   const summaries = config.agents.list.map((agent) => ({
     id: agent.id,
-    cliTool: agent.cliTool ?? agent.runner?.command ?? config.agents.defaults.runner.command,
+    cliTool:
+      agent.cli ??
+      inferAgentCliToolId(agent.runner?.command) ??
+      config.agents.defaults.cli,
     responseMode: agent.responseMode,
     additionalMessageMode: agent.additionalMessageMode,
     workspace:
       agent.workspace ??
       config.agents.defaults.workspace.replaceAll("{agentId}", agent.id),
-    startupOptions:
-      agent.startupOptions ??
-      (agent.cliTool
-        ? DEFAULT_AGENT_TOOL_TEMPLATES[agent.cliTool]?.startupOptions ??
-          agent.runner?.args ??
-          config.agents.defaults.runner.args
-        : agent.runner?.args ?? config.agents.defaults.runner.args),
-    bootstrapMode: agent.bootstrap?.mode,
+    startupOptions: agent.runner?.args,
+    bootstrapMode: agent.bootstrap?.botType,
     bootstrapState: getBootstrapWorkspaceState(
       resolveWorkspacePath(config, agent.id, agent.workspace),
-      agent.bootstrap?.mode,
-      agent.cliTool ?? inferAgentCliToolId(agent.runner?.command) ?? undefined,
+      agent.bootstrap?.botType,
+      agent.cli ?? inferAgentCliToolId(agent.runner?.command) ?? undefined,
     ),
-    bindings: config.bindings
-      .filter((binding) => binding.agentId === agent.id)
-      .map((binding) => formatBinding(binding.match)),
   }));
 
   if (printJson) {
@@ -281,9 +222,6 @@ async function listAgents(args: string[]) {
     if (summary.bootstrapMode) {
       parts.push(`bootstrap=${summary.bootstrapMode}:${summary.bootstrapState}`);
     }
-    if (includeBindings && summary.bindings.length > 0) {
-      parts.push(`bindings=${summary.bindings.join(",")}`);
-    }
     console.log(parts.join(" "));
   }
 }
@@ -293,7 +231,6 @@ export async function addAgentToEditableConfig(params: AddAgentParams) {
   ensureAgentMissing(config, params.agentId);
 
   const cliTool = params.cliTool;
-  const bindings = params.bindings ?? [];
   const toolTemplate = DEFAULT_AGENT_TOOL_TEMPLATES[cliTool];
   const resolvedStartupOptions =
     params.startupOptions && params.startupOptions.length > 0
@@ -301,13 +238,8 @@ export async function addAgentToEditableConfig(params: AddAgentParams) {
       : toolTemplate.startupOptions;
   const runner = buildRunnerFromToolTemplate(cliTool, toolTemplate, resolvedStartupOptions);
   const workspacePath = resolveWorkspacePath(config, params.agentId, params.workspace);
-  const startupOptionsOverride = areStringArraysEqual(
-    resolvedStartupOptions,
-    toolTemplate.startupOptions,
-  )
-    ? undefined
-    : resolvedStartupOptions;
-  const runnerOverride = areJsonEqual(runner, config.agents.defaults.runner)
+  const defaultRunner = config.agents.defaults.runner[cliTool];
+  const runnerOverride = areJsonEqual(runner, defaultRunner)
     ? undefined
     : runner;
 
@@ -317,23 +249,17 @@ export async function addAgentToEditableConfig(params: AddAgentParams) {
 
   config.agents.list.push({
     id: params.agentId,
-    cliTool,
-    startupOptions: startupOptionsOverride,
+    cli: cliTool,
     workspace: params.workspace,
-    bootstrap: params.bootstrap ? { mode: params.bootstrap } : undefined,
+    bootstrap: params.bootstrap ? { botType: params.bootstrap } : undefined,
     runner: runnerOverride,
   });
-
-  for (const binding of bindings) {
-    upsertBinding(config, params.agentId, binding);
-  }
 
   await writeEditableConfig(configPath, config);
 
   return {
     configPath,
     workspacePath,
-    bindings,
     startupOptions: resolvedStartupOptions,
   };
 }
@@ -363,20 +289,15 @@ async function addAgent(args: string[]) {
     bootstrap = parseBotType(botType);
   }
 
-  const bindings = parseRepeatedOption(args, "--bind").map(parseBinding);
   const result = await addAgentToEditableConfig({
     agentId,
     cliTool,
     workspace,
     startupOptions,
     bootstrap,
-    bindings,
   });
 
   console.log(`Added agent ${agentId} with tool ${cliTool}.`);
-  if (bindings.length > 0) {
-    console.log(`Bindings: ${bindings.map(formatBinding).join(", ")}`);
-  }
   if (bootstrap) {
     console.log(
       `Bootstrap files seeded for ${bootstrap} in ${result.workspacePath}`,
@@ -416,7 +337,7 @@ async function bootstrapAgent(args: string[]) {
     force,
   });
   entry.bootstrap = {
-    mode,
+    botType: mode,
   };
   await writeEditableConfig(configPath, config);
 
@@ -426,64 +347,18 @@ async function bootstrapAgent(args: string[]) {
 }
 
 async function listBindings(args: string[]) {
-  const { config } = await readEditableConfig(getEditableConfigPath());
-  const agentId = parseSingleOption(args, "--agent");
-  const printJson = hasFlag(args, "--json");
-  const bindings = config.bindings
-    .filter((binding) => !agentId || binding.agentId === agentId)
-    .map((binding) => ({
-      binding: formatBinding(binding.match),
-      agentId: binding.agentId,
-    }));
-
-  if (printJson) {
-    console.log(JSON.stringify(bindings, null, 2));
-    return;
-  }
-
-  if (bindings.length === 0) {
-    console.log("No bindings configured.");
-    return;
-  }
-
-  console.log("Configured bindings:");
-  for (const binding of bindings) {
-    console.log(`- ${binding.binding} -> ${binding.agentId}`);
-  }
+  void args;
+  console.log("Agent bindings are no longer managed here. Use `clisbot bots ...` or `clisbot routes ...`.");
 }
 
 async function bindAgent(args: string[]) {
-  const agentId = parseSingleOption(args, "--agent");
-  const bindingValue = parseSingleOption(args, "--bind");
-  if (!agentId || !bindingValue) {
-    throw new Error("Usage: agents bind --agent <id> --bind <channel[:accountId]>");
-  }
-
-  const { config, configPath } = await readEditableConfig(getEditableConfigPath());
-  ensureAgentExists(config, agentId);
-  const binding = parseBinding(bindingValue);
-  upsertBinding(config, agentId, binding);
-  await writeEditableConfig(configPath, config);
-  console.log(`Bound ${formatBinding(binding)} to ${agentId}.`);
+  void args;
+  throw new Error("Use `clisbot bots set-agent ...` or `clisbot routes set-agent ...` instead.");
 }
 
 async function unbindAgent(args: string[]) {
-  const agentId = parseSingleOption(args, "--agent");
-  if (!agentId) {
-    throw new Error("Usage: agents unbind --agent <id> [--bind <channel[:accountId]> | --all]");
-  }
-
-  const removeAll = hasFlag(args, "--all");
-  const bindingValue = parseSingleOption(args, "--bind");
-  if (!removeAll && !bindingValue) {
-    throw new Error("Usage: agents unbind --agent <id> [--bind <channel[:accountId]> | --all]");
-  }
-
-  const { config, configPath } = await readEditableConfig(getEditableConfigPath());
-  ensureAgentExists(config, agentId);
-  removeBinding(config, agentId, removeAll ? undefined : parseBinding(bindingValue!));
-  await writeEditableConfig(configPath, config);
-  console.log(removeAll ? `Removed all bindings for ${agentId}.` : `Removed ${bindingValue} from ${agentId}.`);
+  void args;
+  throw new Error("Use `clisbot bots clear-agent ...` or `clisbot routes clear-agent ...` instead.");
 }
 
 async function runAgentResponseModeCli(args: string[]) {

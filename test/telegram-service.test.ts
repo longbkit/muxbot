@@ -4,8 +4,11 @@ import {
   dispatchTelegramUpdates,
   renderTelegramUnroutedRouteMessage,
 } from "../src/channels/telegram/service.ts";
+import { resolveTelegramBotConfig } from "../src/config/channel-accounts.ts";
 import type { TelegramUpdate } from "../src/channels/telegram/message.ts";
 import type { LoadedConfig } from "../src/config/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 function makeUpdate(updateId: number): TelegramUpdate {
   return {
@@ -24,63 +27,44 @@ function makeUpdate(updateId: number): TelegramUpdate {
   };
 }
 
-function createTelegramConfig(): LoadedConfig["raw"]["channels"]["telegram"] {
-  return {
+function createTelegramConfig() {
+  const config = clisbotConfigSchema.parse(
+    JSON.parse(
+      renderDefaultConfigTemplate({
+        slackEnabled: false,
+        telegramEnabled: true,
+      }),
+    ),
+  );
+  config.bots.telegram.defaults.enabled = true;
+  config.bots.telegram.default.enabled = true;
+  config.bots.telegram.default.botToken = "telegram-token";
+  config.bots.telegram.default.groups["-1003455688247"] = {
     enabled: true,
-    mode: "polling",
-    botToken: "telegram-token",
-    defaultAccount: "default",
-    accounts: {
-      default: {
-        botToken: "telegram-token",
-      },
-    },
-    agentPrompt: {
-      enabled: true,
-      maxProgressMessages: 3,
-      requireFinalResponse: true,
-    },
+    agentId: "default",
+    requireMention: true,
     allowBots: false,
-    groupPolicy: "allowlist",
-    defaultAgentId: "default",
-    commandPrefixes: {
-      slash: ["::", "\\"],
-      bash: ["!"],
-    },
-    streaming: "all",
-    response: "final",
-    responseMode: "message-tool",
-    additionalMessageMode: "steer",
-    verbose: "minimal",
-    followUp: {
-      mode: "auto",
-      participationTtlMin: 5,
-    },
-    polling: {
-      timeoutSeconds: 20,
-      retryDelayMs: 1000,
-    },
-    groups: {
-      "-1003455688247": {
+    allowUsers: [],
+    blockUsers: [],
+    topics: {
+      "3": {
+        enabled: true,
         agentId: "default",
-        requireMention: true,
-        allowBots: false,
-        topics: {
-          "3": {
-            agentId: "default",
-          },
-        },
+        allowUsers: [],
+        blockUsers: [],
       },
-    },
-    directMessages: {
-      enabled: true,
-      policy: "open",
-      allowFrom: [],
-      requireMention: false,
-      allowBots: false,
-      agentId: "default",
     },
   };
+  config.bots.telegram.default.directMessages["dm:*"] = {
+    enabled: true,
+    policy: "open",
+    allowUsers: [],
+    blockUsers: [],
+    requireMention: false,
+    allowBots: false,
+    agentId: "default",
+  };
+  return resolveTelegramBotConfig(config.bots.telegram, "default");
 }
 
 describe("dispatchTelegramUpdates", () => {
@@ -148,7 +132,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
         isForum: true,
       }),
     ).toContain(
-      "`clisbot channels add telegram-group -1003455688247 --topic 3 --agent <id>`",
+      "`clisbot routes set-agent --channel telegram topic:-1003455688247:3 --bot default --agent <id>`",
     );
   });
 
@@ -163,12 +147,21 @@ describe("renderTelegramUnroutedRouteMessage", () => {
 
     expect(text).toContain("clisbot: this Telegram topic is not configured yet.");
     expect(text).toContain("Ask the bot owner to choose one of these:");
-    expect(text).toContain("Add the whole group with the default agent:");
-    expect(text).toContain("`clisbot channels add telegram-group -1003455688247`");
-    expect(text).toContain("Add the whole group with a specific agent:");
-    expect(text).toContain("`clisbot channels add telegram-group -1003455688247 --agent <id>`");
-    expect(text).toContain("Add only this topic with a specific agent:");
-    expect(text).toContain("`clisbot channels add telegram-group -1003455688247 --topic 3 --agent <id>`");
+    expect(text).toContain("Add the whole group to the allowlist:");
+    expect(text).toContain(
+      "`clisbot routes add --channel telegram group:-1003455688247 --bot default`",
+    );
+    expect(text).toContain("Bind the whole group to a specific agent:");
+    expect(text).toContain(
+      "`clisbot routes set-agent --channel telegram group:-1003455688247 --bot default --agent <id>`",
+    );
+    expect(text).toContain("Or bind only this topic to a specific agent:");
+    expect(text).toContain(
+      "`clisbot routes add --channel telegram topic:-1003455688247:3 --bot default`",
+    );
+    expect(text).toContain(
+      "`clisbot routes set-agent --channel telegram topic:-1003455688247:3 --bot default --agent <id>`",
+    );
     expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
   });
 

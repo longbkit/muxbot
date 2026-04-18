@@ -58,7 +58,7 @@ function summarizeSlackHealthError(error: unknown) {
     return {
       summary: "Socket Mode app token was rejected.",
       actions: [
-        "verify `channels.slack.appToken` resolves to an `xapp-` token",
+        "verify `bots.slack.<botId>.appToken` resolves to an `xapp-` token",
         "enable Slack Socket Mode and grant the app token `connections:write`",
         "confirm the app token and bot token belong to the same Slack app and workspace",
       ],
@@ -74,7 +74,7 @@ function summarizeSlackHealthError(error: unknown) {
     return {
       summary: "Slack token authentication failed.",
       actions: [
-        "verify `channels.slack.botToken` resolves to a valid `xoxb-` token",
+        "verify `bots.slack.<botId>.botToken` resolves to a valid `xoxb-` token",
         "confirm the Slack app was installed to the target workspace after the latest token rotation",
         "confirm the bot token and app token belong to the same Slack app and workspace",
       ],
@@ -107,7 +107,7 @@ function summarizeTelegramHealthError(error: unknown) {
     summary: "Telegram channel failed to start.",
     detail: normalizeErrorMessage(error),
     actions: [
-      "verify `channels.telegram.botToken` resolves to the intended bot token",
+      "verify `bots.telegram.<botId>.botToken` resolves to the intended bot token",
       "confirm no other Telegram bot instance is polling the same token",
       "run `clisbot logs` again after restarting to confirm the startup error is gone",
     ],

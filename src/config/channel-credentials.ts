@@ -6,12 +6,13 @@ import {
   getCanonicalTelegramBotTokenPath,
   getConfiguredDefaultAccountId,
   getCredentialSkipPaths,
-  getAccountsRecord,
   getSlackAccountConfig,
+  getSlackBotsRecord,
   getSlackEnvReference,
   getSlackMemAppEnvName,
   getSlackMemBotEnvName,
   getTelegramAccountConfig,
+  getTelegramBotsRecord,
   getTelegramEnvReference,
   getTelegramMemEnvName,
   normalizeAccountId,
@@ -71,32 +72,28 @@ export function validatePersistentChannelCredentials(config: ClisbotConfig) {
     );
   };
 
-  validateTokenField(config.channels.slack.appToken, "channels.slack.appToken");
-  validateTokenField(config.channels.slack.botToken, "channels.slack.botToken");
-  validateTokenField(config.channels.telegram.botToken, "channels.telegram.botToken");
-
-  for (const accountId of Object.keys(getAccountsRecord(config.channels.slack.accounts))) {
-    const account = getSlackAccountConfig(config.channels.slack, accountId);
-    validateTokenField(account?.appToken, `channels.slack.accounts.${accountId}.appToken`);
-    validateTokenField(account?.botToken, `channels.slack.accounts.${accountId}.botToken`);
+  for (const accountId of Object.keys(getSlackBotsRecord(config.bots.slack))) {
+    const account = getSlackAccountConfig(config.bots.slack, accountId);
+    validateTokenField(account?.appToken, `bots.slack.${accountId}.appToken`);
+    validateTokenField(account?.botToken, `bots.slack.${accountId}.botToken`);
   }
 
-  for (const accountId of Object.keys(getAccountsRecord(config.channels.telegram.accounts))) {
-    const account = getTelegramAccountConfig(config.channels.telegram, accountId);
-    validateTokenField(account?.botToken, `channels.telegram.accounts.${accountId}.botToken`);
+  for (const accountId of Object.keys(getTelegramBotsRecord(config.bots.telegram))) {
+    const account = getTelegramAccountConfig(config.bots.telegram, accountId);
+    validateTokenField(account?.botToken, `bots.telegram.${accountId}.botToken`);
   }
 }
 
 export function resolveTelegramCredential(params: {
-  config: ClisbotConfig["channels"]["telegram"];
+  config: ClisbotConfig["bots"]["telegram"];
   accountId?: string | null;
   env?: NodeJS.ProcessEnv;
   runtimeCredentialsPath?: string;
 }): ResolvedTelegramCredential {
   const env = params.env ?? process.env;
   const accountId = normalizeAccountId(params.accountId) ?? getConfiguredDefaultAccountId({
-    defaultAccount: params.config.defaultAccount,
-    accounts: params.config.accounts,
+    defaultBotId: params.config.defaults.defaultBotId,
+    bots: getTelegramBotsRecord(params.config),
   });
   const account = getTelegramAccountConfig(params.config, accountId);
 
@@ -125,7 +122,7 @@ export function resolveTelegramCredential(params: {
       accountId,
       botToken: readRequiredCredentialFile(
         explicitTokenFile,
-        `channels.telegram.accounts.${accountId}.tokenFile`,
+        `bots.telegram.${accountId}.tokenFile`,
       ),
       source: {
         source: "credential-file",
@@ -140,7 +137,7 @@ export function resolveTelegramCredential(params: {
       accountId,
       botToken: readRequiredCredentialFile(
         canonicalTokenFile,
-        `channels.telegram.accounts.${accountId}`,
+        `bots.telegram.${accountId}`,
       ),
       source: {
         source: "credential-file",
@@ -170,7 +167,7 @@ export function resolveTelegramCredential(params: {
     if (!value) {
       throw new MissingEnvVarError(
         envName,
-        `channels.telegram.accounts.${accountId}.botToken`,
+        `bots.telegram.${accountId}.botToken`,
       );
     }
     return {
@@ -199,15 +196,15 @@ export function resolveTelegramCredential(params: {
 }
 
 export function resolveSlackCredential(params: {
-  config: ClisbotConfig["channels"]["slack"];
+  config: ClisbotConfig["bots"]["slack"];
   accountId?: string | null;
   env?: NodeJS.ProcessEnv;
   runtimeCredentialsPath?: string;
 }): ResolvedSlackCredential {
   const env = params.env ?? process.env;
   const accountId = normalizeAccountId(params.accountId) ?? getConfiguredDefaultAccountId({
-    defaultAccount: params.config.defaultAccount,
-    accounts: params.config.accounts,
+    defaultBotId: params.config.defaults.defaultBotId,
+    bots: getSlackBotsRecord(params.config),
   });
   const account = getSlackAccountConfig(params.config, accountId);
 
@@ -243,11 +240,11 @@ export function resolveSlackCredential(params: {
       accountId,
       appToken: readRequiredCredentialFile(
         explicitAppTokenFile,
-        `channels.slack.accounts.${accountId}.appTokenFile`,
+        `bots.slack.${accountId}.appTokenFile`,
       ),
       botToken: readRequiredCredentialFile(
         explicitBotTokenFile,
-        `channels.slack.accounts.${accountId}.botTokenFile`,
+        `bots.slack.${accountId}.botTokenFile`,
       ),
       source: {
         source: "credential-file",
@@ -269,11 +266,11 @@ export function resolveSlackCredential(params: {
       accountId,
       appToken: readRequiredCredentialFile(
         canonicalAppTokenFile,
-        `channels.slack.accounts.${accountId}`,
+        `bots.slack.${accountId}`,
       ),
       botToken: readRequiredCredentialFile(
         canonicalBotTokenFile,
-        `channels.slack.accounts.${accountId}`,
+        `bots.slack.${accountId}`,
       ),
       source: {
         source: "credential-file",
@@ -316,13 +313,13 @@ export function resolveSlackCredential(params: {
     if (!appToken) {
       throw new MissingEnvVarError(
         appEnvName,
-        `channels.slack.accounts.${accountId}.appToken`,
+        `bots.slack.${accountId}.appToken`,
       );
     }
     if (!botToken) {
       throw new MissingEnvVarError(
         botEnvName,
-        `channels.slack.accounts.${accountId}.botToken`,
+        `bots.slack.${accountId}.botToken`,
       );
     }
     return {
@@ -369,17 +366,17 @@ export function materializeRuntimeChannelCredentials(
   const shouldMaterializeSlack =
     materializeAll || materializeChannels.includes("slack");
 
-  if (shouldMaterializeTelegram && nextConfig.channels.telegram.enabled) {
-    const accountIds = Object.keys(getAccountsRecord(nextConfig.channels.telegram.accounts));
+  if (shouldMaterializeTelegram && nextConfig.bots.telegram.defaults.enabled) {
+    const accountIds = Object.keys(getTelegramBotsRecord(nextConfig.bots.telegram));
     const ids = accountIds.length > 0
       ? accountIds
       : [getConfiguredDefaultAccountId({
-        defaultAccount: nextConfig.channels.telegram.defaultAccount,
-        accounts: nextConfig.channels.telegram.accounts,
+        defaultBotId: nextConfig.bots.telegram.defaults.defaultBotId,
+        bots: getTelegramBotsRecord(nextConfig.bots.telegram),
       })];
     const resolvedAccounts: Record<string, TelegramPersistentAccountConfig> = {};
     for (const accountId of ids) {
-      const existing = (getTelegramAccountConfig(nextConfig.channels.telegram, accountId) ?? {}) as
+      const existing = (getTelegramAccountConfig(nextConfig.bots.telegram, accountId) ?? {}) as
         TelegramPersistentAccountConfig;
       if (existing.enabled === false) {
         continue;
@@ -387,7 +384,7 @@ export function materializeRuntimeChannelCredentials(
       let resolved: ResolvedTelegramCredential | undefined;
       try {
         resolved = resolveTelegramCredential({
-          config: config.channels.telegram,
+          config: config.bots.telegram,
           accountId,
           env,
           runtimeCredentialsPath: options.runtimeCredentialsPath,
@@ -405,30 +402,29 @@ export function materializeRuntimeChannelCredentials(
         botToken: resolved.botToken,
       };
     }
-    nextConfig.channels.telegram.accounts = resolvedAccounts;
-    const preferredDefaultTelegramAccountId = normalizeAccountId(
-      nextConfig.channels.telegram.defaultAccount,
-    );
-    const fallbackTelegramAccountId = preferredDefaultTelegramAccountId &&
-        resolvedAccounts[preferredDefaultTelegramAccountId]
-      ? preferredDefaultTelegramAccountId
-      : Object.keys(resolvedAccounts)[0];
-    nextConfig.channels.telegram.botToken = fallbackTelegramAccountId
-      ? resolvedAccounts[fallbackTelegramAccountId]?.botToken ?? ""
-      : "";
+    for (const [accountId, resolved] of Object.entries(resolvedAccounts)) {
+      const current = nextConfig.bots.telegram[accountId] as TelegramPersistentAccountConfig | undefined;
+      if (!current) {
+        continue;
+      }
+      nextConfig.bots.telegram[accountId] = {
+        ...current,
+        botToken: resolved.botToken,
+      };
+    }
   }
 
-  if (shouldMaterializeSlack && nextConfig.channels.slack.enabled) {
-    const accountIds = Object.keys(getAccountsRecord(nextConfig.channels.slack.accounts));
+  if (shouldMaterializeSlack && nextConfig.bots.slack.defaults.enabled) {
+    const accountIds = Object.keys(getSlackBotsRecord(nextConfig.bots.slack));
     const ids = accountIds.length > 0
       ? accountIds
       : [getConfiguredDefaultAccountId({
-        defaultAccount: nextConfig.channels.slack.defaultAccount,
-        accounts: nextConfig.channels.slack.accounts,
+        defaultBotId: nextConfig.bots.slack.defaults.defaultBotId,
+        bots: getSlackBotsRecord(nextConfig.bots.slack),
       })];
     const resolvedAccounts: Record<string, SlackPersistentAccountConfig> = {};
     for (const accountId of ids) {
-      const existing = (getSlackAccountConfig(nextConfig.channels.slack, accountId) ?? {}) as
+      const existing = (getSlackAccountConfig(nextConfig.bots.slack, accountId) ?? {}) as
         SlackPersistentAccountConfig;
       if (existing.enabled === false) {
         continue;
@@ -436,7 +432,7 @@ export function materializeRuntimeChannelCredentials(
       let resolved: ResolvedSlackCredential | undefined;
       try {
         resolved = resolveSlackCredential({
-          config: config.channels.slack,
+          config: config.bots.slack,
           accountId,
           env,
           runtimeCredentialsPath: options.runtimeCredentialsPath,
@@ -455,33 +451,32 @@ export function materializeRuntimeChannelCredentials(
         botToken: resolved.botToken,
       };
     }
-    nextConfig.channels.slack.accounts = resolvedAccounts;
-    const preferredDefaultSlackAccountId = normalizeAccountId(nextConfig.channels.slack.defaultAccount);
-    const fallbackSlackAccountId = preferredDefaultSlackAccountId &&
-        resolvedAccounts[preferredDefaultSlackAccountId]
-      ? preferredDefaultSlackAccountId
-      : Object.keys(resolvedAccounts)[0];
-    nextConfig.channels.slack.appToken = fallbackSlackAccountId
-      ? resolvedAccounts[fallbackSlackAccountId]?.appToken ?? ""
-      : "";
-    nextConfig.channels.slack.botToken = fallbackSlackAccountId
-      ? resolvedAccounts[fallbackSlackAccountId]?.botToken ?? ""
-      : "";
+    for (const [accountId, resolved] of Object.entries(resolvedAccounts)) {
+      const current = nextConfig.bots.slack[accountId] as SlackPersistentAccountConfig | undefined;
+      if (!current) {
+        continue;
+      }
+      nextConfig.bots.slack[accountId] = {
+        ...current,
+        appToken: resolved.appToken,
+        botToken: resolved.botToken,
+      };
+    }
   }
 
   return nextConfig;
 }
 
 export function describeTelegramCredentialSource(params: {
-  config: ClisbotConfig["channels"]["telegram"];
+  config: ClisbotConfig["bots"]["telegram"];
   accountId?: string | null;
   env?: NodeJS.ProcessEnv;
   runtimeCredentialsPath?: string;
 }) {
   const env = params.env ?? process.env;
   const accountId = normalizeAccountId(params.accountId) ?? getConfiguredDefaultAccountId({
-    defaultAccount: params.config.defaultAccount,
-    accounts: params.config.accounts,
+    defaultBotId: params.config.defaults.defaultBotId,
+    bots: getTelegramBotsRecord(params.config),
   });
   const account = getTelegramAccountConfig(params.config, accountId);
   if (account?.credentialType === "mem") {
@@ -499,15 +494,15 @@ export function describeTelegramCredentialSource(params: {
 }
 
 export function describeSlackCredentialSource(params: {
-  config: ClisbotConfig["channels"]["slack"];
+  config: ClisbotConfig["bots"]["slack"];
   accountId?: string | null;
   env?: NodeJS.ProcessEnv;
   runtimeCredentialsPath?: string;
 }) {
   const env = params.env ?? process.env;
   const accountId = normalizeAccountId(params.accountId) ?? getConfiguredDefaultAccountId({
-    defaultAccount: params.config.defaultAccount,
-    accounts: params.config.accounts,
+    defaultBotId: params.config.defaults.defaultBotId,
+    bots: getSlackBotsRecord(params.config),
   });
   const account = getSlackAccountConfig(params.config, accountId);
   if (account?.credentialType === "mem") {

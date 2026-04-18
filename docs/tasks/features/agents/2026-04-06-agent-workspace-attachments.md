@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress
+Done
 
 ## Priority
 
@@ -12,7 +12,7 @@ P0
 
 Users need Slack and Telegram file uploads to become usable local files for Codex or Claude.
 
-The current MVP should stay simple:
+This MVP stayed intentionally simple:
 
 - save inbound files inside the agent workspace
 - mention them as `@/absolute/path`
@@ -20,7 +20,7 @@ The current MVP should stay simple:
 
 ## Scope
 
-Current slice:
+Delivered slice:
 
 - Slack inbound file download
 - Telegram inbound document or photo download
@@ -41,13 +41,22 @@ Out of scope for this slice:
 - the agents layer owns workspace placement
 - runners stay provider-agnostic and only receive local file paths
 
-## Planned Checks
+## What Shipped
 
 - inbound files land under `{workspace}/.attachments/{sessionKey}/{messageId}`
 - text-only messages keep current behavior
 - file-only messages still produce a usable prompt
 - slash commands and bash commands are not broken by attachment prefixing
 - failed downloads do not crash normal text handling
+
+## Evidence
+
+- Slack and Telegram attachment download paths are implemented in the channel layer
+- workspace-local storage is implemented in the agents layer under `.attachments`
+- prompt shaping is implemented as `@/absolute/path` mention prepending
+- regression coverage exists for storage, prompt shaping, and Slack attachment hydration
+
+This task should stay closed unless a new follow-up task is opened for outbound files, OCR, richer media handling, retention, or stronger cross-channel coverage.
 
 ## Related Docs
 

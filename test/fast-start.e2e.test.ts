@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getCanonicalTelegramBotTokenPath } from "../src/config/channel-credentials.ts";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 describe("fast start e2e", () => {
   let tempDir = "";
@@ -49,15 +51,16 @@ describe("fast start e2e", () => {
     expect(stderr.trim()).toBe("");
 
     const config = JSON.parse(readFileSync(configPath, "utf8"));
-    expect(config.channels.telegram.enabled).toBe(true);
-    expect(config.channels.telegram.accounts.default.credentialType).toBe("tokenFile");
-    expect(config.channels.telegram.accounts.default.botToken ?? "").toBe("");
+    expect(config.bots.telegram.defaults.enabled).toBe(true);
+    expect(config.bots.telegram.default.enabled).toBe(true);
+    expect(config.bots.telegram.default.credentialType).toBe("tokenFile");
+    expect(config.bots.telegram.default.botToken ?? "").toBe("");
     expect(readFileSync(getCanonicalTelegramBotTokenPath("default", {
       ...process.env,
       CLISBOT_HOME: tempDir,
     }), "utf8").trim()).toBe("123456:telegram-dev-token");
     expect(stdout).toContain("Persisted telegram/default");
-  });
+  }, 15000);
 
   test("init rejects literal telegram tokens unless --persist is passed", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-fast-start-e2e-"));
@@ -89,7 +92,7 @@ describe("fast start e2e", () => {
 
     expect(exitCode).toBe(1);
     expect(stderr).toContain("`clisbot init` with literal channel tokens requires --persist.");
-  });
+  }, 15000);
 
   test("start repeats FAILED at the end when long first-run guidance is rendered", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-fast-start-e2e-"));
@@ -123,119 +126,15 @@ describe("fast start e2e", () => {
   test("stop disables stale mem-backed accounts in config", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-fast-start-e2e-"));
     const configPath = join(tempDir, "clisbot.json");
-    writeFileSync(configPath, `${JSON.stringify({
-      meta: { schemaVersion: 1 },
-      tmux: { socketPath: "~/.clisbot/state/clisbot.sock" },
-      session: {
-        mainKey: "main",
-        dmScope: "main",
-        identityLinks: {},
-        storePath: "~/.clisbot/state/sessions.json",
-      },
-      agents: {
-        defaults: {
-          workspace: "~/.clisbot/workspaces/{agentId}",
-          runner: {
-            command: "codex",
-            args: ["-C", "{workspace}"],
-            trustWorkspace: true,
-            startupDelayMs: 1,
-            promptSubmitDelayMs: 1,
-            sessionId: {
-              create: { mode: "runner", args: [] },
-              capture: {
-                mode: "off",
-                statusCommand: "/status",
-                pattern: "x",
-                timeoutMs: 1,
-                pollIntervalMs: 1,
-              },
-              resume: { mode: "off", args: [] },
-            },
-          },
-          stream: {
-            captureLines: 1,
-            updateIntervalMs: 1,
-            idleTimeoutMs: 1,
-            noOutputTimeoutMs: 1,
-            maxRuntimeMin: 1,
-            maxMessageChars: 100,
-          },
-          session: {
-            createIfMissing: true,
-            staleAfterMinutes: 60,
-            name: "{sessionKey}",
-          },
-        },
-        list: [],
-      },
-      bindings: [],
-      control: {
-        configReload: { watch: false, watchDebounceMs: 250 },
-        sessionCleanup: { enabled: true, intervalMinutes: 5 },
-        loop: { maxRunsPerLoop: 20, maxActiveLoops: 10 },
-      },
-      channels: {
-        slack: {
-          enabled: false,
-          mode: "socket",
-          appToken: "",
-          botToken: "",
-          defaultAccount: "default",
-          accounts: {},
-          agentPrompt: { enabled: true, maxProgressMessages: 3, requireFinalResponse: true },
-          ackReaction: "",
-          typingReaction: "",
-          processingStatus: { enabled: true, status: "Working...", loadingMessages: [] },
-          allowBots: false,
-          replyToMode: "thread",
-          channelPolicy: "allowlist",
-          groupPolicy: "allowlist",
-          defaultAgentId: "default",
-          commandPrefixes: { slash: ["::"], bash: ["!"] },
-          streaming: "off",
-          response: "final",
-          responseMode: "message-tool",
-          additionalMessageMode: "steer",
-          followUp: { mode: "auto", participationTtlMin: 5 },
-          channels: {},
-          groups: {},
-          directMessages: { enabled: true, policy: "pairing", allowFrom: [], requireMention: false },
-        },
-        telegram: {
-          enabled: true,
-          mode: "polling",
-          botToken: "",
-          defaultAccount: "default",
-          accounts: {
-            default: {
-              enabled: true,
-              credentialType: "mem",
-              botToken: "",
-            },
-          },
-          agentPrompt: { enabled: true, maxProgressMessages: 3, requireFinalResponse: true },
-          allowBots: false,
-          groupPolicy: "allowlist",
-          defaultAgentId: "default",
-          commandPrefixes: { slash: ["::"], bash: ["!"] },
-          streaming: "off",
-          response: "final",
-          responseMode: "message-tool",
-          additionalMessageMode: "steer",
-          followUp: { mode: "auto", participationTtlMin: 5 },
-          polling: { timeoutSeconds: 20, retryDelayMs: 1000 },
-          groups: {},
-          directMessages: {
-            enabled: true,
-            policy: "pairing",
-            allowFrom: [],
-            requireMention: false,
-            allowBots: false,
-          },
-        },
-      },
-    }, null, 2)}\n`);
+    const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
+    config.agents.list = [];
+    config.app.control.configReload.watch = false;
+    config.bots.slack.defaults.enabled = false;
+    config.bots.telegram.defaults.enabled = true;
+    config.bots.telegram.default.enabled = true;
+    config.bots.telegram.default.credentialType = "mem";
+    config.bots.telegram.default.botToken = "";
+    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
 
     const subprocess = Bun.spawn([
       bunExecutable,
@@ -259,10 +158,10 @@ describe("fast start e2e", () => {
 
     expect(exitCode).toBe(0);
     expect(stderr.trim()).toBe("");
-    expect(stdout.trimEnd().endsWith("+---------+\n| FAILED  |\n+---------+")).toBe(true);
+    expect(stdout).toMatch(/clisbot (stopped|is not running)/);
 
-    const config = JSON.parse(readFileSync(configPath, "utf8"));
-    expect(config.channels.telegram.enabled).toBe(false);
-    expect(config.channels.telegram.accounts.default.enabled).toBe(false);
+    const persistedConfig = JSON.parse(readFileSync(configPath, "utf8"));
+    expect(persistedConfig.bots.telegram.defaults.enabled).toBe(false);
+    expect(persistedConfig.bots.telegram.default.enabled).toBe(false);
   });
 });

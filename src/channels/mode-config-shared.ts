@@ -1,5 +1,11 @@
 import type { ClisbotConfig } from "../config/schema.ts";
 import type { ChannelIdentity } from "./channel-identity.ts";
+import {
+  getSlackBotConfig,
+  getTelegramBotConfig,
+  resolveSlackAccountId,
+  resolveTelegramAccountId,
+} from "../config/channel-accounts.ts";
 
 export type ResponseMode = "capture-pane" | "message-tool";
 export type AdditionalMessageMode = "queue" | "steer";
@@ -9,8 +15,8 @@ export type SurfaceModeField = "responseMode" | "additionalMessageMode" | "strea
 
 export type ConfiguredSurfaceModeTarget = {
   channel: SurfaceModeChannel;
+  botId?: string;
   target?: string;
-  topic?: string;
 };
 
 type SurfaceModeValueMap = {
@@ -29,243 +35,266 @@ type SurfaceModeTargetBinding<TField extends SurfaceModeField> = {
   label: string;
 };
 
-type TelegramGroupRoute = ClisbotConfig["channels"]["telegram"]["groups"][string];
-type TelegramTopicRoute = TelegramGroupRoute["topics"][string];
-
-function createTelegramGroupRoute(): TelegramGroupRoute {
+function createTelegramRouteOverride() {
   return {
-    requireMention: true,
-    allowBots: false,
-    topics: {},
+    enabled: true,
+    allowUsers: [] as string[],
+    blockUsers: [] as string[],
   };
 }
 
-function ensureTelegramGroupRoute(config: ClisbotConfig, chatId: string) {
-  const existing = config.channels.telegram.groups[chatId];
-  if (existing) {
-    return existing;
+function getOrCreateTelegramGroupRoute(
+  bot: NonNullable<ReturnType<typeof getTelegramBotConfig>>,
+  chatId: string,
+) {
+  const existingGroup = bot.groups[chatId];
+  if (existingGroup) {
+    return existingGroup;
   }
-
-  const created = createTelegramGroupRoute();
-  config.channels.telegram.groups[chatId] = created;
-  return created;
+  const createdGroup = {
+    ...createTelegramRouteOverride(),
+    topics: {} as Record<string, ReturnType<typeof createTelegramRouteOverride>>,
+  };
+  bot.groups[chatId] = createdGroup;
+  return createdGroup;
 }
 
-function ensureTelegramTopicRoute(config: ClisbotConfig, chatId: string, topicId: string) {
-  const group = ensureTelegramGroupRoute(config, chatId);
-  const existing = group.topics[topicId];
-  if (existing) {
-    return existing;
+function getOrCreateTelegramTopicRoute(
+  bot: NonNullable<ReturnType<typeof getTelegramBotConfig>>,
+  chatId: string,
+  topicId: string,
+) {
+  const group = getOrCreateTelegramGroupRoute(bot, chatId);
+  const existingTopic = group.topics[topicId];
+  if (existingTopic) {
+    return existingTopic;
   }
-
-  const created: TelegramTopicRoute = {};
-  group.topics[topicId] = created;
-  return created;
+  const createdTopic = createTelegramRouteOverride();
+  (group.topics as Record<string, ReturnType<typeof createTelegramRouteOverride>>)[topicId] =
+    createdTopic;
+  return createdTopic;
 }
 
 function getModeValue<TField extends SurfaceModeField>(
-  source: SurfaceModeSource,
+  source: (SurfaceModeSource & Record<string, unknown>) | undefined,
   field: TField,
 ) {
-  return source[field] as SurfaceModeValueMap[TField] | undefined;
+  return source?.[field] as SurfaceModeValueMap[TField] | undefined;
 }
 
 function setModeValue<TField extends SurfaceModeField>(
-  source: SurfaceModeSource,
+  source: SurfaceModeSource & Record<string, unknown>,
   field: TField,
   value: SurfaceModeValueMap[TField],
 ) {
   source[field] = value;
 }
 
-const EMPTY_MODE_SOURCE: SurfaceModeSource = {};
+function renderFieldLabel(field: SurfaceModeField) {
+  if (field === "responseMode") {
+    return "response mode";
+  }
+  if (field === "additionalMessageMode") {
+    return "additional message mode";
+  }
+  return "streaming";
+}
 
 function resolveSlackConfigTarget<TField extends SurfaceModeField>(
   config: ClisbotConfig,
   field: TField,
-  params: {
-    target?: string;
-    conversationKind?: ChannelIdentity["conversationKind"];
-  },
+  params: ConfiguredSurfaceModeTarget,
 ): SurfaceModeTargetBinding<TField> {
+  const botId = resolveSlackAccountId(config.bots.slack, params.botId);
+  const bot = getSlackBotConfig(config.bots.slack, botId);
+  if (!bot) {
+    throw new Error(`Unknown Slack bot: ${botId}`);
+  }
+
   if (!params.target) {
     return {
-      get: () => getModeValue(config.channels.slack, field),
+      get: () => getModeValue(bot, field),
       set: (value) => {
-        setModeValue(config.channels.slack, field, value);
+        setModeValue(bot, field, value);
       },
-      label: "slack",
+      label: `slack bot ${botId}`,
     };
   }
 
-  const [kind, rawId] = params.target.split(":", 2);
-  const targetId = rawId?.trim();
-
-  if (!targetId) {
-    throw new Error(`Slack ${renderFieldLabel(field)} target must use channel:<id>, group:<id>, or dm:<id>.`);
+  const [kind, targetId] = params.target.split(":", 2);
+  if (!targetId?.trim()) {
+    throw new Error(
+      `Slack ${renderFieldLabel(field)} target must use channel:<id>, group:<id>, or dm:<id>.`,
+    );
   }
 
-  if (kind === "dm" || params.conversationKind === "dm") {
-    return {
-      get: () =>
-        getModeValue(config.channels.slack.directMessages, field) ??
-        getModeValue(config.channels.slack, field),
-      set: (value) => {
-        setModeValue(config.channels.slack.directMessages, field, value);
-      },
-      label: `slack dm ${targetId}`,
-    };
-  }
-
-  if (kind === "channel") {
-    const route = config.channels.slack.channels[targetId];
+  if (kind === "dm") {
+    const routeKey = `dm:${targetId.trim()}`;
+    const route = bot.directMessages[routeKey] ?? bot.directMessages[targetId.trim()];
     if (!route) {
-      throw new Error(`Route not configured yet: slack channel ${targetId}. Add the route first.`);
+      throw new Error(`Route not configured yet: slack ${routeKey}. Add the route first.`);
     }
     return {
-      get: () => getModeValue(route, field) ?? getModeValue(config.channels.slack, field),
+      get: () => getModeValue(route, field) ?? getModeValue(bot, field),
       set: (value) => {
         setModeValue(route, field, value);
       },
-      label: `slack channel ${targetId}`,
+      label: `slack ${routeKey}`,
     };
   }
 
-  if (kind === "group") {
-    const route = config.channels.slack.groups[targetId];
+  if (kind === "channel" || kind === "group") {
+    const routeKey = `${kind}:${targetId.trim()}`;
+    const route = bot.groups[routeKey];
     if (!route) {
-      throw new Error(`Route not configured yet: slack group ${targetId}. Add the route first.`);
+      throw new Error(`Route not configured yet: slack ${routeKey}. Add the route first.`);
     }
     return {
-      get: () => getModeValue(route, field) ?? getModeValue(config.channels.slack, field),
+      get: () => getModeValue(route, field) ?? getModeValue(bot, field),
       set: (value) => {
         setModeValue(route, field, value);
       },
-      label: `slack group ${targetId}`,
+      label: `slack ${routeKey}`,
     };
   }
 
-  throw new Error(`Slack ${renderFieldLabel(field)} target must use channel:<id>, group:<id>, or dm:<id>.`);
+  throw new Error(
+    `Slack ${renderFieldLabel(field)} target must use channel:<id>, group:<id>, or dm:<id>.`,
+  );
 }
 
 function resolveTelegramConfigTarget<TField extends SurfaceModeField>(
   config: ClisbotConfig,
   field: TField,
-  params: {
-    target?: string;
-    topic?: string;
-    conversationKind?: ChannelIdentity["conversationKind"];
-  },
+  params: ConfiguredSurfaceModeTarget,
 ): SurfaceModeTargetBinding<TField> {
+  const botId = resolveTelegramAccountId(config.bots.telegram, params.botId);
+  const bot = getTelegramBotConfig(config.bots.telegram, botId);
+  if (!bot) {
+    throw new Error(`Unknown Telegram bot: ${botId}`);
+  }
+
   if (!params.target) {
     return {
-      get: () => getModeValue(config.channels.telegram, field),
+      get: () => getModeValue(bot, field),
       set: (value) => {
-        setModeValue(config.channels.telegram, field, value);
+        setModeValue(bot, field, value);
       },
-      label: "telegram",
+      label: `telegram bot ${botId}`,
     };
   }
 
-  const chatId = params.target.trim();
-  if (!chatId) {
-    throw new Error(`Telegram ${renderFieldLabel(field)} target must be a numeric chat id.`);
+  const [kind, routeId, topicId] = params.target.split(":", 3);
+  if (kind === "dm") {
+    const targetId = routeId?.trim();
+    if (!targetId) {
+      throw new Error(`Telegram ${renderFieldLabel(field)} target must use dm:<id|*>.`);
+    }
+    const routeKey = `dm:${targetId}`;
+    const route = bot.directMessages[routeKey] ?? bot.directMessages[targetId];
+    if (!route) {
+      throw new Error(`Route not configured yet: telegram ${routeKey}. Add the route first.`);
+    }
+    return {
+      get: () => getModeValue(route, field) ?? getModeValue(bot, field),
+      set: (value) => {
+        setModeValue(route, field, value);
+      },
+      label: `telegram ${routeKey}`,
+    };
   }
 
-  const topicId = params.topic?.trim();
-  const isDirectMessage = !chatId.startsWith("-") || params.conversationKind === "dm";
-  if (isDirectMessage) {
-    if (topicId) {
-      throw new Error("Telegram direct-message targets do not support --topic.");
+  if (kind === "group") {
+    const chatId = routeId?.trim();
+    if (!chatId) {
+      throw new Error(`Telegram ${renderFieldLabel(field)} target must use group:<chatId>.`);
+    }
+    const route = bot.groups[chatId];
+    if (!route) {
+      throw new Error(`Route not configured yet: telegram group:${chatId}. Add the route first.`);
+    }
+    return {
+      get: () => getModeValue(route, field) ?? getModeValue(bot, field),
+      set: (value) => {
+        setModeValue(route, field, value);
+      },
+      label: `telegram group:${chatId}`,
+    };
+  }
+
+  if (kind === "topic") {
+    const chatId = routeId?.trim();
+    const nextTopicId = topicId?.trim();
+    if (!chatId || !nextTopicId) {
+      throw new Error(
+        `Telegram ${renderFieldLabel(field)} target must use topic:<chatId>:<topicId>.`,
+      );
+    }
+    const group = bot.groups[chatId];
+    const topic = group?.topics?.[nextTopicId];
+    const canInheritFromBotDefaults =
+      (bot.groupPolicy ?? config.bots.telegram.defaults.groupPolicy) === "open";
+    if (!group && !canInheritFromBotDefaults) {
+      throw new Error(
+        `Route not configured yet: telegram topic:${chatId}:${nextTopicId}. Add the route first.`,
+      );
     }
     return {
       get: () =>
-        getModeValue(config.channels.telegram.directMessages, field) ??
-        getModeValue(config.channels.telegram, field),
+        getModeValue(topic, field) ??
+        getModeValue(group, field) ??
+        getModeValue(bot, field),
       set: (value) => {
-        setModeValue(config.channels.telegram.directMessages, field, value);
+        const nextTopic = getOrCreateTelegramTopicRoute(bot, chatId, nextTopicId);
+        setModeValue(nextTopic, field, value);
       },
-      label: `telegram dm ${chatId}`,
+      label: `telegram topic:${chatId}:${nextTopicId}`,
     };
   }
 
-  const group = config.channels.telegram.groups[chatId];
-  if (topicId) {
-    const topic = group?.topics?.[topicId];
-    return {
-      get: () =>
-        getModeValue(topic ?? EMPTY_MODE_SOURCE, field) ??
-        getModeValue(group ?? EMPTY_MODE_SOURCE, field) ??
-        getModeValue(config.channels.telegram, field),
-      set: (value) => {
-        setModeValue(ensureTelegramTopicRoute(config, chatId, topicId), field, value);
-      },
-      label: `telegram topic ${chatId}/${topicId}`,
-    };
-  }
-
-  if (!group) {
-    return {
-      get: () => getModeValue(config.channels.telegram, field),
-      set: (value) => {
-        setModeValue(ensureTelegramGroupRoute(config, chatId), field, value);
-      },
-      label: `telegram group ${chatId}`,
-    };
-  }
-
-  return {
-    get: () => getModeValue(group, field) ?? getModeValue(config.channels.telegram, field),
-    set: (value) => {
-      setModeValue(group, field, value);
-    },
-    label: `telegram group ${chatId}`,
-  };
+  throw new Error(
+    `Telegram ${renderFieldLabel(field)} target must use dm:<id|*>, group:<chatId>, or topic:<chatId>:<topicId>.`,
+  );
 }
 
 export function resolveConfiguredSurfaceModeTarget<TField extends SurfaceModeField>(
   config: ClisbotConfig,
   field: TField,
-  params: ConfiguredSurfaceModeTarget & {
-    conversationKind?: ChannelIdentity["conversationKind"];
-  },
+  params: ConfiguredSurfaceModeTarget,
 ) {
   if (params.channel === "slack") {
-    return resolveSlackConfigTarget(config, field, {
-      target: params.target,
-      conversationKind: params.conversationKind,
-    });
+    return resolveSlackConfigTarget(config, field, params);
   }
 
-  return resolveTelegramConfigTarget(config, field, {
-    target: params.target,
-    topic: params.topic,
-    conversationKind: params.conversationKind,
-  });
+  return resolveTelegramConfigTarget(config, field, params);
 }
 
 export function buildConfiguredTargetFromIdentity(identity: ChannelIdentity) {
-  return {
-    channel: identity.platform,
-    target:
-      identity.platform === "slack"
-        ? identity.conversationKind === "dm"
-          ? `dm:${identity.channelId ?? ""}`
-          : `${identity.conversationKind === "group" ? "group" : "channel"}:${identity.channelId ?? ""}`
-        : identity.chatId,
-    topic: identity.topicId,
-    conversationKind: identity.conversationKind,
-  } satisfies ConfiguredSurfaceModeTarget & {
-    conversationKind: ChannelIdentity["conversationKind"];
-  };
-}
+  if (identity.platform === "slack") {
+    const target =
+      identity.conversationKind === "dm"
+        ? `dm:${identity.senderId ?? identity.channelId ?? "*"}`
+        : identity.conversationKind === "group"
+          ? `group:${identity.channelId ?? ""}`
+          : `channel:${identity.channelId ?? ""}`;
 
-function renderFieldLabel(field: SurfaceModeField) {
-  if (field === "responseMode") {
-    return "response-mode";
+    return {
+      channel: "slack" as const,
+      botId: identity.accountId,
+      target,
+    };
   }
-  if (field === "additionalMessageMode") {
-    return "additional-message-mode";
-  }
-  return "streaming";
+
+  const target =
+    identity.conversationKind === "dm"
+      ? `dm:${identity.senderId ?? identity.chatId ?? "*"}`
+      : identity.conversationKind === "topic"
+        ? `topic:${identity.chatId ?? ""}:${identity.topicId ?? ""}`
+        : `group:${identity.chatId ?? ""}`;
+
+  return {
+    channel: "telegram" as const,
+    botId: identity.accountId,
+    target,
+  };
 }

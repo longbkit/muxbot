@@ -1,30 +1,33 @@
 # Native Channel Message Formatting And Render Fallbacks
 
+## Status
+
+Done
+
 ## Summary
 
 Improve `clisbot` reply readability by making channel output feel native to each surface instead of looking like plain text pasted into Slack or Telegram.
 
-Shipped follow-up note:
+Current shipped result:
 
 - the current message command surface now uses `--body-file` as the preferred file-backed body option, with `--message-file` kept only as a compatibility alias
 - bot-facing guidance still prefers `--message` with inline text or heredoc bodies instead of file-backed payloads
-
-This task focuses on two complementary paths:
-
-1. AI passes a channel-native safe format directly when the model is good enough
-2. `clisbot` falls back to channel-native rendering from simpler Markdown-like output when the model is weaker
+- `clisbot message send` and `clisbot message edit` now have an explicit native render contract
+- Markdown-like input can already be rendered natively per channel in the current phase
+- future fallback expansion can return as a separate follow-up if product needs change
 
 ## Why This Task Exists
 
 Readable output quality is a major part of whether the bot feels genuinely useful at work.
 
-Right now, the product direction already includes structured channel rendering, but this specific product question needs its own contract:
+This task existed to lock the current contract:
 
-- when should the AI return channel-native formatting directly
-- when should the transport layer or message command renderer transform simpler output
-- how should Slack and Telegram each get the best readable result
+- what `--input` means
+- what `--render` means
+- how Slack and Telegram each receive native readable output
+- which native paths are explicit versus channel-owned
 
-Without this, the system risks falling into an awkward middle state where:
+Without this, the system risked an awkward middle state where:
 
 - prompts become bloated with formatting instructions
 - weak models still produce ugly output
@@ -35,73 +38,55 @@ Without this, the system risks falling into an awkward middle state where:
 
 For each channel, make the default visible reply as native, readable, and low-friction as possible.
 
-Examples:
+Current product shape:
 
 - Telegram should prefer safe readable HTML when possible
-- Slack should prefer Block Kit or other native structured formatting where it materially improves readability
-- plain text should remain a truthful fallback, not the aspirational default for every surface
+- Slack should support native readable rendering, including explicit Block Kit when requested
+- plain text should not be the default mental model for normal operator use
 
 ## Scope
 
 - define the message-formatting contract for channel replies
-- define the dual rendering path:
-  - AI-native formatted output
-  - fallback rendering from simpler Markdown-like output
 - define how `message` command rendering participates in that contract
-- define operator-visible status for the winning render path
-- define safe fallback rules per channel when parsing or conversion fails
+- define explicit native paths versus channel-owned native rendering
+- keep operator-visible behavior short, predictable, and reviewable
 
 ## Non-Goals
 
 - solving every advanced channel widget in phase 1
 - inventing a universal rich-text format for all providers
-- hiding failed rendering behind silent transport magic
+- continuing broader fallback experimentation before it is needed again
 
 ## Channel-Specific Direction
 
 ### Telegram
 
-- preferred high-quality path: AI returns Telegram-safe HTML or a render intent that resolves to safe HTML
-- fallback path: AI returns Markdown-ish text and the renderer converts it into Telegram-safe HTML where possible
-- final fallback: plain text if HTML conversion or send validation fails
+- current preferred path: Markdown-like input resolves into Telegram-safe HTML
+- direct native path: pre-rendered HTML can pass through explicitly
 
 ### Slack
 
-- preferred high-quality path: AI returns an explicit structured render intent or Slack-native formatting contract
-- fallback path: AI returns Markdown-ish text and the renderer maps it into a Slack-friendly structured or text presentation
-- final fallback: plain text with good spacing and readability if richer rendering is unsafe or unsupported
+- current preferred path: Markdown-like input resolves into Slack-native readable output
+- explicit structured path: Block Kit can be sent directly or requested explicitly
 
-## Review Questions
+## What Shipped
 
-1. What is the minimal output contract the AI should target by default?
-2. Which models are trusted to emit channel-native safe formatting directly?
-3. Should the message command layer accept explicit render modes such as `html_safe` or `slack_blocks`?
-4. What is the canonical fallback format: plain text, Markdown-ish text, or a small internal render intent?
-5. How should status or logs report whether the final output came from direct AI formatting or renderer fallback?
+- `--input md --render native` is now the default contract
+- Telegram native delivery supports safe HTML output for Markdown-like input
+- Slack native delivery supports readable native formatting and explicit Block Kit paths
+- raw native payloads remain available through explicit input and render combinations
+- help text, feature docs, and message CLI behavior are aligned around the same contract
 
-## Proposed Direction
+## Follow-Up Boundary
 
-- keep prompts smaller by not forcing every model to emit perfect native channel formatting
-- let stronger models opt into richer explicit output contracts
-- let weaker models emit simpler Markdown-like structure
-- make the renderer own safe channel-native fallback conversion
-- keep the winning render path explicit in status or debug output
-
-## Initial Subtasks
-
-- [ ] define the minimal reply-format contract for AI output
-- [ ] define explicit render modes for high-quality model-directed output
-- [ ] define fallback conversion rules from Markdown-like output to Telegram-safe HTML
-- [ ] define fallback conversion rules from Markdown-like output to Slack-friendly structured output
-- [ ] define message-command rendering ownership and status reporting
-- [ ] split implementation into narrow channel-specific slices
+- do not keep this task open just to speculate about more fallback paths
+- if future product direction needs richer renderer fallback logic, reopen it as a new follow-up task with a narrower concrete contract
 
 ## Exit Criteria
 
-- a reviewer can explain the direct-format path versus fallback-render path clearly
+- a reviewer can explain the native render contract clearly
 - Slack and Telegram each have a preferred native formatting strategy
-- weaker models no longer force the product into ugly plain-text replies by default
-- the winning render path is observable rather than implicit
+- operators can use the surface without treating plain text as the main delivery contract
 
 ## Related Docs
 

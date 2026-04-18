@@ -37,30 +37,38 @@ That raises the bar beyond "works on happy path". A single uncaught rejection, s
 
 ## Current Audit Findings
 
-### 1. No process-level fatal-event containment
+### 1. Fatal-event containment was the original gap, and is now shipped
 
-`serveForeground()` only handles `SIGINT` and `SIGTERM`.
+This was a real gap when the task started:
 
-- there is no `uncaughtException` handler
-- there is no `unhandledRejection` handler
-- there is no last-gasp health transition before exit
+- `serveForeground()` only handled `SIGINT` and `SIGTERM`
+- there was no `uncaughtException` handler
+- there was no `unhandledRejection` handler
+- there was no last-gasp health transition before exit
 
-Practical consequence:
+That part is now implemented:
 
-- any uncaught async failure in a timer, watcher, or background service can terminate the whole detached runtime
-- operators then have to notice the outage and run `clisbot start` again manually
+- detached runtime now installs fatal handlers for `uncaughtException` and `unhandledRejection`
+- fatal shutdown now records channel health as `failed` before exit instead of disappearing silently
+- bounded restart now comes from the runtime monitor layer after worker exit
 
 Relevant code:
 
-- `src/main.ts`
+- `src/control/runtime-management-cli.ts`
+- `src/control/runtime-monitor.ts`
 
-### 2. Session cleanup timer can produce an unhandled rejection
+### 2. Session cleanup rejection containment was the original gap, and is now shipped
 
-`AgentService.start()` schedules periodic cleanup with:
+This was also a real gap when the task started:
 
-- `void this.runnerSessions.runSessionCleanup()`
+- `AgentService.start()` scheduled periodic cleanup with `void this.runnerSessions.runSessionCleanup()`
+- that callback had no `.catch(...)`
+- a transient tmux, fs, or session-store fault could therefore become an unhandled rejection
 
-That callback has no `.catch(...)`, so a transient tmux, fs, or session-store failure can become an unhandled rejection in the live detached process.
+That path is now contained:
+
+- session cleanup failures are caught and logged
+- they no longer escape as an unhandled rejection that can kill the detached runtime
 
 Relevant code:
 
@@ -68,37 +76,39 @@ Relevant code:
 - `src/agents/runner-service.ts`
 - `src/agents/session-store.ts`
 
-### 3. Telegram can stop polling and stay dead without supervisor recovery
+### 3. Telegram post-start polling failure was the original gap, and is now shipped
 
-`TelegramPollingService.pollLoop()` exits permanently on Telegram polling conflict:
+This was another real gap when the task started:
 
-- sets `this.running = false`
-- logs the conflict
-- returns from the loop
+- `TelegramPollingService.pollLoop()` could exit permanently on polling conflict
+- the process stayed alive
+- Telegram could therefore be dead while operator status still looked healthy
 
-Nothing notifies `RuntimeSupervisor`, nothing marks runtime health as failed, and nothing attempts a bounded restart. The detached process can therefore stay alive while Telegram is already dead.
+That specific path is now much better:
+
+- Telegram post-start polling conflict now reports lifecycle failure up to the supervisor
+- runtime health is marked failed for that channel instead of staying falsely active
+- the process-level monitor can then apply bounded restart if the worker exits
 
 Relevant code:
 
 - `src/channels/telegram/service.ts`
 - `src/control/runtime-supervisor.ts`
 
-### 4. Supervisor only owns startup and reload, not post-start service health
+### 4. Post-start lifecycle reporting now exists, but only part of the wider problem is solved
 
-`RuntimeSupervisor` knows how to:
+This task originally found that the supervisor only really owned startup and reload.
 
-- create services
-- start them
-- stop them
-- reload on config change
+That is no longer fully true:
 
-But the `ChannelRuntimeService` contract has no way to report:
+- `ChannelRuntimeService` now has a lifecycle callback path
+- `RuntimeSupervisor.reportChannelLifecycle()` can update health after startup
 
-- runtime death after successful start
-- degraded connection state
-- restart-needed signals
+But this area is still only partially hardened:
 
-That means health can remain `active` after the real channel service has already stalled or died.
+- Telegram failure after startup is covered
+- broader degradation or restart-needed signals are still not modeled consistently across all services
+- the contract still only reports `active` or `failed`, not a richer degraded or restart-needed state
 
 Relevant code:
 
@@ -107,15 +117,21 @@ Relevant code:
 - `src/channels/slack/service.ts`
 - `src/channels/telegram/service.ts`
 
-### 5. Some runtime-owned stores are still fragile for service-grade use
+### 5. Runtime-owned state files are still only partially hardened
 
 There are still store paths where corruption or partial-write scenarios can turn into runtime failure or stale truth:
 
 - `RuntimeHealthStore.read()` does raw `JSON.parse()` with no corruption fallback
 - `RuntimeHealthStore.write()` uses direct overwrite, not temp-file rename
-- `SessionStore.readStore()` also does raw `JSON.parse()` with no corruption fallback
+- `SessionStore.readStore()` still does raw `JSON.parse()` with no corruption fallback
 
-These files sit on live control paths, so a bad write or bad manual edit should be absorbed with bounded recovery or quarantine instead of taking down the service or blocking status.
+Important nuance:
+
+- `SessionStore.writeStore()` is already better because it now writes through temp-file rename
+- but the read path is still fragile
+- `RuntimeHealthStore` is still fragile on both read and write
+
+This means the task is not blocked on zero progress here. It is blocked on finishing the hardening consistently.
 
 Relevant code:
 
@@ -162,7 +178,9 @@ Relevant code:
 
 ### 7. Runtime startup still has too much blast radius at the channel or account boundary
 
-`RuntimeSupervisor.startRuntime()` still uses an all-or-nothing startup model.
+This is still a real open problem.
+
+`RuntimeSupervisor.createRuntime()` still uses an all-or-nothing startup model:
 
 - it starts `agentService`
 - then starts every configured channel service instance in sequence
@@ -196,26 +214,32 @@ Relevant code:
 - `src/control/runtime-health-store.ts`
 - `src/control/runtime-supervisor.ts`
 
-### 9. Process-level fatal policy still exits after marking failed, with no in-place recovery path
+### 9. Process-level fatal policy is now bounded by monitor restart, but still not true in-place self-healing
 
-`serveForeground()` now records fatal health truth more explicitly, but the policy still remains:
+The current fatal policy is now stronger than when this task started:
 
-- mark runtime health failed
-- stop supervisor
-- exit process `1`
+- worker marks health failed
+- worker exits
+- runtime monitor can restart with bounded backoff
+
+But the deeper self-healing concern still remains:
+
+- there is still no in-place recovery strategy inside the worker after a fatal path
+- resilience is still largely process-level restart, not component-level self-heal
 
 Practical consequence:
 
-- any surviving `uncaughtException` or `unhandledRejection` still chooses process death and waits for operator restart or external supervision
-- this is safer than silently limping, but it is not yet a self-healing strategy for a highly resilient remote service
+- the runtime is now much safer than before
+- but it still is not the final shape of a highly resilient remote service
 
 Relevant code:
 
-- `src/main.ts`
+- `src/control/runtime-management-cli.ts`
+- `src/control/runtime-monitor.ts`
 
 ## Current Implementation Progress
 
-The current P0 slice is now implemented:
+The current P0 shipped slice is:
 
 - detached runtime now installs fatal handlers for `uncaughtException` and `unhandledRejection`
 - fatal shutdown records channel health as `failed` before exit instead of silently disappearing
@@ -225,7 +249,13 @@ The current P0 slice is now implemented:
 - mid-prompt runner-session loss now attempts same-context recovery first, then opens a fresh session without prompt replay if context continuity is gone
 - recovery-step notes for that path now render even when channel `streaming` is `off`
 
-Still open after this slice:
+Partially hardened, but not done:
+
+- process-level bounded restart now exists through the runtime monitor
+- `SessionStore` write path now uses temp-file rename, but read path still has no corruption fallback
+- post-start lifecycle reporting now exists, but still does not cover broader degraded or restart-needed states consistently
+
+Still open and should drive the retry work:
 
 - service-grade hardening for runtime-owned state files such as atomic writes and corruption-tolerant reads
 - broader post-start lifecycle reporting beyond the Telegram failure path

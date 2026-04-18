@@ -665,14 +665,17 @@ describe("processChannelInteraction sensitive command gating", () => {
         configPath,
         JSON.stringify({
           ...JSON.parse(renderDefaultConfigTemplate()),
-          channels: {
-            ...JSON.parse(renderDefaultConfigTemplate()).channels,
+          bots: {
+            ...JSON.parse(renderDefaultConfigTemplate()).bots,
             slack: {
-              ...JSON.parse(renderDefaultConfigTemplate()).channels.slack,
-              channels: {
-                C123: {
-                  requireMention: true,
-                  responseMode: "message-tool",
+              ...JSON.parse(renderDefaultConfigTemplate()).bots.slack,
+              default: {
+                ...JSON.parse(renderDefaultConfigTemplate()).bots.slack.default,
+                groups: {
+                  "channel:C123": {
+                    requireMention: true,
+                    responseMode: "message-tool",
+                  },
                 },
               },
             },
@@ -721,14 +724,17 @@ describe("processChannelInteraction sensitive command gating", () => {
         configPath,
         JSON.stringify({
           ...template,
-          channels: {
-            ...template.channels,
+          bots: {
+            ...template.bots,
             slack: {
-              ...template.channels.slack,
-              channels: {
-                C123: {
-                  requireMention: true,
-                  streaming: "all",
+              ...template.bots.slack,
+              default: {
+                ...template.bots.slack.default,
+                groups: {
+                  "channel:C123": {
+                    requireMention: true,
+                    streaming: "all",
+                  },
                 },
               },
             },
@@ -761,7 +767,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     }
 
     expect(posted[0]).toContain("clisbot streaming mode: `latest`");
-    expect(posted[0]).toContain("config.target: `slack channel C123`");
+    expect(posted[0]).toContain("config.target: `slack channel:C123`");
     expect(posted[0]).not.toContain("activeRoute.streaming:");
     expect(posted[0]).not.toContain("config.streaming:");
   });
@@ -778,14 +784,17 @@ describe("processChannelInteraction sensitive command gating", () => {
         configPath,
         JSON.stringify({
           ...template,
-          channels: {
-            ...template.channels,
+          bots: {
+            ...template.bots,
             slack: {
-              ...template.channels.slack,
-              channels: {
-                C123: {
-                  requireMention: true,
-                  streaming: "off",
+              ...template.bots.slack,
+              default: {
+                ...template.bots.slack.default,
+                groups: {
+                  "channel:C123": {
+                    requireMention: true,
+                    streaming: "off",
+                  },
                 },
               },
             },
@@ -834,15 +843,18 @@ describe("processChannelInteraction sensitive command gating", () => {
         configPath,
         JSON.stringify({
           ...template,
-          channels: {
-            ...template.channels,
+          bots: {
+            ...template.bots,
             telegram: {
-              ...template.channels.telegram,
-              groups: {
-                "-1001": {
-                  requireMention: true,
-                  streaming: "all",
-                  topics: {},
+              ...template.bots.telegram,
+              default: {
+                ...template.bots.telegram.default,
+                groups: {
+                  "-1001": {
+                    requireMention: true,
+                    streaming: "all",
+                    topics: {},
+                  },
                 },
               },
             },
@@ -875,7 +887,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     }
 
     expect(posted[0]).toContain("clisbot streaming mode: `all`");
-    expect(posted[0]).toContain("config.target: `telegram topic -1001/4`");
+    expect(posted[0]).toContain("config.target: `telegram topic:-1001:4`");
   });
 
   test("updates persisted streaming mode for a telegram topic by materializing a topic override", async () => {
@@ -890,15 +902,18 @@ describe("processChannelInteraction sensitive command gating", () => {
         configPath,
         JSON.stringify({
           ...template,
-          channels: {
-            ...template.channels,
+          bots: {
+            ...template.bots,
             telegram: {
-              ...template.channels.telegram,
-              groups: {
-                "-1001": {
-                  requireMention: true,
-                  streaming: "all",
-                  topics: {},
+              ...template.bots.telegram,
+              default: {
+                ...template.bots.telegram.default,
+                groups: {
+                  "-1001": {
+                    requireMention: true,
+                    streaming: "all",
+                    topics: {},
+                  },
                 },
               },
             },
@@ -927,14 +942,14 @@ describe("processChannelInteraction sensitive command gating", () => {
       });
 
       const updated = JSON.parse(readFileSync(configPath, "utf8"));
-      expect(updated.channels.telegram.groups["-1001"].topics["4"].streaming).toBe("off");
+      expect(updated.bots.telegram.default.groups["-1001"].topics["4"].streaming).toBe("off");
     } finally {
       process.env.CLISBOT_CONFIG_PATH = originalConfigPath;
       rmSync(configDir, { recursive: true, force: true });
     }
 
     expect(posted[0]).toContain("Updated streaming mode");
-    expect(posted[0]).toContain("`telegram topic -1001/4`");
+    expect(posted[0]).toContain("`telegram topic:-1001:4`");
   });
 
   test("updates persisted response mode for the current route", async () => {
@@ -948,14 +963,17 @@ describe("processChannelInteraction sensitive command gating", () => {
         configPath,
         JSON.stringify({
           ...JSON.parse(renderDefaultConfigTemplate()),
-          channels: {
-            ...JSON.parse(renderDefaultConfigTemplate()).channels,
+          bots: {
+            ...JSON.parse(renderDefaultConfigTemplate()).bots,
             slack: {
-              ...JSON.parse(renderDefaultConfigTemplate()).channels.slack,
-              channels: {
-                C123: {
-                  requireMention: true,
-                  responseMode: "message-tool",
+              ...JSON.parse(renderDefaultConfigTemplate()).bots.slack,
+              default: {
+                ...JSON.parse(renderDefaultConfigTemplate()).bots.slack.default,
+                groups: {
+                  "channel:C123": {
+                    requireMention: true,
+                    responseMode: "message-tool",
+                  },
                 },
               },
             },
@@ -1003,14 +1021,17 @@ describe("processChannelInteraction sensitive command gating", () => {
         configPath,
         JSON.stringify({
           ...template,
-          channels: {
-            ...template.channels,
+          bots: {
+            ...template.bots,
             slack: {
-              ...template.channels.slack,
-              channels: {
-                C123: {
-                  requireMention: true,
-                  additionalMessageMode: "queue",
+              ...template.bots.slack,
+              default: {
+                ...template.bots.slack.default,
+                groups: {
+                  "channel:C123": {
+                    requireMention: true,
+                    additionalMessageMode: "queue",
+                  },
                 },
               },
             },
@@ -1059,14 +1080,17 @@ describe("processChannelInteraction sensitive command gating", () => {
         configPath,
         JSON.stringify({
           ...template,
-          channels: {
-            ...template.channels,
+          bots: {
+            ...template.bots,
             slack: {
-              ...template.channels.slack,
-              channels: {
-                C123: {
-                  requireMention: true,
-                  additionalMessageMode: "steer",
+              ...template.bots.slack,
+              default: {
+                ...template.bots.slack.default,
+                groups: {
+                  "channel:C123": {
+                    requireMention: true,
+                    additionalMessageMode: "steer",
+                  },
                 },
               },
             },

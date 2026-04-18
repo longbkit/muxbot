@@ -1,4 +1,4 @@
-# clisbot - Turn your favorite coding CLI into an agentic assistant and code on the go
+# clisbot - Turn your favorite coding CLI into an agentic personal assistant, workplace assistant, coding partner - on the go
 Want to use OpenClaw but are struggling because:
 
 - API cost is too high, so you end up looking for LLM proxy workarounds
@@ -174,10 +174,11 @@ The docs in this repo are kept current, including the [User Guide](docs/user-gui
 
 If you prefer to configure everything yourself:
 
-1. Read the full config template in [config/clisbot.json.template](config/clisbot.json.template).
-2. Copy it to `~/.clisbot/clisbot.json` and adjust channels, bindings, workspaces, and policies for your environment.
-3. Add agents through the CLI so tool defaults, startup options, and bootstrap templates stay consistent.
-4. Optionally move stable channel secrets into env vars or canonical credential files after your first successful run.
+1. Read the official config template in [config/clisbot.json.template](config/clisbot.json.template).
+2. If you need the archived legacy snapshot, compare it with [config/clisbot.json.v0.1.0.template](config/clisbot.json.v0.1.0.template).
+3. Copy the official template to `~/.clisbot/clisbot.json` and adjust bots, routes, agents, workspaces, and policies for your environment.
+4. Add agents through the CLI so tool defaults, startup options, and bootstrap templates stay consistent.
+5. Optionally move stable channel secrets into env vars or canonical credential files after your first successful run.
 
 Channel route setup is manual by design:
 
@@ -189,9 +190,9 @@ Channel route setup is manual by design:
 Advanced agent management:
 
 - most users should stay on `clisbot start --cli ... --bot-type ...` and let first-run create the default agent
-- if you need more than one agent, custom bindings, or manual workspace bootstrap flows, use the `clisbot agents ...` commands described in [docs/user-guide/README.md](docs/user-guide/README.md)
+- if you need more than one agent, custom bot defaults, or manual route setup flows, use the `clisbot agents ...`, `clisbot bots ...`, and `clisbot routes ...` commands described in [docs/user-guide/README.md](docs/user-guide/README.md)
 - README intentionally keeps that low-level surface out of the main onboarding path because the public first-run model is `--bot-type personal|team`, not internal template-mode naming
-- fresh channel config still points at the `default` agent; if your first agent uses another id, update `defaultAgentId` and any route `agentId` values in config
+- fresh bot config still points at the `default` agent; if your first useful agent uses another id, update the fallback with `clisbot bots set-agent ...` or override it on a route with `clisbot routes set-agent ...`
 
 Env-backed setup is still supported when you want config to reference an env name instead of persisting a credential file:
 
@@ -251,12 +252,14 @@ Most users only need a small set of commands at first:
 - `clisbot auth add-user agent --agent <id> --role admin --user <principal>`
 - `clisbot pairing approve slack <CODE>`
 - `clisbot pairing approve telegram <CODE>`
-- `clisbot channels enable slack`
-- `clisbot channels enable telegram`
-- `clisbot channels add telegram-group <chatId> [--topic <topicId>] [--agent <id>] [--require-mention true|false]`
-- `clisbot channels add slack-channel <channelId> [--agent <id>] [--require-mention true|false]`
-- `clisbot agents list --bindings`
-- `clisbot agents bindings`
+- `clisbot bots list`
+- `clisbot bots add --channel telegram --bot default --bot-token TELEGRAM_BOT_TOKEN --persist`
+- `clisbot bots add --channel slack --bot default --app-token SLACK_APP_TOKEN --bot-token SLACK_BOT_TOKEN --persist`
+- `clisbot routes add --channel telegram group:<chatId> --bot default`
+- `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
+- `clisbot routes add --channel slack channel:<channelId> --bot default`
+- `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`
+- `clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent <id>`
 - `clisbot --help`
 
 If you are running from the repo instead of the global package:
@@ -306,14 +309,14 @@ Command prefix defaults:
 
 - slash-style shortcuts: `["::", "\\"]`
 - bash shortcuts: `["!"]`
-- both are configurable with `channels.slack.commandPrefixes` and `channels.telegram.commandPrefixes`
+- both are configurable with `bots.defaults.commandPrefixes`, `bots.slack.defaults.commandPrefixes`, or `bots.telegram.defaults.commandPrefixes`
 
 Sensitive actions now follow auth and route policy:
 
 - `/transcript` depends on the route `verbose` policy
 - `/bash` depends on resolved agent auth through `shellExecute`
 - use `clisbot auth --help` to inspect scopes and mutate role users or permissions
-- use `clisbot channels --help` for route-level setup and channel policy guidance
+- use `clisbot routes --help` for route-level setup and route policy guidance
 
 Follow-up behavior matters in team threads:
 
@@ -386,6 +389,7 @@ This repo also serves as a small example of an AI-native engineering workflow:
 - lessons-learned docs to capture repeated feedback and pitfalls
 - architecture docs used as a stable implementation contract
 - end-to-end validation expectations to close the feedback loop for AI agents
+- workflow docs for shortest-review-first artifacts, repeated review loops, and task-readiness shaping in [docs/workflow/README.md](docs/workflow/README.md)
 
 ## Contributing
 

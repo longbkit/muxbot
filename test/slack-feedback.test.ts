@@ -33,8 +33,10 @@ describe("slack feedback helpers", () => {
     });
 
     expect(text).toContain("this Slack channel is not configured yet");
-    expect(text).toContain("`clisbot channels add slack-channel C123`");
-    expect(text).toContain("`clisbot channels add slack-channel C123 --agent <id>`");
+    expect(text).toContain("`clisbot routes add --channel slack channel:C123 --bot default`");
+    expect(text).toContain(
+      "`clisbot routes set-agent --channel slack channel:C123 --bot default --agent <id>`",
+    );
     expect(text).toContain("mention this bot (clisbot)");
     expect(text).toContain("`\\start`");
     expect(text).not.toContain("@clisbot");

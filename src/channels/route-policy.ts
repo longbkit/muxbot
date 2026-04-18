@@ -1,6 +1,5 @@
 import type { CommandPrefixes } from "../agents/commands.ts";
 import type { FollowUpConfig } from "../agents/follow-up-policy.ts";
-import { resolveTopLevelBoundAgentId } from "../config/bindings.ts";
 import { resolveConfigDurationMs } from "../config/duration.ts";
 import { getAgentEntry, type LoadedConfig } from "../config/load-config.ts";
 import type { SurfaceNotificationsConfig } from "./surface-notifications.ts";
@@ -21,6 +20,8 @@ export type SharedChannelRoute = {
 };
 
 export type SharedChannelRouteOverride = {
+  enabled?: boolean;
+  policy?: "open" | "pairing" | "allowlist" | "disabled";
   agentId?: string;
   requireMention?: boolean;
   allowBots?: boolean;
@@ -40,7 +41,7 @@ export type SharedChannelRouteOverride = {
 };
 
 type SharedChannelConfig = {
-  defaultAgentId: string;
+  agentId?: string;
   allowBots: boolean;
   commandPrefixes: CommandPrefixes;
   streaming: "off" | "latest" | "all";
@@ -69,11 +70,8 @@ type BuildSharedChannelRouteParams = {
 export function buildSharedChannelRoute(params: BuildSharedChannelRouteParams): SharedChannelRoute {
   const agentId =
     params.route?.agentId ??
-    resolveTopLevelBoundAgentId(params.loadedConfig, {
-      channel: params.channel,
-      accountId: params.accountId,
-    }) ??
-    params.channelConfig.defaultAgentId;
+    params.channelConfig.agentId ??
+    params.loadedConfig.raw.agents.defaults.defaultAgentId;
   const agentEntry = getAgentEntry(params.loadedConfig, agentId);
 
   return {

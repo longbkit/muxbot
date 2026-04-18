@@ -41,7 +41,8 @@ Then:
 2. approve the pairing code with `clisbot pairing approve telegram <CODE>`
 3. add the bot to your group
 4. send `/whoami` in that group or topic
-5. run `clisbot channels add telegram-group <chatId> [--topic <topicId>]`
+5. run `clisbot routes add --channel telegram group:<chatId> --bot default` or `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
+6. bind that routed surface with `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default` or `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default`
 
 The rest of this page explains each step in detail.
 
@@ -172,25 +173,26 @@ Important Telegram behavior:
 After you get the `chatId`, add the group route:
 
 ```bash
-clisbot channels add telegram-group <chatId>
+clisbot routes add --channel telegram group:<chatId> --bot default
 ```
 
 Example:
 
 ```bash
-clisbot channels add telegram-group -1001234567890
+clisbot routes add --channel telegram group:-1001234567890 --bot default
 ```
 
-If you want to bind a specific agent:
+Then bind the group to the agent that should answer there:
 
 ```bash
-clisbot channels add telegram-group -1001234567890 --agent default
+clisbot routes set-agent --channel telegram group:-1001234567890 --bot default --agent default
 ```
 
 If you want the group to work without explicit bot mention:
 
 ```bash
-clisbot channels add telegram-group -1001234567890 --require-mention false
+clisbot routes add --channel telegram group:-1001234567890 --bot default
+clisbot routes set-require-mention --channel telegram group:-1001234567890 --bot default --value false
 ```
 
 Practical default:
@@ -218,25 +220,25 @@ Copy the values:
 Add only that topic:
 
 ```bash
-clisbot channels add telegram-group <chatId> --topic <topicId>
+clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default
 ```
 
 Example:
 
 ```bash
-clisbot channels add telegram-group -1001234567890 --topic 42
+clisbot routes add --channel telegram topic:-1001234567890:42 --bot default
 ```
 
-If you want a specific agent:
+Then bind only that topic to the agent that should answer there:
 
 ```bash
-clisbot channels add telegram-group -1001234567890 --topic 42 --agent default
+clisbot routes set-agent --channel telegram topic:-1001234567890:42 --bot default --agent default
 ```
 
 How topic routing works:
 
-- the parent group route lives at `channels.telegram.groups.<chatId>`
-- the topic route lives at `channels.telegram.groups.<chatId>.topics.<topicId>`
+- the parent group route lives at `bots.telegram.default.groups.<chatId>`
+- the topic route lives at `bots.telegram.default.groups.<chatId>.topics.<topicId>`
 - a topic can override the parent group behavior
 
 This is the cleanest setup when:
@@ -255,11 +257,13 @@ Use this exact order:
 4. verify DM reply works
 5. add the bot to the target group
 6. run `/whoami` in the group
-7. add the group route with `clisbot channels add telegram-group <chatId>`
-8. send a normal test prompt in the group
-9. if using topics, run `/whoami` inside the topic
-10. add the topic route with `--topic <topicId>`
-11. send a normal test prompt in that topic
+7. add the group route with `clisbot routes add --channel telegram group:<chatId> --bot default`
+8. bind the group route with `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default`
+9. send a normal test prompt in the group
+10. if using topics, run `/whoami` inside the topic
+11. add the topic route with `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
+12. bind the topic route with `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default`
+13. send a normal test prompt in that topic
 
 Good group and topic test prompts:
 
@@ -299,11 +303,19 @@ clisbot pairing approve telegram <CODE>
 ```
 
 ```bash
-clisbot channels add telegram-group <chatId>
+clisbot routes add --channel telegram group:<chatId> --bot default
 ```
 
 ```bash
-clisbot channels add telegram-group <chatId> --topic <topicId>
+clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default
+```
+
+```bash
+clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default
+```
+
+```bash
+clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default
 ```
 
 ## Troubleshooting
@@ -335,7 +347,7 @@ Then test again.
 Most common cause:
 
 - you only configured Telegram DM behavior
-- the target group was never added to `channels.telegram.groups`
+- the target group was never added to `bots.telegram.default.groups`
 
 Fix:
 
@@ -344,7 +356,7 @@ Fix:
 3. run:
 
 ```bash
-clisbot channels add telegram-group <chatId>
+clisbot routes add --channel telegram group:<chatId> --bot default
 ```
 
 ### The bot is silent in one specific topic
@@ -362,7 +374,7 @@ Fix:
 3. run:
 
 ```bash
-clisbot channels add telegram-group <chatId> --topic <topicId>
+clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default
 ```
 
 ### Telegram says another process is already calling `getUpdates`

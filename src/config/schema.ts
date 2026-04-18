@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { getDefaultSessionIdPattern } from "../agents/session-identity.ts";
 import { isValidLoopTimezone } from "../agents/loop-command.ts";
 import {
   SUPPORTED_AGENT_CLI_TOOLS,
@@ -9,36 +8,12 @@ import {
   agentAuthOverrideSchema,
   agentAuthSchema,
   appAuthSchema,
-  authRoleOverrideSchema,
-  authRoleSchema,
   defaultAgentAuthConfig,
   defaultAppAuthConfig,
 } from "./auth-schema.ts";
 
-const defaultRunnerSessionIdConfig = {
-  create: {
-    mode: "runner" as const,
-    args: [],
-  },
-  capture: {
-    mode: "status-command" as const,
-    statusCommand: "/status",
-    pattern: getDefaultSessionIdPattern(),
-    timeoutMs: 5000,
-    pollIntervalMs: 250,
-  },
-  resume: {
-    mode: "command" as const,
-    args: [
-      "resume",
-      "{sessionId}",
-      "--dangerously-bypass-approvals-and-sandbox",
-      "--no-alt-screen",
-      "-C",
-      "{workspace}",
-    ],
-  },
-};
+const defaultSessionIdPattern =
+  "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b";
 
 const runnerSessionIdCreateSchema = z.object({
   mode: z.enum(["runner", "explicit"]).default("runner"),
@@ -48,7 +23,7 @@ const runnerSessionIdCreateSchema = z.object({
 const runnerSessionIdCaptureSchema = z.object({
   mode: z.enum(["off", "status-command"]).default("off"),
   statusCommand: z.string().min(1).default("/status"),
-  pattern: z.string().min(1).default(getDefaultSessionIdPattern()),
+  pattern: z.string().min(1).default(defaultSessionIdPattern),
   timeoutMs: z.number().int().positive().default(5000),
   pollIntervalMs: z.number().int().positive().default(250),
 });
@@ -56,57 +31,42 @@ const runnerSessionIdCaptureSchema = z.object({
 const runnerSessionIdResumeSchema = z.object({
   mode: z.enum(["off", "command"]).default("off"),
   command: z.string().min(1).optional(),
-  args: z
-    .array(z.string())
-    .default([
-      "resume",
-      "{sessionId}",
-      "--dangerously-bypass-approvals-and-sandbox",
-      "--no-alt-screen",
-      "-C",
-      "{workspace}",
-    ]),
+  args: z.array(z.string()).default([]),
 });
 
-const runnerSessionIdObjectSchema = z.object({
-  create: runnerSessionIdCreateSchema.default(
-    defaultRunnerSessionIdConfig.create,
-  ),
-  capture: runnerSessionIdCaptureSchema.default(
-    defaultRunnerSessionIdConfig.capture,
-  ),
-  resume: runnerSessionIdResumeSchema.default(
-    defaultRunnerSessionIdConfig.resume,
-  ),
+const runnerSessionIdSchema = z.object({
+  create: runnerSessionIdCreateSchema.default({
+    mode: "runner",
+    args: [],
+  }),
+  capture: runnerSessionIdCaptureSchema.default({
+    mode: "status-command",
+    statusCommand: "/status",
+    pattern: defaultSessionIdPattern,
+    timeoutMs: 5000,
+    pollIntervalMs: 250,
+  }),
+  resume: runnerSessionIdResumeSchema.default({
+    mode: "command",
+    args: [],
+  }),
 });
-
-const runnerSessionIdSchema = runnerSessionIdObjectSchema.default(
-  defaultRunnerSessionIdConfig,
-);
 
 const runnerStartupBlockerSchema = z.object({
   pattern: z.string().min(1),
   message: z.string().min(1),
 });
 
-const runnerSchema = z.object({
+const runnerLaunchSchema = z.object({
   command: z.string().min(1),
-  args: z
-    .array(z.string())
-    .default([
-      "--dangerously-bypass-approvals-and-sandbox",
-      "--no-alt-screen",
-      "-C",
-      "{workspace}",
-    ]),
-  trustWorkspace: z.boolean().default(true),
-  startupDelayMs: z.number().int().positive().default(3000),
-  startupRetryCount: z.number().int().min(0).default(2),
-  startupRetryDelayMs: z.number().int().min(0).default(1000),
+  args: z.array(z.string()).default([]),
+  startupDelayMs: z.number().int().positive().optional(),
+  startupRetryCount: z.number().int().min(0).optional(),
+  startupRetryDelayMs: z.number().int().min(0).optional(),
   startupReadyPattern: z.string().min(1).optional(),
   startupBlockers: z.array(runnerStartupBlockerSchema).optional(),
-  promptSubmitDelayMs: z.number().int().min(0).default(150),
-  sessionId: runnerSessionIdSchema.default(defaultRunnerSessionIdConfig),
+  promptSubmitDelayMs: z.number().int().min(0).optional(),
+  sessionId: runnerSessionIdSchema.optional(),
 });
 
 const streamSchema = z.object({
@@ -119,10 +79,71 @@ const streamSchema = z.object({
   maxMessageChars: z.number().int().positive().default(3500),
 });
 
-const sessionSchema = z.object({
+const streamOverrideSchema = streamSchema.partial();
+
+const sessionRuntimeSchema = z.object({
   createIfMissing: z.boolean().default(true),
   staleAfterMinutes: z.number().int().min(0).default(60),
   name: z.string().default("{sessionKey}"),
+});
+
+const sessionRuntimeOverrideSchema = sessionRuntimeSchema.partial();
+
+const runnerDefaultsSchema = z.object({
+  tmux: z.object({
+    socketPath: z.string().default("~/.clisbot/state/clisbot.sock"),
+  }).default({
+    socketPath: "~/.clisbot/state/clisbot.sock",
+  }),
+  trustWorkspace: z.boolean().default(true),
+  startupDelayMs: z.number().int().positive().default(3000),
+  startupRetryCount: z.number().int().min(0).default(2),
+  startupRetryDelayMs: z.number().int().min(0).default(1000),
+  promptSubmitDelayMs: z.number().int().min(0).default(150),
+  stream: streamSchema.default({
+    captureLines: 160,
+    updateIntervalMs: 2000,
+    idleTimeoutMs: 6000,
+    noOutputTimeoutMs: 20000,
+    maxRuntimeMin: 30,
+    maxMessageChars: 3500,
+  }),
+  session: sessionRuntimeSchema.default({
+    createIfMissing: true,
+    staleAfterMinutes: 60,
+    name: "{sessionKey}",
+  }),
+});
+
+const runnerDefaultsOverrideSchema = z.object({
+  tmux: z.object({
+    socketPath: z.string().optional(),
+  }).optional(),
+  trustWorkspace: z.boolean().optional(),
+  startupDelayMs: z.number().int().positive().optional(),
+  startupRetryCount: z.number().int().min(0).optional(),
+  startupRetryDelayMs: z.number().int().min(0).optional(),
+  promptSubmitDelayMs: z.number().int().min(0).optional(),
+  stream: streamOverrideSchema.optional(),
+  session: sessionRuntimeOverrideSchema.optional(),
+});
+
+const runnerFamilySchema = runnerLaunchSchema;
+
+const runnerFamilyOverrideSchema = z.object({
+  command: z.string().min(1).optional(),
+  args: z.array(z.string()).optional(),
+  startupDelayMs: z.number().int().positive().optional(),
+  startupRetryCount: z.number().int().min(0).optional(),
+  startupRetryDelayMs: z.number().int().min(0).optional(),
+  startupReadyPattern: z.string().min(1).optional(),
+  startupBlockers: z.array(runnerStartupBlockerSchema).optional(),
+  promptSubmitDelayMs: z.number().int().min(0).optional(),
+  sessionId: z.object({
+    create: runnerSessionIdCreateSchema.partial().optional(),
+    capture: runnerSessionIdCaptureSchema.partial().optional(),
+    resume: runnerSessionIdResumeSchema.partial().optional(),
+  }).optional(),
 });
 
 const sessionDmScopeSchema = z.enum([
@@ -132,108 +153,10 @@ const sessionDmScopeSchema = z.enum([
   "per-account-channel-peer",
 ]);
 
-const sessionConfigSchema = z.object({
+const appSessionSchema = z.object({
   mainKey: z.string().min(1).default("main"),
-  dmScope: sessionDmScopeSchema.default("per-channel-peer"),
   identityLinks: z.record(z.string(), z.array(z.string())).default({}),
   storePath: z.string().default("~/.clisbot/state/sessions.json"),
-});
-
-const runnerOverrideSchema = z.object({
-  command: z.string().min(1).optional(),
-  args: z.array(z.string()).optional(),
-  trustWorkspace: z.boolean().optional(),
-  startupDelayMs: z.number().int().positive().optional(),
-  startupRetryCount: z.number().int().min(0).optional(),
-  startupRetryDelayMs: z.number().int().min(0).optional(),
-  startupReadyPattern: z.string().min(1).optional(),
-  startupBlockers: z.array(runnerStartupBlockerSchema).optional(),
-  promptSubmitDelayMs: z.number().int().min(0).optional(),
-  sessionId: runnerSessionIdObjectSchema
-    .partial()
-    .extend({
-      create: runnerSessionIdCreateSchema.partial().optional(),
-      capture: runnerSessionIdCaptureSchema.partial().optional(),
-      resume: runnerSessionIdResumeSchema.partial().optional(),
-    })
-    .optional(),
-});
-
-const agentBootstrapSchema = z.object({
-  mode: z.enum(SUPPORTED_BOOTSTRAP_MODES).default("personal-assistant"),
-});
-
-const agentOverrideSchema = z.object({
-  workspace: z.string().optional(),
-  responseMode: z.enum(["capture-pane", "message-tool"]).optional(),
-  additionalMessageMode: z.enum(["queue", "steer"]).optional(),
-  auth: agentAuthOverrideSchema.optional(),
-  runner: runnerOverrideSchema.optional(),
-  stream: streamSchema.partial().optional(),
-  session: sessionSchema.partial().optional(),
-});
-
-const agentEntrySchema = agentOverrideSchema.extend({
-  id: z.string().min(1),
-  default: z.boolean().optional(),
-  name: z.string().optional(),
-  cliTool: z.enum(SUPPORTED_AGENT_CLI_TOOLS).optional(),
-  startupOptions: z.array(z.string()).optional(),
-  bootstrap: agentBootstrapSchema.optional(),
-});
-
-const agentDefaultsSchema = z.object({
-  workspace: z.string().default("~/.clisbot/workspaces/{agentId}"),
-  auth: agentAuthSchema.default(defaultAgentAuthConfig),
-  runner: runnerSchema.default({
-    command: "codex",
-    args: [
-      "--dangerously-bypass-approvals-and-sandbox",
-      "--no-alt-screen",
-      "-C",
-      "{workspace}",
-    ],
-    trustWorkspace: true,
-    startupDelayMs: 3000,
-    startupRetryCount: 2,
-    startupRetryDelayMs: 1000,
-    promptSubmitDelayMs: 150,
-    sessionId: defaultRunnerSessionIdConfig,
-  }),
-  stream: streamSchema.default({
-    captureLines: 160,
-    updateIntervalMs: 2000,
-    idleTimeoutMs: 6000,
-    noOutputTimeoutMs: 20000,
-    maxRuntimeMin: 30,
-    maxMessageChars: 3500,
-  }),
-  session: sessionSchema.default({
-    createIfMissing: true,
-    staleAfterMinutes: 60,
-    name: "{sessionKey}",
-  }),
-});
-
-const slackStreamingSchema = z.enum(["off", "latest", "all"]);
-const slackResponseSchema = z.enum(["all", "final"]);
-const slackConversationPolicySchema = z.enum(["allowlist", "open", "disabled"]);
-const directMessagePolicySchema = z.enum(["open", "pairing", "allowlist", "disabled"]);
-const slackFollowUpModeSchema = z.enum(["auto", "mention-only", "paused"]);
-const slackFollowUpSchema = z.object({
-  mode: slackFollowUpModeSchema.default("auto"),
-  participationTtlSec: z.number().int().positive().optional(),
-  participationTtlMin: z.number().int().positive().optional(),
-});
-const slackProcessingStatusSchema = z.object({
-  enabled: z.boolean().default(true),
-  status: z.string().min(1).default("Working..."),
-  loadingMessages: z.array(z.string().min(1)).default([]),
-});
-const slackFollowUpOverrideSchema = z.object({
-  mode: slackFollowUpModeSchema.optional(),
-  participationTtlSec: z.number().int().positive().optional(),
-  participationTtlMin: z.number().int().positive().optional(),
 });
 
 const commandPrefixesSchema = z.object({
@@ -246,233 +169,333 @@ const commandPrefixesOverrideSchema = z.object({
   bash: z.array(z.string().min(1)).optional(),
 });
 
-const channelAgentPromptSchema = z.object({
-  enabled: z.boolean().default(true),
-  maxProgressMessages: z.number().int().min(0).default(3),
-  requireFinalResponse: z.boolean().default(true),
-});
-
-const channelResponseModeSchema = z.enum(["capture-pane", "message-tool"]);
-const channelAdditionalMessageModeSchema = z.enum(["queue", "steer"]);
-const channelVerboseSchema = z.enum(["off", "minimal"]);
-const surfaceNotificationModeSchema = z.enum(["none", "brief", "full"]);
+const streamingSchema = z.enum(["off", "latest", "all"]);
+const responseSchema = z.enum(["all", "final"]);
+const responseModeSchema = z.enum(["capture-pane", "message-tool"]);
+const additionalMessageModeSchema = z.enum(["queue", "steer"]);
+const verboseSchema = z.enum(["off", "minimal"]);
+const notificationModeSchema = z.enum(["none", "brief", "full"]);
+const conversationPolicySchema = z.enum(["open", "allowlist", "disabled"]);
+const dmPolicySchema = z.enum(["open", "pairing", "allowlist", "disabled"]);
+const followUpModeSchema = z.enum(["auto", "mention-only", "paused"]);
 const timezoneSchema = z.string().refine(isValidLoopTimezone, {
   message: "Expected a valid IANA timezone such as Asia/Ho_Chi_Minh",
 });
 
 const surfaceNotificationsSchema = z.object({
-  queueStart: surfaceNotificationModeSchema.default("brief"),
-  loopStart: surfaceNotificationModeSchema.default("brief"),
+  queueStart: notificationModeSchema.default("brief"),
+  loopStart: notificationModeSchema.default("brief"),
 });
 
 const surfaceNotificationsOverrideSchema = z.object({
-  queueStart: surfaceNotificationModeSchema.optional(),
-  loopStart: surfaceNotificationModeSchema.optional(),
+  queueStart: notificationModeSchema.optional(),
+  loopStart: notificationModeSchema.optional(),
 });
 
-const slackRouteSchema = z.object({
-  requireMention: z.boolean().default(false),
-  allowBots: z.boolean().default(false),
-  agentId: z.string().optional(),
-  commandPrefixes: commandPrefixesOverrideSchema.optional(),
-  streaming: slackStreamingSchema.optional(),
-  response: slackResponseSchema.optional(),
-  responseMode: channelResponseModeSchema.optional(),
-  additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
-  surfaceNotifications: surfaceNotificationsOverrideSchema.optional(),
-  verbose: channelVerboseSchema.optional(),
-  followUp: slackFollowUpOverrideSchema.optional(),
-  timezone: timezoneSchema.optional(),
+const followUpSchema = z.object({
+  mode: followUpModeSchema.default("auto"),
+  participationTtlSec: z.number().int().positive().optional(),
+  participationTtlMin: z.number().int().positive().optional(),
 });
 
-const telegramTopicRouteSchema = z.object({
+const followUpOverrideSchema = z.object({
+  mode: followUpModeSchema.optional(),
+  participationTtlSec: z.number().int().positive().optional(),
+  participationTtlMin: z.number().int().positive().optional(),
+});
+
+const botRouteSchema = z.object({
+  enabled: z.boolean().default(true),
   requireMention: z.boolean().optional(),
+  policy: z.enum(["open", "pairing", "allowlist", "disabled"]).optional(),
+  allowUsers: z.array(z.string()).default([]),
+  blockUsers: z.array(z.string()).default([]),
   allowBots: z.boolean().optional(),
   agentId: z.string().optional(),
   commandPrefixes: commandPrefixesOverrideSchema.optional(),
-  streaming: slackStreamingSchema.optional(),
-  response: slackResponseSchema.optional(),
-  responseMode: channelResponseModeSchema.optional(),
-  additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
+  streaming: streamingSchema.optional(),
+  response: responseSchema.optional(),
+  responseMode: responseModeSchema.optional(),
+  additionalMessageMode: additionalMessageModeSchema.optional(),
   surfaceNotifications: surfaceNotificationsOverrideSchema.optional(),
-  verbose: channelVerboseSchema.optional(),
-  followUp: slackFollowUpOverrideSchema.optional(),
+  verbose: verboseSchema.optional(),
+  followUp: followUpOverrideSchema.optional(),
   timezone: timezoneSchema.optional(),
 });
 
-const telegramGroupRouteSchema = z.object({
-  requireMention: z.boolean().default(true),
-  allowBots: z.boolean().default(false),
-  agentId: z.string().optional(),
-  commandPrefixes: commandPrefixesOverrideSchema.optional(),
-  streaming: slackStreamingSchema.optional(),
-  response: slackResponseSchema.optional(),
-  responseMode: channelResponseModeSchema.optional(),
-  additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
-  surfaceNotifications: surfaceNotificationsOverrideSchema.optional(),
-  verbose: channelVerboseSchema.optional(),
-  followUp: slackFollowUpOverrideSchema.optional(),
-  timezone: timezoneSchema.optional(),
+const telegramTopicRouteSchema = botRouteSchema;
+
+const telegramGroupRouteSchema = botRouteSchema.extend({
   topics: z.record(z.string(), telegramTopicRouteSchema).default({}),
 });
 
-const telegramDirectMessagesSchema = z.object({
+const slackProcessingStatusSchema = z.object({
   enabled: z.boolean().default(true),
-  policy: directMessagePolicySchema.default("pairing"),
-  allowFrom: z.array(z.string()).default([]),
-  requireMention: z.boolean().default(false),
-  allowBots: z.boolean().default(false),
-  agentId: z.string().optional(),
-  commandPrefixes: commandPrefixesOverrideSchema.optional(),
-  streaming: slackStreamingSchema.optional(),
-  response: slackResponseSchema.optional(),
-  responseMode: channelResponseModeSchema.optional(),
-  additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
-  surfaceNotifications: surfaceNotificationsOverrideSchema.optional(),
-  verbose: channelVerboseSchema.optional(),
-  followUp: slackFollowUpOverrideSchema.optional(),
-  timezone: timezoneSchema.optional(),
+  status: z.string().min(1).default("Working..."),
+  loadingMessages: z.array(z.string().min(1)).default([]),
 });
 
-const telegramPollingSchema = z.object({
-  timeoutSeconds: z.number().int().positive().default(20),
-  retryDelayMs: z.number().int().positive().default(1000),
-});
-
-const telegramAccountSchema = z.object({
-  enabled: z.boolean().optional(),
-  credentialType: z.enum(["mem", "tokenFile"]).optional(),
-  botToken: z.string().default(""),
-  tokenFile: z.string().optional(),
-});
-
-const telegramSchema = z.object({
-  enabled: z.boolean().default(false),
-  mode: z.literal("polling").default("polling"),
-  botToken: z.string().default(""),
-  defaultAccount: z.string().min(1).default("default"),
-  accounts: z.record(z.string(), telegramAccountSchema).default({}),
-  agentPrompt: channelAgentPromptSchema.default({
-    enabled: true,
-    maxProgressMessages: 3,
-    requireFinalResponse: true,
-  }),
-  allowBots: z.boolean().default(false),
-  groupPolicy: slackConversationPolicySchema.default("allowlist"),
-  defaultAgentId: z.string().default("default"),
-  commandPrefixes: commandPrefixesSchema.default({
-    slash: ["::", "\\"],
-    bash: ["!"],
-  }),
-  streaming: slackStreamingSchema.default("off"),
-  response: slackResponseSchema.default("final"),
-  responseMode: channelResponseModeSchema.default("message-tool"),
-  additionalMessageMode: channelAdditionalMessageModeSchema.default("steer"),
-  surfaceNotifications: surfaceNotificationsSchema.optional(),
-  verbose: channelVerboseSchema.default("minimal"),
-  followUp: slackFollowUpSchema.default({
-    mode: "auto",
-    participationTtlMin: 5,
-  }),
-  timezone: timezoneSchema.optional(),
-  polling: telegramPollingSchema.default({
-    timeoutSeconds: 20,
-    retryDelayMs: 1000,
-  }),
-  groups: z.record(z.string(), telegramGroupRouteSchema).default({}),
-  directMessages: telegramDirectMessagesSchema.default({
-    enabled: true,
-    policy: "pairing",
-    allowFrom: [],
-    requireMention: false,
-    allowBots: false,
-  }),
-});
-
-const directMessagesSchema = z.object({
+const agentPromptSchema = z.object({
   enabled: z.boolean().default(true),
-  policy: directMessagePolicySchema.default("pairing"),
-  allowFrom: z.array(z.string()).default([]),
-  requireMention: z.boolean().default(false),
-  agentId: z.string().optional(),
-  commandPrefixes: commandPrefixesOverrideSchema.optional(),
-  streaming: slackStreamingSchema.optional(),
-  response: slackResponseSchema.optional(),
-  responseMode: channelResponseModeSchema.optional(),
-  additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
-  surfaceNotifications: surfaceNotificationsOverrideSchema.optional(),
-  verbose: channelVerboseSchema.optional(),
-  followUp: slackFollowUpOverrideSchema.optional(),
-  timezone: timezoneSchema.optional(),
+  maxProgressMessages: z.number().int().min(0).default(3),
+  requireFinalResponse: z.boolean().default(true),
 });
 
-const slackSchema = z.object({
+const credentialTypeSchema = z.enum(["mem", "tokenFile"]);
+
+const slackBotSchema = z.object({
+  enabled: z.boolean().default(true),
+  name: z.string().optional(),
+  agentId: z.string().optional(),
+  credentialType: credentialTypeSchema.optional(),
+  appToken: z.string().optional(),
+  botToken: z.string().optional(),
+  appTokenFile: z.string().optional(),
+  botTokenFile: z.string().optional(),
+  allowBots: z.boolean().optional(),
+  channelPolicy: conversationPolicySchema.optional(),
+  groupPolicy: conversationPolicySchema.optional(),
+  agentPrompt: agentPromptSchema.optional(),
+  ackReaction: z.string().optional(),
+  typingReaction: z.string().optional(),
+  replyToMode: z.enum(["thread", "all"]).optional(),
+  processingStatus: slackProcessingStatusSchema.optional(),
+  commandPrefixes: commandPrefixesOverrideSchema.optional(),
+  streaming: streamingSchema.optional(),
+  response: responseSchema.optional(),
+  responseMode: responseModeSchema.optional(),
+  additionalMessageMode: additionalMessageModeSchema.optional(),
+  surfaceNotifications: surfaceNotificationsOverrideSchema.optional(),
+  verbose: verboseSchema.optional(),
+  followUp: followUpOverrideSchema.optional(),
+  timezone: timezoneSchema.optional(),
+  directMessages: z.record(z.string(), botRouteSchema).default({}),
+  groups: z.record(z.string(), botRouteSchema).default({}),
+});
+
+const slackProviderDefaultsSchema = z.object({
   enabled: z.boolean().default(false),
+  defaultBotId: z.string().min(1).default("default"),
   mode: z.literal("socket").default("socket"),
-  appToken: z.string().default(""),
-  botToken: z.string().default(""),
-  defaultAccount: z.string().min(1).default("default"),
-  accounts: z.record(z.string(), z.object({
-    enabled: z.boolean().optional(),
-    credentialType: z.enum(["mem", "tokenFile"]).optional(),
-    appToken: z.string().default(""),
-    botToken: z.string().default(""),
-    appTokenFile: z.string().optional(),
-    botTokenFile: z.string().optional(),
-  })).default({}),
-  agentPrompt: channelAgentPromptSchema.default({
+  allowBots: z.boolean().default(false),
+  channelPolicy: conversationPolicySchema.default("disabled"),
+  groupPolicy: conversationPolicySchema.default("disabled"),
+  agentPrompt: agentPromptSchema.default({
     enabled: true,
     maxProgressMessages: 3,
     requireFinalResponse: true,
   }),
   ackReaction: z.string().default(""),
   typingReaction: z.string().default(""),
+  replyToMode: z.enum(["thread", "all"]).default("thread"),
   processingStatus: slackProcessingStatusSchema.default({
     enabled: true,
     status: "Working...",
     loadingMessages: [],
   }),
-  allowBots: z.boolean().default(false),
-  replyToMode: z.enum(["thread", "all"]).default("thread"),
-  channelPolicy: slackConversationPolicySchema.default("allowlist"),
-  groupPolicy: slackConversationPolicySchema.default("allowlist"),
-  defaultAgentId: z.string().default("default"),
   commandPrefixes: commandPrefixesSchema.default({
     slash: ["::", "\\"],
     bash: ["!"],
   }),
-  streaming: slackStreamingSchema.default("off"),
-  response: slackResponseSchema.default("final"),
-  responseMode: channelResponseModeSchema.default("message-tool"),
-  additionalMessageMode: channelAdditionalMessageModeSchema.default("steer"),
+  streaming: streamingSchema.default("off"),
+  response: responseSchema.default("final"),
+  responseMode: responseModeSchema.default("message-tool"),
+  additionalMessageMode: additionalMessageModeSchema.default("steer"),
   surfaceNotifications: surfaceNotificationsSchema.optional(),
-  verbose: channelVerboseSchema.default("minimal"),
-  followUp: slackFollowUpSchema.default({
+  verbose: verboseSchema.default("minimal"),
+  followUp: followUpSchema.default({
     mode: "auto",
     participationTtlMin: 5,
   }),
   timezone: timezoneSchema.optional(),
-  channels: z.record(z.string(), slackRouteSchema).default({}),
-  groups: z.record(z.string(), slackRouteSchema).default({}),
-  directMessages: directMessagesSchema.default({
+  directMessages: z.record(z.string(), botRouteSchema).default({}),
+});
+
+const telegramBotSchema = z.object({
+  enabled: z.boolean().default(true),
+  name: z.string().optional(),
+  agentId: z.string().optional(),
+  credentialType: credentialTypeSchema.optional(),
+  botToken: z.string().optional(),
+  tokenFile: z.string().optional(),
+  allowBots: z.boolean().optional(),
+  groupPolicy: conversationPolicySchema.optional(),
+  agentPrompt: agentPromptSchema.optional(),
+  commandPrefixes: commandPrefixesOverrideSchema.optional(),
+  streaming: streamingSchema.optional(),
+  response: responseSchema.optional(),
+  responseMode: responseModeSchema.optional(),
+  additionalMessageMode: additionalMessageModeSchema.optional(),
+  surfaceNotifications: surfaceNotificationsOverrideSchema.optional(),
+  verbose: verboseSchema.optional(),
+  followUp: followUpOverrideSchema.optional(),
+  timezone: timezoneSchema.optional(),
+  directMessages: z.record(z.string(), botRouteSchema).default({}),
+  groups: z.record(z.string(), telegramGroupRouteSchema).default({}),
+  polling: z.object({
+    timeoutSeconds: z.number().int().positive().default(20),
+    retryDelayMs: z.number().int().positive().default(1000),
+  }).optional(),
+});
+
+const telegramProviderDefaultsSchema = z.object({
+  enabled: z.boolean().default(false),
+  defaultBotId: z.string().min(1).default("default"),
+  mode: z.literal("polling").default("polling"),
+  allowBots: z.boolean().default(false),
+  groupPolicy: conversationPolicySchema.default("disabled"),
+  agentPrompt: agentPromptSchema.default({
     enabled: true,
-    policy: "pairing",
-    allowFrom: [],
-    requireMention: false,
+    maxProgressMessages: 3,
+    requireFinalResponse: true,
+  }),
+  commandPrefixes: commandPrefixesSchema.default({
+    slash: ["::", "\\"],
+    bash: ["!"],
+  }),
+  streaming: streamingSchema.default("off"),
+  response: responseSchema.default("final"),
+  responseMode: responseModeSchema.default("message-tool"),
+  additionalMessageMode: additionalMessageModeSchema.default("steer"),
+  surfaceNotifications: surfaceNotificationsSchema.optional(),
+  verbose: verboseSchema.default("minimal"),
+  followUp: followUpSchema.default({
+    mode: "auto",
+    participationTtlMin: 5,
+  }),
+  timezone: timezoneSchema.optional(),
+  directMessages: z.record(z.string(), botRouteSchema).default({}),
+  polling: z.object({
+    timeoutSeconds: z.number().int().positive().default(20),
+    retryDelayMs: z.number().int().positive().default(1000),
+  }).default({
+    timeoutSeconds: 20,
+    retryDelayMs: 1000,
   }),
 });
 
-const controlConfigReloadSchema = z.object({
+const botsDefaultsSchema = z.object({
+  allowBots: z.boolean().default(false),
+  requireMention: z.boolean().default(true),
+  dmScope: sessionDmScopeSchema.default("per-channel-peer"),
+  groupPolicy: conversationPolicySchema.default("allowlist"),
+  commandPrefixes: commandPrefixesSchema.default({
+    slash: ["::", "\\"],
+    bash: ["!"],
+  }),
+  streaming: streamingSchema.default("off"),
+  response: responseSchema.default("final"),
+  responseMode: responseModeSchema.default("message-tool"),
+  additionalMessageMode: additionalMessageModeSchema.default("steer"),
+  surfaceNotifications: surfaceNotificationsSchema.optional(),
+  verbose: verboseSchema.default("minimal"),
+  followUp: followUpSchema.default({
+    mode: "auto",
+    participationTtlMin: 5,
+  }),
+  timezone: timezoneSchema.optional(),
+});
+
+const slackBotsSchema = z.object({
+  defaults: slackProviderDefaultsSchema.default({
+    enabled: false,
+    defaultBotId: "default",
+    mode: "socket",
+    allowBots: false,
+    channelPolicy: "disabled",
+    groupPolicy: "disabled",
+    agentPrompt: {
+      enabled: true,
+      maxProgressMessages: 3,
+      requireFinalResponse: true,
+    },
+    ackReaction: "",
+    typingReaction: "",
+    replyToMode: "thread",
+    processingStatus: {
+      enabled: true,
+      status: "Working...",
+      loadingMessages: [],
+    },
+    commandPrefixes: {
+      slash: ["::", "\\"],
+      bash: ["!"],
+    },
+    streaming: "off",
+    response: "final",
+    responseMode: "message-tool",
+    additionalMessageMode: "steer",
+    verbose: "minimal",
+    followUp: {
+      mode: "auto",
+      participationTtlMin: 5,
+    },
+    directMessages: {
+      "*": {
+        enabled: true,
+        requireMention: false,
+        policy: "pairing",
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    },
+  }),
+}).catchall(slackBotSchema);
+
+const telegramBotsSchema = z.object({
+  defaults: telegramProviderDefaultsSchema.default({
+    enabled: false,
+    defaultBotId: "default",
+    mode: "polling",
+    allowBots: false,
+    groupPolicy: "disabled",
+    agentPrompt: {
+      enabled: true,
+      maxProgressMessages: 3,
+      requireFinalResponse: true,
+    },
+    commandPrefixes: {
+      slash: ["::", "\\"],
+      bash: ["!"],
+    },
+    streaming: "off",
+    response: "final",
+    responseMode: "message-tool",
+    additionalMessageMode: "steer",
+    verbose: "minimal",
+    followUp: {
+      mode: "auto",
+      participationTtlMin: 5,
+    },
+    directMessages: {
+      "*": {
+        enabled: true,
+        requireMention: false,
+        policy: "pairing",
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    },
+    polling: {
+      timeoutSeconds: 20,
+      retryDelayMs: 1000,
+    },
+  }),
+}).catchall(telegramBotSchema);
+
+const appControlConfigReloadSchema = z.object({
   watch: z.boolean().default(false),
   watchDebounceMs: z.number().int().min(0).default(250),
 });
 
-const controlSessionCleanupSchema = z.object({
+const appControlSessionCleanupSchema = z.object({
   enabled: z.boolean().default(true),
   intervalMinutes: z.number().int().positive().default(5),
 });
 
-const controlLoopSchema = z.object({
+const appControlLoopSchema = z.object({
   maxRunsPerLoop: z.number().int().positive().default(20),
   maxActiveLoops: z.number().int().positive().default(10),
   defaultTimezone: timezoneSchema.optional(),
@@ -480,40 +503,29 @@ const controlLoopSchema = z.object({
   maxTimes: z.number().int().positive().optional(),
 });
 
-const controlRuntimeMonitorRestartStageSchema = z.object({
-  delayMinutes: z.number().int().positive().default(15),
-  maxRestarts: z.number().int().positive().default(4),
-});
-
-const controlRuntimeMonitorFastRetrySchema = z.object({
-  delaySeconds: z.number().int().positive().default(10),
-  maxRestarts: z.number().int().min(0).default(3),
-});
-
-const controlRuntimeMonitorRestartBackoffSchema = z.object({
-  fastRetry: controlRuntimeMonitorFastRetrySchema.default({
-    delaySeconds: 10,
-    maxRestarts: 3,
-  }),
-  stages: z.array(controlRuntimeMonitorRestartStageSchema).min(1).default([
-    {
-      delayMinutes: 15,
-      maxRestarts: 4,
-    },
-    {
-      delayMinutes: 30,
-      maxRestarts: 4,
-    },
-  ]),
-});
-
-const controlRuntimeMonitorOwnerAlertsSchema = z.object({
-  enabled: z.boolean().default(true),
-  minIntervalMinutes: z.number().int().positive().default(30),
-});
-
-const controlRuntimeMonitorSchema = z.object({
-  restartBackoff: controlRuntimeMonitorRestartBackoffSchema.default({
+const appControlRuntimeMonitorSchema = z.object({
+  restartBackoff: z.object({
+    fastRetry: z.object({
+      delaySeconds: z.number().int().positive().default(10),
+      maxRestarts: z.number().int().min(0).default(3),
+    }).default({
+      delaySeconds: 10,
+      maxRestarts: 3,
+    }),
+    stages: z.array(z.object({
+      delayMinutes: z.number().int().positive().default(15),
+      maxRestarts: z.number().int().positive().default(4),
+    })).min(1).default([
+      {
+        delayMinutes: 15,
+        maxRestarts: 4,
+      },
+      {
+        delayMinutes: 30,
+        maxRestarts: 4,
+      },
+    ]),
+  }).default({
     fastRetry: {
       delaySeconds: 10,
       maxRestarts: 3,
@@ -529,138 +541,316 @@ const controlRuntimeMonitorSchema = z.object({
       },
     ],
   }),
-  ownerAlerts: controlRuntimeMonitorOwnerAlertsSchema.default({
+  ownerAlerts: z.object({
+    enabled: z.boolean().default(true),
+    minIntervalMinutes: z.number().int().positive().default(30),
+  }).default({
     enabled: true,
     minIntervalMinutes: 30,
   }),
 });
 
-const controlSchema = z.object({
-  configReload: controlConfigReloadSchema.default({
-    watch: false,
-    watchDebounceMs: 250,
+const agentBootstrapSchema = z.object({
+  botType: z.enum(SUPPORTED_BOOTSTRAP_MODES).default("personal-assistant"),
+});
+
+const agentRunnerOverrideSchema = z.object({
+  defaults: runnerDefaultsOverrideSchema.optional(),
+  command: z.string().min(1).optional(),
+  args: z.array(z.string()).optional(),
+  startupDelayMs: z.number().int().positive().optional(),
+  startupRetryCount: z.number().int().min(0).optional(),
+  startupRetryDelayMs: z.number().int().min(0).optional(),
+  startupReadyPattern: z.string().min(1).optional(),
+  startupBlockers: z.array(runnerStartupBlockerSchema).optional(),
+  promptSubmitDelayMs: z.number().int().min(0).optional(),
+  sessionId: z.object({
+    create: runnerSessionIdCreateSchema.partial().optional(),
+    capture: runnerSessionIdCaptureSchema.partial().optional(),
+    resume: runnerSessionIdResumeSchema.partial().optional(),
+  }).optional(),
+});
+
+const agentOverrideSchema = z.object({
+  workspace: z.string().optional(),
+  responseMode: responseModeSchema.optional(),
+  additionalMessageMode: additionalMessageModeSchema.optional(),
+  auth: agentAuthOverrideSchema.optional(),
+  runner: agentRunnerOverrideSchema.optional(),
+});
+
+const agentEntrySchema = agentOverrideSchema.extend({
+  id: z.string().min(1),
+  default: z.boolean().optional(),
+  name: z.string().optional(),
+  cli: z.enum(SUPPORTED_AGENT_CLI_TOOLS).optional(),
+  bootstrap: agentBootstrapSchema.optional(),
+});
+
+const agentsDefaultsSchema = z.object({
+  defaultAgentId: z.string().min(1).default("default"),
+  workspace: z.string().default("~/.clisbot/workspaces/{agentId}"),
+  cli: z.enum(SUPPORTED_AGENT_CLI_TOOLS).default("codex"),
+  bootstrap: agentBootstrapSchema.default({
+    botType: "personal-assistant",
   }),
-  sessionCleanup: controlSessionCleanupSchema.default({
-    enabled: true,
-    intervalMinutes: 5,
-  }),
-  loop: controlLoopSchema.default({
-    maxRunsPerLoop: 20,
-    maxActiveLoops: 10,
-  }),
-  runtimeMonitor: controlRuntimeMonitorSchema.default({
-    restartBackoff: {
-      stages: [
+  runner: z.object({
+    defaults: runnerDefaultsSchema.default({
+      tmux: {
+        socketPath: "~/.clisbot/state/clisbot.sock",
+      },
+      trustWorkspace: true,
+      startupDelayMs: 3000,
+      startupRetryCount: 2,
+      startupRetryDelayMs: 1000,
+      promptSubmitDelayMs: 150,
+      stream: {
+        captureLines: 160,
+        updateIntervalMs: 2000,
+        idleTimeoutMs: 6000,
+        noOutputTimeoutMs: 20000,
+        maxRuntimeMin: 30,
+        maxMessageChars: 3500,
+      },
+      session: {
+        createIfMissing: true,
+        staleAfterMinutes: 60,
+        name: "{sessionKey}",
+      },
+    }),
+    codex: runnerFamilySchema.default({
+      command: "codex",
+      args: [
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--no-alt-screen",
+        "-C",
+        "{workspace}",
+      ],
+      sessionId: {
+        create: {
+          mode: "runner",
+          args: [],
+        },
+        capture: {
+          mode: "status-command",
+          statusCommand: "/status",
+          pattern: defaultSessionIdPattern,
+          timeoutMs: 5000,
+          pollIntervalMs: 250,
+        },
+        resume: {
+          mode: "command",
+          args: [
+            "resume",
+            "{sessionId}",
+            "--dangerously-bypass-approvals-and-sandbox",
+            "--no-alt-screen",
+            "-C",
+            "{workspace}",
+          ],
+        },
+      },
+    }),
+    claude: runnerFamilySchema.default({
+      command: "claude",
+      args: ["--dangerously-skip-permissions"],
+      sessionId: {
+        create: {
+          mode: "explicit",
+          args: ["--session-id", "{sessionId}"],
+        },
+        capture: {
+          mode: "off",
+          statusCommand: "/status",
+          pattern: defaultSessionIdPattern,
+          timeoutMs: 5000,
+          pollIntervalMs: 250,
+        },
+        resume: {
+          mode: "command",
+          args: ["--resume", "{sessionId}", "--dangerously-skip-permissions"],
+        },
+      },
+    }),
+    gemini: runnerFamilySchema.default({
+      command: "gemini",
+      args: ["--approval-mode=yolo", "--sandbox=false"],
+      startupDelayMs: 15000,
+      startupRetryCount: 2,
+      startupRetryDelayMs: 1000,
+      startupReadyPattern: "Type your message or @path/to/file",
+      startupBlockers: [
         {
-          delayMinutes: 15,
-          maxRestarts: 4,
+          pattern:
+            "Please visit the following URL to authorize the application|Enter the authorization code:",
+          message:
+            "Gemini CLI is waiting for manual OAuth authorization. Authenticate Gemini once in a direct interactive terminal, or configure headless auth such as GEMINI_API_KEY or Vertex AI before routing Gemini through clisbot.",
         },
         {
-          delayMinutes: 30,
-          maxRestarts: 4,
+          pattern:
+            "How would you like to authenticate for this project\\?|Failed to sign in\\.|Manual authorization is required but the current session is non-interactive",
+          message:
+            "Gemini CLI is blocked in its authentication setup flow or sign-in recovery. Complete Gemini authentication directly first, or switch clisbot to a headless auth path such as GEMINI_API_KEY or Vertex AI before routing prompts.",
         },
       ],
-    },
-    ownerAlerts: {
-      enabled: true,
-      minIntervalMinutes: 30,
-    },
+      promptSubmitDelayMs: 200,
+      sessionId: {
+        create: {
+          mode: "runner",
+          args: [],
+        },
+        capture: {
+          mode: "status-command",
+          statusCommand: "/stats session",
+          pattern: defaultSessionIdPattern,
+          timeoutMs: 8000,
+          pollIntervalMs: 250,
+        },
+        resume: {
+          mode: "command",
+          args: ["--resume", "{sessionId}", "--approval-mode=yolo", "--sandbox=false"],
+        },
+      },
+    }),
   }),
+  auth: agentAuthSchema.default(defaultAgentAuthConfig),
 });
 
 export const clisbotConfigSchema = z.object({
-  meta: z
-    .object({
-      schemaVersion: z.number().int().positive().default(1),
-      lastTouchedAt: z.string().optional(),
-    })
-    .default({
-      schemaVersion: 1,
-    }),
-  tmux: z.object({
-    socketPath: z.string().default("~/.clisbot/state/clisbot.sock"),
-  }),
-  session: sessionConfigSchema.default({
-    mainKey: "main",
-    dmScope: "per-channel-peer",
-    identityLinks: {},
-    storePath: "~/.clisbot/state/sessions.json",
+  meta: z.object({
+    schemaVersion: z.string().min(1).default("0.1.39"),
+    lastTouchedAt: z.string().optional(),
+  }).default({
+    schemaVersion: "0.1.39",
   }),
   app: z.object({
+    session: appSessionSchema.default({
+      mainKey: "main",
+      identityLinks: {},
+      storePath: "~/.clisbot/state/sessions.json",
+    }),
     auth: appAuthSchema.default(defaultAppAuthConfig),
-  }).default({
-    auth: defaultAppAuthConfig,
-  }),
-  agents: z.object({
-    defaults: agentDefaultsSchema,
-    list: z.array(agentEntrySchema).default([
-      {
-        id: "default",
-      },
-    ]),
-  }),
-  bindings: z
-    .array(
-      z.object({
-        match: z.object({
-          channel: z.enum(["slack", "telegram"]),
-          accountId: z.string().min(1).optional(),
-        }),
-        agentId: z.string().min(1),
+    control: z.object({
+      configReload: appControlConfigReloadSchema.default({
+        watch: false,
+        watchDebounceMs: 250,
       }),
-    )
-    .default([]),
-  control: controlSchema.default({
-    configReload: {
-      watch: false,
-      watchDebounceMs: 250,
-    },
-    sessionCleanup: {
-      enabled: true,
-      intervalMinutes: 5,
-    },
-    loop: {
-      maxRunsPerLoop: 20,
-      maxActiveLoops: 10,
-    },
-    runtimeMonitor: {
-      restartBackoff: {
-        fastRetry: {
-          delaySeconds: 10,
-          maxRestarts: 3,
-        },
-        stages: [
-          {
-            delayMinutes: 15,
-            maxRestarts: 4,
-          },
-          {
-            delayMinutes: 30,
-            maxRestarts: 4,
-          },
-        ],
-      },
-      ownerAlerts: {
+      sessionCleanup: appControlSessionCleanupSchema.default({
         enabled: true,
-        minIntervalMinutes: 30,
+        intervalMinutes: 5,
+      }),
+      loop: appControlLoopSchema.default({
+        maxRunsPerLoop: 20,
+        maxActiveLoops: 10,
+      }),
+      runtimeMonitor: appControlRuntimeMonitorSchema.default({
+        restartBackoff: {
+          fastRetry: {
+            delaySeconds: 10,
+            maxRestarts: 3,
+          },
+          stages: [
+            {
+              delayMinutes: 15,
+              maxRestarts: 4,
+            },
+            {
+              delayMinutes: 30,
+              maxRestarts: 4,
+            },
+          ],
+        },
+        ownerAlerts: {
+          enabled: true,
+          minIntervalMinutes: 30,
+        },
+      }),
+    }).default({
+      configReload: {
+        watch: false,
+        watchDebounceMs: 250,
+      },
+      sessionCleanup: {
+        enabled: true,
+        intervalMinutes: 5,
+      },
+      loop: {
+        maxRunsPerLoop: 20,
+        maxActiveLoops: 10,
+      },
+      runtimeMonitor: {
+        restartBackoff: {
+          fastRetry: {
+            delaySeconds: 10,
+            maxRestarts: 3,
+          },
+          stages: [
+            {
+              delayMinutes: 15,
+              maxRestarts: 4,
+            },
+            {
+              delayMinutes: 30,
+              maxRestarts: 4,
+            },
+          ],
+        },
+        ownerAlerts: {
+          enabled: true,
+          minIntervalMinutes: 30,
+        },
+      },
+    }),
+  }).default({
+    session: {
+      mainKey: "main",
+      identityLinks: {},
+      storePath: "~/.clisbot/state/sessions.json",
+    },
+    auth: defaultAppAuthConfig,
+    control: {
+      configReload: {
+        watch: false,
+        watchDebounceMs: 250,
+      },
+      sessionCleanup: {
+        enabled: true,
+        intervalMinutes: 5,
+      },
+      loop: {
+        maxRunsPerLoop: 20,
+        maxActiveLoops: 10,
+      },
+      runtimeMonitor: {
+        restartBackoff: {
+          fastRetry: {
+            delaySeconds: 10,
+            maxRestarts: 3,
+          },
+          stages: [
+            {
+              delayMinutes: 15,
+              maxRestarts: 4,
+            },
+            {
+              delayMinutes: 30,
+              maxRestarts: 4,
+            },
+          ],
+        },
+        ownerAlerts: {
+          enabled: true,
+          minIntervalMinutes: 30,
+        },
       },
     },
   }),
-  channels: z.object({
-    slack: slackSchema,
-    telegram: telegramSchema.default({
-      enabled: false,
-      mode: "polling",
-      botToken: "",
-      defaultAccount: "default",
-      accounts: {
-        default: {
-          botToken: "${TELEGRAM_BOT_TOKEN}",
-        },
-      },
+  bots: z.object({
+    defaults: botsDefaultsSchema.default({
       allowBots: false,
+      requireMention: true,
+      dmScope: "per-channel-peer",
       groupPolicy: "allowlist",
-      defaultAgentId: "default",
       commandPrefixes: {
         slash: ["::", "\\"],
         bash: ["!"],
@@ -669,31 +859,461 @@ export const clisbotConfigSchema = z.object({
       response: "final",
       responseMode: "message-tool",
       additionalMessageMode: "steer",
-      surfaceNotifications: {
-        queueStart: "brief",
-        loopStart: "brief",
-      },
       verbose: "minimal",
       followUp: {
         mode: "auto",
         participationTtlMin: 5,
       },
-      polling: {
-        timeoutSeconds: 20,
-        retryDelayMs: 1000,
-      },
-      groups: {},
-      directMessages: {
-        enabled: true,
-        policy: "pairing",
-        allowFrom: [],
-        requireMention: false,
-        allowBots: false,
-      },
     }),
+    slack: z.object({
+      defaults: slackProviderDefaultsSchema.default({
+        enabled: false,
+        defaultBotId: "default",
+        mode: "socket",
+        allowBots: false,
+        channelPolicy: "disabled",
+        groupPolicy: "disabled",
+        agentPrompt: {
+          enabled: true,
+          maxProgressMessages: 3,
+          requireFinalResponse: true,
+        },
+        ackReaction: "",
+        typingReaction: "",
+        replyToMode: "thread",
+        processingStatus: {
+          enabled: true,
+          status: "Working...",
+          loadingMessages: [],
+        },
+        commandPrefixes: {
+          slash: ["::", "\\"],
+          bash: ["!"],
+        },
+        streaming: "off",
+        response: "final",
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        verbose: "minimal",
+        followUp: {
+          mode: "auto",
+          participationTtlMin: 5,
+        },
+        directMessages: {
+          "*": {
+            enabled: true,
+            requireMention: false,
+            policy: "pairing",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+      }),
+    }).catchall(slackBotSchema).default({
+      defaults: {
+        enabled: false,
+        defaultBotId: "default",
+        mode: "socket",
+        allowBots: false,
+        channelPolicy: "disabled",
+        groupPolicy: "disabled",
+        agentPrompt: {
+          enabled: true,
+          maxProgressMessages: 3,
+          requireFinalResponse: true,
+        },
+        ackReaction: "",
+        typingReaction: "",
+        replyToMode: "thread",
+        processingStatus: {
+          enabled: true,
+          status: "Working...",
+          loadingMessages: [],
+        },
+        commandPrefixes: {
+          slash: ["::", "\\"],
+          bash: ["!"],
+        },
+        streaming: "off",
+        response: "final",
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        verbose: "minimal",
+        followUp: {
+          mode: "auto",
+          participationTtlMin: 5,
+        },
+        directMessages: {
+          "*": {
+            enabled: true,
+            requireMention: false,
+            policy: "pairing",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+      },
+    } as any),
+    telegram: z.object({
+      defaults: telegramProviderDefaultsSchema.default({
+        enabled: false,
+        defaultBotId: "default",
+        mode: "polling",
+        allowBots: false,
+        groupPolicy: "disabled",
+        agentPrompt: {
+          enabled: true,
+          maxProgressMessages: 3,
+          requireFinalResponse: true,
+        },
+        commandPrefixes: {
+          slash: ["::", "\\"],
+          bash: ["!"],
+        },
+        streaming: "off",
+        response: "final",
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        verbose: "minimal",
+        followUp: {
+          mode: "auto",
+          participationTtlMin: 5,
+        },
+        directMessages: {
+          "*": {
+            enabled: true,
+            requireMention: false,
+            policy: "pairing",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+        polling: {
+          timeoutSeconds: 20,
+          retryDelayMs: 1000,
+        },
+      }),
+    }).catchall(telegramBotSchema).default({
+      defaults: {
+        enabled: false,
+        defaultBotId: "default",
+        mode: "polling",
+        allowBots: false,
+        groupPolicy: "disabled",
+        agentPrompt: {
+          enabled: true,
+          maxProgressMessages: 3,
+          requireFinalResponse: true,
+        },
+        commandPrefixes: {
+          slash: ["::", "\\"],
+          bash: ["!"],
+        },
+        streaming: "off",
+        response: "final",
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        verbose: "minimal",
+        followUp: {
+          mode: "auto",
+          participationTtlMin: 5,
+        },
+        directMessages: {
+          "*": {
+            enabled: true,
+            requireMention: false,
+            policy: "pairing",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+        polling: {
+          timeoutSeconds: 20,
+          retryDelayMs: 1000,
+        },
+      },
+    } as any),
+  }),
+  agents: z.object({
+    defaults: agentsDefaultsSchema.default({
+      defaultAgentId: "default",
+      workspace: "~/.clisbot/workspaces/{agentId}",
+      cli: "codex",
+      bootstrap: {
+        botType: "personal-assistant",
+      },
+      runner: {
+        defaults: {
+          tmux: {
+            socketPath: "~/.clisbot/state/clisbot.sock",
+          },
+          trustWorkspace: true,
+          startupDelayMs: 3000,
+          startupRetryCount: 2,
+          startupRetryDelayMs: 1000,
+          promptSubmitDelayMs: 150,
+          stream: {
+            captureLines: 160,
+            updateIntervalMs: 2000,
+            idleTimeoutMs: 6000,
+            noOutputTimeoutMs: 20000,
+            maxRuntimeMin: 30,
+            maxMessageChars: 3500,
+          },
+          session: {
+            createIfMissing: true,
+            staleAfterMinutes: 60,
+            name: "{sessionKey}",
+          },
+        },
+        codex: {
+          command: "codex",
+          args: [
+            "--dangerously-bypass-approvals-and-sandbox",
+            "--no-alt-screen",
+            "-C",
+            "{workspace}",
+          ],
+          sessionId: {
+            create: {
+              mode: "runner",
+              args: [],
+            },
+            capture: {
+              mode: "status-command",
+              statusCommand: "/status",
+              pattern: defaultSessionIdPattern,
+              timeoutMs: 5000,
+              pollIntervalMs: 250,
+            },
+            resume: {
+              mode: "command",
+              args: [
+                "resume",
+                "{sessionId}",
+                "--dangerously-bypass-approvals-and-sandbox",
+                "--no-alt-screen",
+                "-C",
+                "{workspace}",
+              ],
+            },
+          },
+        },
+        claude: {
+          command: "claude",
+          args: ["--dangerously-skip-permissions"],
+          sessionId: {
+            create: {
+              mode: "explicit",
+              args: ["--session-id", "{sessionId}"],
+            },
+            capture: {
+              mode: "off",
+              statusCommand: "/status",
+              pattern: defaultSessionIdPattern,
+              timeoutMs: 5000,
+              pollIntervalMs: 250,
+            },
+            resume: {
+              mode: "command",
+              args: ["--resume", "{sessionId}", "--dangerously-skip-permissions"],
+            },
+          },
+        },
+        gemini: {
+          command: "gemini",
+          args: ["--approval-mode=yolo", "--sandbox=false"],
+          startupDelayMs: 15000,
+          startupRetryCount: 2,
+          startupRetryDelayMs: 1000,
+          startupReadyPattern: "Type your message or @path/to/file",
+          startupBlockers: [
+            {
+              pattern:
+                "Please visit the following URL to authorize the application|Enter the authorization code:",
+              message:
+                "Gemini CLI is waiting for manual OAuth authorization. Authenticate Gemini once in a direct interactive terminal, or configure headless auth such as GEMINI_API_KEY or Vertex AI before routing Gemini through clisbot.",
+            },
+            {
+              pattern:
+                "How would you like to authenticate for this project\\?|Failed to sign in\\.|Manual authorization is required but the current session is non-interactive",
+              message:
+                "Gemini CLI is blocked in its authentication setup flow or sign-in recovery. Complete Gemini authentication directly first, or switch clisbot to a headless auth path such as GEMINI_API_KEY or Vertex AI before routing prompts.",
+            },
+          ],
+          promptSubmitDelayMs: 200,
+          sessionId: {
+            create: {
+              mode: "runner",
+              args: [],
+            },
+            capture: {
+              mode: "status-command",
+              statusCommand: "/stats session",
+              pattern: defaultSessionIdPattern,
+              timeoutMs: 8000,
+              pollIntervalMs: 250,
+            },
+            resume: {
+              mode: "command",
+              args: ["--resume", "{sessionId}", "--approval-mode=yolo", "--sandbox=false"],
+            },
+          },
+        },
+      },
+      auth: defaultAgentAuthConfig,
+    }),
+    list: z.array(agentEntrySchema).default([]),
+  }).default({
+    defaults: {
+      defaultAgentId: "default",
+      workspace: "~/.clisbot/workspaces/{agentId}",
+      cli: "codex",
+      bootstrap: {
+        botType: "personal-assistant",
+      },
+      runner: {
+        defaults: {
+          tmux: {
+            socketPath: "~/.clisbot/state/clisbot.sock",
+          },
+          trustWorkspace: true,
+          startupDelayMs: 3000,
+          startupRetryCount: 2,
+          startupRetryDelayMs: 1000,
+          promptSubmitDelayMs: 150,
+          stream: {
+            captureLines: 160,
+            updateIntervalMs: 2000,
+            idleTimeoutMs: 6000,
+            noOutputTimeoutMs: 20000,
+            maxRuntimeMin: 30,
+            maxMessageChars: 3500,
+          },
+          session: {
+            createIfMissing: true,
+            staleAfterMinutes: 60,
+            name: "{sessionKey}",
+          },
+        },
+        codex: {
+          command: "codex",
+          args: [
+            "--dangerously-bypass-approvals-and-sandbox",
+            "--no-alt-screen",
+            "-C",
+            "{workspace}",
+          ],
+          sessionId: {
+            create: {
+              mode: "runner",
+              args: [],
+            },
+            capture: {
+              mode: "status-command",
+              statusCommand: "/status",
+              pattern: defaultSessionIdPattern,
+              timeoutMs: 5000,
+              pollIntervalMs: 250,
+            },
+            resume: {
+              mode: "command",
+              args: [
+                "resume",
+                "{sessionId}",
+                "--dangerously-bypass-approvals-and-sandbox",
+                "--no-alt-screen",
+                "-C",
+                "{workspace}",
+              ],
+            },
+          },
+        },
+        claude: {
+          command: "claude",
+          args: ["--dangerously-skip-permissions"],
+          sessionId: {
+            create: {
+              mode: "explicit",
+              args: ["--session-id", "{sessionId}"],
+            },
+            capture: {
+              mode: "off",
+              statusCommand: "/status",
+              pattern: defaultSessionIdPattern,
+              timeoutMs: 5000,
+              pollIntervalMs: 250,
+            },
+            resume: {
+              mode: "command",
+              args: ["--resume", "{sessionId}", "--dangerously-skip-permissions"],
+            },
+          },
+        },
+        gemini: {
+          command: "gemini",
+          args: ["--approval-mode=yolo", "--sandbox=false"],
+          startupDelayMs: 15000,
+          startupRetryCount: 2,
+          startupRetryDelayMs: 1000,
+          startupReadyPattern: "Type your message or @path/to/file",
+          startupBlockers: [
+            {
+              pattern:
+                "Please visit the following URL to authorize the application|Enter the authorization code:",
+              message:
+                "Gemini CLI is waiting for manual OAuth authorization. Authenticate Gemini once in a direct interactive terminal, or configure headless auth such as GEMINI_API_KEY or Vertex AI before routing Gemini through clisbot.",
+            },
+            {
+              pattern:
+                "How would you like to authenticate for this project\\?|Failed to sign in\\.|Manual authorization is required but the current session is non-interactive",
+              message:
+                "Gemini CLI is blocked in its authentication setup flow or sign-in recovery. Complete Gemini authentication directly first, or switch clisbot to a headless auth path such as GEMINI_API_KEY or Vertex AI before routing prompts.",
+            },
+          ],
+          promptSubmitDelayMs: 200,
+          sessionId: {
+            create: {
+              mode: "runner",
+              args: [],
+            },
+            capture: {
+              mode: "status-command",
+              statusCommand: "/stats session",
+              pattern: defaultSessionIdPattern,
+              timeoutMs: 8000,
+              pollIntervalMs: 250,
+            },
+            resume: {
+              mode: "command",
+              args: ["--resume", "{sessionId}", "--approval-mode=yolo", "--sandbox=false"],
+            },
+          },
+        },
+      },
+      auth: defaultAgentAuthConfig,
+    },
+    list: [],
   }),
 });
 
 export type ClisbotConfig = z.infer<typeof clisbotConfigSchema>;
 export type AgentOverride = z.infer<typeof agentOverrideSchema>;
 export type AgentEntry = z.infer<typeof agentEntrySchema>;
+export type AppSessionConfig = z.infer<typeof appSessionSchema>;
+export type RunnerDefaultsConfig = z.infer<typeof runnerDefaultsSchema>;
+export type RunnerLaunchConfig = z.infer<typeof runnerLaunchSchema>;
+export type StreamConfig = z.infer<typeof streamSchema>;
+export type SessionRuntimeConfig = z.infer<typeof sessionRuntimeSchema>;
+export type CommandPrefixesConfig = z.infer<typeof commandPrefixesSchema>;
+export type SurfaceNotificationsConfig = z.infer<typeof surfaceNotificationsSchema>;
+export type FollowUpConfig = z.infer<typeof followUpSchema>;
+export type BotRouteConfig = z.infer<typeof botRouteSchema>;
+export type SlackBotConfig = z.infer<typeof slackBotSchema>;
+export type SlackProviderDefaultsConfig = z.infer<typeof slackProviderDefaultsSchema>;
+export type TelegramBotConfig = z.infer<typeof telegramBotSchema>;
+export type TelegramProviderDefaultsConfig = z.infer<typeof telegramProviderDefaultsSchema>;

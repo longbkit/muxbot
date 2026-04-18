@@ -3,9 +3,11 @@ import { runPairingCli } from "./channels/pairing/cli.ts";
 import { runAgentsCli } from "./control/agents-cli.ts";
 import { runAccountsCli } from "./control/accounts-cli.ts";
 import { runAuthCli } from "./control/auth-cli.ts";
+import { runBotsCli } from "./control/bots-cli.ts";
 import { runChannelsCli } from "./control/channels-cli.ts";
 import { runLoopsCli } from "./control/loops-cli.ts";
 import { runMessageCli } from "./control/message-cli.ts";
+import { runRoutesCli } from "./control/routes-cli.ts";
 import { runRunnerCli } from "./control/runner-cli.ts";
 import { initConfig, start } from "./control/runtime-bootstrap-cli.ts";
 import {
@@ -82,6 +84,16 @@ async function runBuiltinCommand(command: ReturnType<typeof parseCliArgs>) {
 async function runControlCommand(command: ReturnType<typeof parseCliArgs>) {
   if (command.name === "channels") {
     await runChannelsCli(command.args);
+    return true;
+  }
+
+  if (command.name === "bots") {
+    await runBotsCli(command.args);
+    return true;
+  }
+
+  if (command.name === "routes") {
+    await runRoutesCli(command.args);
     return true;
   }
 

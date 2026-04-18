@@ -95,28 +95,27 @@ Target result:
 
 ## Persistence Commands
 
-### `clisbot accounts persist`
+### `clisbot bots add --persist` and `clisbot bots set-credentials --persist`
 
-Add an explicit persistence command so the operator can promote working in-memory credentials into durable storage.
+Use the bot credential commands themselves to promote working in-memory credentials into durable storage.
 
 Examples:
 
 ```bash
-clisbot accounts persist --channel telegram --account default
-clisbot accounts persist --channel slack --account default
-clisbot accounts persist --all
+clisbot bots add --channel telegram --bot default --bot-token TELEGRAM_BOT_TOKEN --persist
+clisbot bots add --channel slack --bot default --app-token SLACK_APP_TOKEN --bot-token SLACK_BOT_TOKEN --persist
+clisbot bots set-credentials --channel telegram --bot default --bot-token "$TELEGRAM_BOT_TOKEN" --persist
 ```
 
 Target behavior:
 
-- resolve currently active in-memory credentials for the requested account
-- write them to the canonical credential file location
-- update config so the account becomes file-backed
+- write the secret to the canonical credential file location
+- update config so the bot becomes file-backed
 - print a brief success summary without printing secret detail
 
 Example summary:
 
-- `Persisted telegram/default to credential file and updated config to credentialType=tokenFile.`
+- `Added telegram/default, persisted=tokenFile, runtime=not-running`
 
 ### `clisbot start --persist`
 
@@ -143,13 +142,13 @@ If persistence fails:
 - startup should report the persistence failure clearly
 - the runtime should still be allowed to use the in-memory credential for that current process if startup already succeeded and the user did not request fail-hard behavior
 
-### `clisbot accounts add`
+### `clisbot bots add`
 
-Add a separate command surface for proactive account management:
+Add a separate command surface for proactive bot management:
 
 ```bash
-clisbot accounts add telegram --account alerts --token TELEGRAM_ALERTS_BOT_TOKEN
-clisbot accounts add slack --account ops --app-token SLACK_OPS_APP_TOKEN --bot-token SLACK_OPS_BOT_TOKEN
+clisbot bots add --channel telegram --bot alerts --bot-token TELEGRAM_ALERTS_BOT_TOKEN
+clisbot bots add --channel slack --bot ops --app-token SLACK_OPS_APP_TOKEN --bot-token SLACK_OPS_BOT_TOKEN
 ```
 
 Rules:
@@ -159,13 +158,13 @@ Rules:
 - env name or `${ENV_NAME}` input stays env-backed
 - if `--persist` is passed with raw input, write canonical credential files and convert config to `credentialType: "tokenFile"`
 - if `--persist` is passed with env-backed input, keep it env-backed and do not copy secret values into files
-- if the runtime is not already running, raw input currently requires `--persist`; otherwise `accounts add` rejects instead of parking an orphan mem credential outside an active runtime
+- if the runtime is not already running, raw input currently requires `--persist`; otherwise `bots add` rejects instead of parking an orphan mem credential outside an active runtime
 
 If the runtime is already running:
 
-- add the account to config
+- add the bot to config
 - reload or reconcile the affected provider
-- start the new account immediately if validation succeeds
+- start the new bot immediately if validation succeeds
 - print a brief status summary
 
 Example summary:

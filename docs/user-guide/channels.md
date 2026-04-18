@@ -1,335 +1,123 @@
-# Channel Operations
+# Routes
 
 ## Purpose
 
-Use this page for routed Slack and Telegram behavior that operators need during setup, debugging, and live validation.
+Use this page for routed Slack and Telegram behavior during setup, debugging, and live operation.
 
-## Conversation Commands
+Official operator surface:
 
-Useful slash commands on routed Slack and Telegram conversations:
+- `clisbot routes ...`
 
-- `/start`
-- `/help`
-- `/status`
-- `/whoami`
-- `/stop`
-- `/nudge`
+Mental model:
 
-`clisbot` also supports session-scoped Slack and Telegram follow-up policy.
+- bots define provider identity and bot-wide defaults
+- routes admit specific inbound surfaces under a bot
+- a route may inherit the bot fallback agent or override it
 
-Current control commands inside a conversation are:
+## Route Ids
 
-- `/followup status`
-- `/followup auto`
-- `/followup mention-only`
-- `/followup pause`
-- `/followup resume`
+Slack route ids:
 
-Current meanings are:
+- `channel:<channelId>`
+- `group:<groupId>`
+- `dm:<userId|*>`
 
-- `auto`: once the bot has already replied in a thread, later plain thread replies can continue naturally without a fresh mention
-- `mention-only`: every later turn in that thread must explicitly mention the bot
-- `pause`: temporarily stop passive follow-up until the next explicit mention
-- `resume`: clear the runtime override and restore the configured default
+Telegram route ids:
 
-Important distinction:
+- `group:<chatId>`
+- `topic:<chatId>:<topicId>`
+- `dm:<userId|*>`
 
-- `mention-only` stays active until changed again
-- `pause` is temporary; the next explicit mention re-activates the conversation and clears the pause override
+Examples:
 
-Operational notes:
+- `channel:C1234567890`
+- `group:G1234567890`
+- `dm:U1234567890`
+- `group:-1001234567890`
+- `topic:-1001234567890:42`
+- `dm:1276408333`
 
-- `/whoami` is the fastest way to confirm the resolved platform, session key, sender id, and resolved auth roles for the current conversation
-- `/status` shows the current route follow-up state, current run state, and resolved auth details such as whether `/bash` is allowed
-- `/status` is also the fastest way to see whether this routed thread is idle, actively running, or detached after a long autonomous turn
-- `/start` is useful both for routed conversations and for Telegram groups or topics that are not routed yet
+## Route Commands
 
-## Recent Context Replay
+Common commands:
 
-Slack and Telegram now use the same KISS recent-context rule for routed conversations.
+```bash
+clisbot routes list
+clisbot routes add --channel slack channel:C1234567890 --bot default
+clisbot routes add --channel slack group:G1234567890 --bot default
+clisbot routes add --channel telegram group:-1001234567890 --bot default
+clisbot routes add --channel telegram topic:-1001234567890:42 --bot default
+clisbot routes add --channel telegram dm:* --bot default
+clisbot routes set-agent --channel slack channel:C1234567890 --bot default --agent support
+clisbot routes set-policy --channel telegram group:-1001234567890 --bot default --policy open
+clisbot routes set-require-mention --channel slack channel:C1234567890 --bot default --value false
+clisbot routes set-allow-bots --channel telegram topic:-1001234567890:42 --bot default --value true
+clisbot routes add-allow-user --channel slack channel:C1234567890 --bot default --user U_OWNER
+clisbot routes add-block-user --channel telegram group:-1001234567890 --bot default --user 1276408333
+clisbot routes set-follow-up-mode --channel slack channel:C1234567890 --bot default --mode mention-only
+clisbot routes set-follow-up-ttl --channel telegram topic:-1001234567890:42 --bot default --minutes 10
+clisbot routes set-response-mode --channel slack channel:C1234567890 --bot default --mode message-tool
+clisbot routes set-additional-message-mode --channel telegram topic:-1001234567890:42 --bot default --mode queue
+```
 
-What is stored per routed conversation:
+Behavior rules:
 
-- the latest 5 inbound messages in that routed boundary
-- one `lastProcessedMarker`
+- `add` is create-only
+- if the route already exists, use the matching `set-<key>` command
+- route-local overrides only work after the route exists
 
-What counts as the routed boundary:
+## Route Policy
 
-- Slack thread route: one thread
-- Slack non-thread route: one channel route
-- Telegram DM: one chat
-- Telegram group: one group
-- Telegram topic: one topic
+Typical meanings:
 
-What counts as the marker:
+- `policy: "open"`: the route is admitted and open to allowed senders
+- `policy: "allowlist"`: the route is admitted but sender access is restricted
+- `policy: "pairing"`: DM-only policy that requires pairing unless auth bypasses it
+- `policy: "disabled"`: the route is configured but inactive
 
-- Slack: message `ts`
-- Telegram: `message_id`
+Common defaults:
 
-When `clisbot` updates the processed marker:
+- Slack public or private shared surfaces usually start with `requireMention: true`
+- Telegram groups and topics usually start with `requireMention: true`
+- DM routes usually start with `requireMention: false`
 
-- only when that message is actually accepted into agent execution
-- this includes normal prompt enqueue, queued prompt enqueue, and steer delivery
+## Route Ownership
 
-What does not advance the marker:
-
-- message delivery by itself
-- follow-up eligibility by itself
-- control commands such as `/status`, `/help`, `/attach`, `/detach`, `/stop`
-
-How replay works on the next real prompt:
-
-1. `clisbot` scans backward through the saved 5-message tail
-2. it stops when it finds the last processed marker
-3. it keeps only the newer messages after that marker
-4. it strips the current message itself
-5. it prepends the remaining tail into the next agent prompt as recent context
-
-Practical effect:
-
-- if a Slack thread or Telegram topic had a few plain human messages that the bot ignored, and someone later mentions the bot, the bot can see that recent gap
-- this is intentionally bounded to 5 messages, so it stays predictable and cheap
-- if the processed marker has already fallen out of the saved window, the bot replays the full surviving 5-message tail
-
-## Operator Commands
-
-Use the `clisbot channels ...` CLI to update route config without editing JSON by hand.
-
-Current commands:
-
-- `clisbot channels enable slack`
-- `clisbot channels disable slack`
-- `clisbot channels enable telegram`
-- `clisbot channels disable telegram`
-- `clisbot channels add telegram-group <chatId> [--topic <topicId>] [--agent <id>] [--require-mention true|false]`
-- `clisbot channels remove telegram-group <chatId> [--topic <topicId>]`
-- `clisbot channels add slack-channel <channelId> [--agent <id>] [--require-mention true|false]`
-- `clisbot channels remove slack-channel <channelId>`
-- `clisbot channels add slack-group <groupId> [--agent <id>] [--require-mention true|false]`
-- `clisbot channels remove slack-group <groupId>`
-- `clisbot channels set-token <slack-app|slack-bot|telegram-bot> <value>`
-- `clisbot channels clear-token <slack-app|slack-bot|telegram-bot>`
-
-Practical notes:
-
-- these commands update the existing OpenClaw-style config paths directly
-- Telegram groups land in `channels.telegram.groups.<chatId>`
-- Telegram topics land in `channels.telegram.groups.<chatId>.topics.<topicId>`
-- Slack public channels land in `channels.slack.channels.<channelId>`
-- Slack private groups land in `channels.slack.groups.<groupId>`
-- new Slack channel/group routes and Telegram group/topic routes default to `requireMention: true`
-- pass `--require-mention false` only when that routed surface should accept plain non-mention messages
-- token commands only change the existing token fields; they do not fetch or validate secrets for you
-
-Current default Slack config is:
-
-- `channels.slack.followUp.mode: "auto"`
-- `channels.slack.followUp.participationTtlMin: 5`
-- `channels.slack.ackReaction: ""`
-- `channels.slack.typingReaction: ""`
-- `channels.slack.processingStatus.enabled: true`
-- `channels.slack.processingStatus.status: "Working..."`
-- `channels.slack.processingStatus.loadingMessages: []`
-
-Reaction notes:
-
-- the live in-thread reply is still the main processing indicator
-- Slack reactions need bot scope `reactions:write`
-- if `reactions:write` is missing, `clisbot` should keep replying normally and fall back to the live in-thread processing reply only
-
-Assistant status notes:
-
-- Slack assistant thread status currently accepts bot scope `chat:write` and still temporarily accepts `assistant:write`
-- this is the UI line that looks like `<bot name> Working...` or rotates configured loading messages
-- if Slack status writes are unavailable, `clisbot` should keep replying normally and fall back to reactions plus the live in-thread processing reply
-
-## Transcript Visibility And Routed Auth
-
-Transcript inspection and bash execution no longer use the same gate.
-
-Current rule:
-
-- `verbose: "minimal"` allows `/transcript`
-- `verbose: "off"` blocks `/transcript`
-- `/bash <command>` and bash shortcuts such as `!<command>` require the resolved agent role to include `shellExecute`
-- protected clisbot control resources are guarded through routed auth and prompt guidance, not through route-local bash flags
-
-Current source of truth:
-
-- `app.auth`
-- `agents.defaults.auth`
-- `agents.<id>.auth`
-
-`verbose` still lives on the routed Slack or Telegram config because transcript visibility is route-local.
-
-Useful rule of thumb:
-
-- use `verbose` when you are deciding whether transcript inspection is visible on a route
-- use auth roles when you are deciding who may run `/bash` or manage protected clisbot control resources
-
-## Slack Event Subscriptions
-
-Natural no-mention continuation in Slack depends on routed `message.*` events, not only `app_mention`.
-
-For channel threads, the critical subscription is:
-
-- `message.channels`
-
-If `message.channels` is missing:
-
-- explicit `@tclisbot ...` messages can still work through `app_mention`
-- plain thread follow-up after the bot has already replied will not reach `clisbot`
-- the follow-up policy status can look correct while the bot still appears silent, because the inbound Slack event never arrives
-
-For other Slack conversation kinds, the matching routed subscriptions are also needed:
-
-- `message.groups`
-- `message.im`
-- `message.mpim`
-
-## Slack Routes
-
-Slack routing supports:
-
-- direct messages through `channels.slack.directMessages`
-- public channel routes through `channels.slack.channels.<channelId>`
-- private channel or group routes through `channels.slack.groups.<groupId>`
-
-If the bot starts successfully but does not respond in Slack, the most common reasons are:
-
-- Slack DMs are gated by `channels.slack.directMessages.policy`
-- Slack channels do not route unless you add `channels.slack.channels.<channelId>`
-- Slack private groups do not route unless you add `channels.slack.groups.<groupId>`
-
-Minimal Slack channel example:
+Routes live under each bot:
 
 ```json
 {
-  "channels": {
+  "bots": {
     "slack": {
-      "defaultAgentId": "default",
-      "channels": {
-        "C1234567890": {
-          "agentId": "default",
-          "requireMention": false
+      "default": {
+        "groups": {
+          "channel:C_GENERAL": {
+            "enabled": true,
+            "policy": "open",
+            "requireMention": false,
+            "agentId": "support"
+          }
+        },
+        "directMessages": {
+          "dm:*": {
+            "enabled": true,
+            "policy": "pairing"
+          }
         }
       }
-    }
-  }
-}
-```
-
-Minimal Slack private group example:
-
-```json
-{
-  "channels": {
-    "slack": {
-      "groups": {
-        "G1234567890": {
-          "agentId": "default",
-          "requireMention": false
-        }
-      }
-    }
-  }
-}
-```
-
-Minimal Slack DM example:
-
-```json
-{
-  "channels": {
-    "slack": {
-      "directMessages": {
-        "enabled": true,
-        "policy": "open",
-        "requireMention": false,
-        "agentId": "default"
-      }
-    }
-  }
-}
-```
-
-Practical rules:
-
-- if you only configured `channels.slack.directMessages`, the bot can still appear healthy in `status` while staying silent in Slack channels
-- if `directMessages.policy` is `pairing`, unknown Slack DMs are also gated until approved
-- if you expect public or private channel traffic, add explicit Slack routes instead of assuming `defaultAgentId` is enough
-
-### How To Get Slack `channelId` And `groupId`
-
-Use one of these practical paths:
-
-1. Open the target Slack channel or private group.
-2. Copy the Slack conversation link.
-3. Read the conversation id from that link.
-4. Copy that id into either `channels.slack.channels.<channelId>` or `channels.slack.groups.<groupId>`.
-
-Practical notes:
-
-- public channels usually use ids that start with `C`
-- private groups usually use ids that start with `G`
-- Slack DMs also have a conversation id, but DM routing is controlled by `channels.slack.directMessages`, not by adding a DM id under `channels.slack.channels`
-- `/whoami` only works after the Slack conversation is already routed to an agent
-- if the bot is not responding yet, check `clisbot logs` after sending a message and confirm the required `message.channels`, `message.groups`, `message.im`, or `message.mpim` subscription exists
-
-Example:
-
-- Slack link contains `C1234567890`
-- config path to use: `channels.slack.channels."C1234567890"`
-- Slack link contains `G1234567890`
-- config path to use: `channels.slack.groups."G1234567890"`
-
-## Telegram Routes
-
-Telegram routing supports:
-
-- direct messages through `channels.telegram.directMessages`
-- group-level routes through `channels.telegram.groups.<chatId>`
-- topic overrides through `channels.telegram.groups.<chatId>.topics.<topicId>`
-
-The main practical difference from Slack is that Telegram topic identity is first-class. One busy topic should not block unrelated Telegram topics or DMs on the same bot.
-
-If the bot starts successfully but does not respond in a Telegram group, the most common reason is simple:
-
-- Telegram DMs can work through `channels.telegram.directMessages`
-- Telegram group messages do not route unless you add `channels.telegram.groups.<chatId>`
-- Telegram forum topics do not route unless you add `channels.telegram.groups.<chatId>.topics.<topicId>`
-
-Minimal Telegram group example:
-
-```json
-{
-  "channels": {
+    },
     "telegram": {
-      "defaultAgentId": "default",
-      "groups": {
-        "-1001234567890": {
-          "agentId": "default",
-          "requireMention": true
-        }
-      }
-    }
-  }
-}
-```
-
-Minimal Telegram topic example:
-
-```json
-{
-  "channels": {
-    "telegram": {
-      "groups": {
-        "-1001234567890": {
-          "agentId": "default",
-          "topics": {
-            "42": {
-              "agentId": "default",
-              "requireMention": true
+      "default": {
+        "groups": {
+          "-1001234567890": {
+            "enabled": true,
+            "policy": "allowlist",
+            "topics": {
+              "42": {
+                "enabled": true,
+                "policy": "open",
+                "agentId": "support"
+              }
             }
           }
         }
@@ -339,140 +127,52 @@ Minimal Telegram topic example:
 }
 ```
 
-Practical rule:
+## Conversation Commands
 
-- if you only configured `channels.telegram.directMessages`, the bot can still appear healthy in `status` while staying silent in Telegram groups
-- if `directMessages.policy` is `pairing`, unknown Telegram DMs are also gated until approved
+Useful commands inside routed Slack and Telegram conversations:
 
-### How To Get Telegram `chatId` And `topicId`
+- `/start`
+- `/help`
+- `/status`
+- `/whoami`
+- `/stop`
+- `/nudge`
+- `/followup status`
+- `/followup auto`
+- `/followup mention-only`
+- `/followup pause`
+- `/followup resume`
 
-Use one of these practical paths:
+Useful rule of thumb:
 
-1. Start `clisbot`, add the bot to the target Telegram group, and send `/start`, `/status`, or `/whoami` in that group.
-2. Read the reply.
-3. Copy `chatId` into `channels.telegram.groups.<chatId>`.
-4. Copy `topicId` into `channels.telegram.groups.<chatId>.topics.<topicId>` when you are using a forum topic.
+- use route config for admission and route-local behavior
+- use auth roles for privileged actions such as `/bash`
 
-What `/whoami` gives you:
+## Transcript And Bash Rules
 
-- `platform`
-- `sessionKey`
-- `senderId`
-- `chatId`
-- `topicId` when the current message is inside a Telegram forum topic
+Current rule split:
 
-When the group or topic is not routed yet:
+- transcript visibility is route-local through `verbose`
+- `/bash` depends on resolved auth permissions such as `shellExecute`
 
-- Telegram still exposes a minimal command menu with `/start`, `/status`, `/help`, and `/whoami`
-- the reply includes the exact `clisbot channels add telegram-group ...` command to run
-- route-only commands such as `/transcript`, `/stop`, `/followup`, and `/bash` only make sense after the route is added; `/transcript` then follows `verbose`, while `/bash` follows resolved agent auth
+Use:
 
-Practical notes:
+- `clisbot auth --help` for auth mutations
+- `clisbot routes --help` for route mutations
 
-- a normal Telegram group only needs `chatId`
-- a Telegram forum supergroup topic needs both `chatId` and `topicId`
-- the General topic usually uses topic id `1`
-- if the bot is not responding yet, check `clisbot logs` after sending a message in the group and look for Telegram activity before assuming the token is wrong
+## Follow-up And Mode Overrides
 
-Example:
+Route-local overrides can control:
 
-- `/whoami` shows `chatId: -1001234567890`
-- `/whoami` shows `topicId: 42`
-- config path to use: `channels.telegram.groups."-1001234567890".topics."42"`
+- `followUp.mode`
+- `followUp.participationTtlMin`
+- `responseMode`
+- `additionalMessageMode`
+- `streaming`
+- `surfaceNotifications`
+- `verbose`
 
-## Direct Message Pairing
+That gives one simple pattern:
 
-Slack and Telegram direct messages support four access policies:
-
-- `open`
-- `pairing`
-- `allowlist`
-- `disabled`
-
-Current defaults are:
-
-- `channels.slack.directMessages.policy: "pairing"`
-- `channels.telegram.directMessages.policy: "pairing"`
-
-If you want OpenClaw-style gated DM onboarding, set the route to `pairing`.
-
-Example:
-
-```json
-{
-  "channels": {
-    "slack": {
-      "directMessages": {
-        "enabled": true,
-        "policy": "pairing",
-        "allowFrom": [],
-        "requireMention": false,
-        "agentId": "default"
-      }
-    }
-  }
-}
-```
-
-Current policy meaning:
-
-- `open`: accept any DM sender
-- `pairing`: create or reuse a pending pairing code for unknown senders
-- `allowlist`: accept only configured or previously approved senders
-- `disabled`: ignore direct messages on that channel
-
-Pairing commands:
-
-```bash
-bun run pairing -- list slack
-```
-
-```bash
-bun run pairing -- approve slack <CODE>
-```
-
-```bash
-bun run pairing -- reject slack <CODE>
-```
-
-```bash
-bun run pairing -- clear slack
-```
-
-```bash
-bun run pairing -- list telegram
-```
-
-```bash
-bun run pairing -- approve telegram <CODE>
-```
-
-```bash
-bun run pairing -- reject telegram <CODE>
-```
-
-```bash
-bun run pairing -- clear telegram
-```
-
-Important rules:
-
-- pairing is checked before session routing and before a runner starts
-- approving a code adds the sender to the channel allowlist store
-- rejecting a code removes that pending request without allowlisting the sender
-- clearing removes every pending request for that channel
-- the pairing store is channel-scoped
-- each channel keeps up to 20 pending pairing requests at a time
-- if the pending queue is full, the bot replies with queue-full guidance instead of staying silent
-- `allowFrom` in config and approved senders in the pairing store are merged for access checks
-
-Safe Slack verification flow:
-
-1. set `channels.slack.directMessages.policy` to `"pairing"`
-2. restart the service, or rely on `control.configReload.watch` if already enabled
-3. send the bot a direct message from a user not already approved
-4. confirm the bot replies with a pairing code
-5. run `bun run pairing -- list slack`
-6. run `bun run pairing -- approve slack <CODE>`
-7. send another direct message from the same user
-8. confirm the normal agent flow now runs
+- set stable behavior on the bot
+- override only the few routes that need something different

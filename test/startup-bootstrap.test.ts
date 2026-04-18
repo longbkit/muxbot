@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { collapseHomePath, getDefaultConfigPath } from "../src/shared/paths.ts";
 import {
   CHANNEL_ACCOUNT_DOC_PATH,
@@ -12,163 +15,22 @@ import {
   renderMissingTokenWarningLines,
 } from "../src/control/startup-bootstrap.ts";
 import { initConfig, start } from "../src/control/runtime-bootstrap-cli.ts";
-import type { ClisbotConfig } from "../src/config/schema.ts";
+import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 function createConfig(): ClisbotConfig {
-  return JSON.parse(JSON.stringify({
-    meta: {
-      schemaVersion: 1,
-    },
-    tmux: {
-      socketPath: "~/.clisbot/state/clisbot.sock",
-    },
-    session: {
-      mainKey: "main",
-      dmScope: "main",
-      identityLinks: {},
-      storePath: "~/.clisbot/state/sessions.json",
-    },
-    agents: {
-      defaults: {
-        workspace: "~/.clisbot/workspaces/{agentId}",
-        runner: {
-          command: "codex",
-          args: ["-C", "{workspace}"],
-          trustWorkspace: true,
-          startupDelayMs: 1,
-          promptSubmitDelayMs: 1,
-          sessionId: {
-            create: {
-              mode: "runner",
-              args: [],
-            },
-            capture: {
-              mode: "off",
-              statusCommand: "/status",
-              pattern:
-                "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
-              timeoutMs: 1000,
-              pollIntervalMs: 100,
-            },
-            resume: {
-              mode: "off",
-              args: ["resume", "{sessionId}", "-C", "{workspace}"],
-            },
-          },
-        },
-        stream: {
-          captureLines: 10,
-          updateIntervalMs: 10,
-          idleTimeoutMs: 10,
-          noOutputTimeoutMs: 10,
-          maxRuntimeSec: 10,
-          maxMessageChars: 100,
-        },
-        session: {
-          createIfMissing: true,
-          staleAfterMinutes: 60,
-          name: "{sessionKey}",
-        },
-      },
-      list: [],
-    },
-    bindings: [],
-    control: {
-      configReload: {
-        watch: false,
-        watchDebounceMs: 250,
-      },
-      sessionCleanup: {
-        enabled: true,
-        intervalMinutes: 5,
-      },
-    },
-    channels: {
-      slack: {
-        enabled: false,
-        mode: "socket",
-        appToken: "",
-        botToken: "",
-        defaultAccount: "default",
-        accounts: {
-          default: {
-            appToken: "${SLACK_APP_TOKEN}",
-            botToken: "${SLACK_BOT_TOKEN}",
-          },
-        },
-        ackReaction: "",
-        typingReaction: "",
-        processingStatus: {
-          enabled: true,
-          status: "Working...",
-          loadingMessages: [],
-        },
-        allowBots: false,
-        replyToMode: "thread",
-        channelPolicy: "allowlist",
-        groupPolicy: "allowlist",
-        defaultAgentId: "default",
-        commandPrefixes: {
-          slash: ["::", "\\"],
-          bash: ["!"],
-        },
-        streaming: "off",
-        response: "final",
-        responseMode: "message-tool",
-        followUp: {
-          mode: "auto",
-          participationTtlMin: 5,
-        },
-        channels: {},
-        groups: {},
-        directMessages: {
-          enabled: true,
-          policy: "open",
-          allowFrom: [],
-          requireMention: false,
-          agentId: "default",
-        },
-      },
-      telegram: {
-        enabled: false,
-        mode: "polling",
-        botToken: "",
-        defaultAccount: "default",
-        accounts: {
-          default: {
-            botToken: "${TELEGRAM_BOT_TOKEN}",
-          },
-        },
-        allowBots: false,
-        groupPolicy: "allowlist",
-        defaultAgentId: "default",
-        commandPrefixes: {
-          slash: ["::", "\\"],
-          bash: ["!"],
-        },
-        streaming: "off",
-        response: "final",
-        responseMode: "message-tool",
-        followUp: {
-          mode: "auto",
-          participationTtlMin: 5,
-        },
-        polling: {
-          timeoutSeconds: 20,
-          retryDelayMs: 1000,
-        },
-        groups: {},
-        directMessages: {
-          enabled: true,
-          policy: "open",
-          allowFrom: [],
-          requireMention: false,
-          allowBots: false,
-          agentId: "default",
-        },
-      },
-    },
-  })) as ClisbotConfig;
+  const config = clisbotConfigSchema.parse(
+    JSON.parse(
+      renderDefaultConfigTemplate({
+        slackEnabled: false,
+        telegramEnabled: false,
+      }),
+    ),
+  );
+  config.agents.list = [];
+  config.app.control.configReload.watch = false;
+  config.app.control.configReload.watchDebounceMs = 250;
+  return config;
 }
 
 describe("startup bootstrap helpers", () => {
@@ -313,18 +175,18 @@ describe("startup bootstrap helpers", () => {
     });
 
     expect(lines).toContain(
-      "warning default Slack tokens are available in SLACK_APP_TOKEN and SLACK_BOT_TOKEN, but channels.slack.enabled is false in the existing config.",
+      "warning default Slack tokens are available in SLACK_APP_TOKEN and SLACK_BOT_TOKEN, but bots.slack.defaults.enabled is false in the existing config.",
     );
     expect(lines).toContain(
-      `Run \`clisbot channels enable slack\` to enable Slack quickly, or update ${configPath} manually.`,
+      `Run \`clisbot bots enable --channel slack --bot default\` to enable Slack quickly, or update ${configPath} manually.`,
     );
-    expect(config.channels.slack.enabled).toBe(false);
+    expect(config.bots.slack.defaults.enabled).toBe(false);
   });
 
   test("does not warn when matching defaults are already enabled", () => {
     const config = createConfig();
-    config.channels.slack.enabled = true;
-    config.channels.telegram.enabled = true;
+    config.bots.slack.defaults.enabled = true;
+    config.bots.telegram.defaults.enabled = true;
 
     const lines = renderDisabledConfiguredChannelWarningLines(config, {
       slack: true,
@@ -347,13 +209,17 @@ describe("startup bootstrap helpers", () => {
 
   test("reports missing env vars for enabled configured channels before runtime start", () => {
     const config = createConfig();
-    config.channels.slack.enabled = true;
-    config.channels.slack.accounts.default.appToken = "${CUSTOM_SLACK_APP_TOKEN}";
-    config.channels.slack.accounts.default.botToken = "${CUSTOM_SLACK_BOT_TOKEN}";
-    config.channels.telegram.enabled = true;
-    config.channels.telegram.accounts.default.botToken = "${CUSTOM_TELEGRAM_BOT_TOKEN}";
+    config.bots.slack.defaults.enabled = true;
+    config.bots.slack.default.appToken = "${CUSTOM_SLACK_APP_TOKEN}";
+    config.bots.slack.default.botToken = "${CUSTOM_SLACK_BOT_TOKEN}";
+    config.bots.telegram.defaults.enabled = true;
+    config.bots.telegram.default.botToken = "${CUSTOM_TELEGRAM_BOT_TOKEN}";
+
+    const tempHome = mkdtempSync(join(tmpdir(), "clisbot-startup-bootstrap-"));
+    process.env.CLISBOT_HOME = tempHome;
 
     const lines = renderConfiguredChannelTokenIssueLines(config, {
+      CLISBOT_HOME: tempHome,
       CUSTOM_SLACK_APP_TOKEN: "app",
     }).join("\n");
 
@@ -365,13 +231,17 @@ describe("startup bootstrap helpers", () => {
 
   test("blocks start when any enabled channel still has missing token env refs", () => {
     const config = createConfig();
-    config.channels.slack.enabled = true;
-    config.channels.slack.accounts.default.appToken = "${SLACK_APP_TOKEN}";
-    config.channels.slack.accounts.default.botToken = "${SLACK_BOT_TOKEN}";
-    config.channels.telegram.enabled = true;
-    config.channels.telegram.accounts.default.botToken = "${TELEGRAM_BOT_TOKEN}";
+    config.bots.slack.defaults.enabled = true;
+    config.bots.slack.default.appToken = "${SLACK_APP_TOKEN}";
+    config.bots.slack.default.botToken = "${SLACK_BOT_TOKEN}";
+    config.bots.telegram.defaults.enabled = true;
+    config.bots.telegram.default.botToken = "${TELEGRAM_BOT_TOKEN}";
+
+    const tempHome = mkdtempSync(join(tmpdir(), "clisbot-startup-bootstrap-"));
+    process.env.CLISBOT_HOME = tempHome;
 
     const lines = renderConfiguredChannelTokenIssueLines(config, {
+      CLISBOT_HOME: tempHome,
       TELEGRAM_BOT_TOKEN: "telegram-token",
     }).join("\n");
 
@@ -381,13 +251,17 @@ describe("startup bootstrap helpers", () => {
 
   test("reports whether configured tokens come from env refs or missing env values", () => {
     const config = createConfig();
-    config.channels.slack.enabled = true;
-    config.channels.slack.accounts.default.appToken = "${CUSTOM_SLACK_APP_TOKEN}";
-    config.channels.slack.accounts.default.botToken = "${CUSTOM_SLACK_BOT_TOKEN}";
-    config.channels.telegram.enabled = true;
-    config.channels.telegram.accounts.default.botToken = "${CUSTOM_TELEGRAM_BOT_TOKEN}";
+    config.bots.slack.defaults.enabled = true;
+    config.bots.slack.default.appToken = "${CUSTOM_SLACK_APP_TOKEN}";
+    config.bots.slack.default.botToken = "${CUSTOM_SLACK_BOT_TOKEN}";
+    config.bots.telegram.defaults.enabled = true;
+    config.bots.telegram.default.botToken = "${CUSTOM_TELEGRAM_BOT_TOKEN}";
+
+    const tempHome = mkdtempSync(join(tmpdir(), "clisbot-startup-bootstrap-"));
+    process.env.CLISBOT_HOME = tempHome;
 
     const lines = renderConfiguredChannelTokenStatusLines(config, {
+      CLISBOT_HOME: tempHome,
       CUSTOM_SLACK_APP_TOKEN: "app",
       CUSTOM_SLACK_BOT_TOKEN: "bot",
     }).join("\n");
@@ -396,15 +270,14 @@ describe("startup bootstrap helpers", () => {
       "Slack account default: source=env app=CUSTOM_SLACK_APP_TOKEN bot=CUSTOM_SLACK_BOT_TOKEN",
     );
     expect(lines).toContain(
-      "Telegram account default: unavailable (Missing env var \"CUSTOM_TELEGRAM_BOT_TOKEN\" referenced at config path: channels.telegram.accounts.default.botToken)",
+      "Telegram account default: unavailable (Missing env var \"CUSTOM_TELEGRAM_BOT_TOKEN\" referenced at config path: bots.telegram.default.botToken)",
     );
   });
 
   test("reports mem credentials as ephemeral even when the current process does not own the secret", () => {
     const config = createConfig();
-    config.channels.telegram.enabled = true;
-    config.channels.telegram.botToken = "";
-    config.channels.telegram.accounts.default = {
+    config.bots.telegram.defaults.enabled = true;
+    config.bots.telegram.default = {
       enabled: true,
       credentialType: "mem",
       botToken: "",

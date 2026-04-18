@@ -12,18 +12,19 @@ export function renderTelegramRouteChoiceMessage(params: {
     "",
     "Ask the bot owner to choose one of these:",
     "",
-    "Add the whole group with the default agent:",
-    `\`clisbot channels add telegram-group ${chatId}\``,
+    "Add the whole group to the allowlist:",
+    `\`clisbot routes add --channel telegram group:${chatId} --bot default\``,
     "",
-    "Add the whole group with a specific agent:",
-    `\`clisbot channels add telegram-group ${chatId} --agent <id>\``,
+    "Bind the whole group to a specific agent:",
+    `\`clisbot routes set-agent --channel telegram group:${chatId} --bot default --agent <id>\``,
   ];
 
   if (topicId != null) {
     lines.push(
       "",
-      "Add only this topic with a specific agent:",
-      `\`clisbot channels add telegram-group ${chatId} --topic ${topicId} --agent <id>\``,
+      "Or bind only this topic to a specific agent:",
+      `\`clisbot routes add --channel telegram topic:${chatId}:${topicId} --bot default\``,
+      `\`clisbot routes set-agent --channel telegram topic:${chatId}:${topicId} --bot default --agent <id>\``,
     );
   }
 
@@ -31,8 +32,8 @@ export function renderTelegramRouteChoiceMessage(params: {
     lines.push(
       "",
       topicId != null
-        ? `Config path: \`channels.telegram.groups.\"${chatId}\".topics.\"${topicId}\"\``
-        : `Config path: \`channels.telegram.groups.\"${chatId}\"\``,
+        ? `Config path: \`bots.telegram.default.groups.\"${chatId}\".topics.\"${topicId}\"\``
+        : `Config path: \`bots.telegram.default.groups.\"${chatId}\"\``,
     );
   } else {
     lines.push(

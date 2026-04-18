@@ -8,7 +8,7 @@ export type ChannelAgentPromptConfig = {
 };
 
 export const CONFIGURATION_GUIDANCE =
-  "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot channels --help`, or `clisbot auth --help` for details.";
+  "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot bots --help`, `clisbot routes --help`, or `clisbot auth --help` for details.";
 
 export const BASE_TEMPLATE = `<system>
 [{{timestamp}}] {{identity_summary}}

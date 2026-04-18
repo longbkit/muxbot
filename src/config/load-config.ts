@@ -15,18 +15,70 @@ import {
 import { readTextFile } from "../shared/fs.ts";
 import { resolveConfigDurationMs } from "./duration.ts";
 import { resolveConfigEnvVars } from "./env-substitution.ts";
-import { type AgentEntry, type ClisbotConfig, clisbotConfigSchema } from "./schema.ts";
+import {
+  type AgentEntry,
+  type ClisbotConfig,
+  clisbotConfigSchema,
+} from "./schema.ts";
+
+export type RuntimeConfig = ClisbotConfig & {
+  session: ClisbotConfig["app"]["session"] & {
+    dmScope: ClisbotConfig["bots"]["defaults"]["dmScope"];
+  };
+  control: ClisbotConfig["app"]["control"];
+  tmux: ClisbotConfig["agents"]["defaults"]["runner"]["defaults"]["tmux"];
+};
+
+export type ResolvedAgentRunnerConfig = {
+  command: string;
+  args: string[];
+  trustWorkspace: boolean;
+  startupDelayMs: number;
+  startupRetryCount: number;
+  startupRetryDelayMs: number;
+  startupReadyPattern?: string;
+  startupBlockers?: Array<{
+    pattern: string;
+    message: string;
+  }>;
+  promptSubmitDelayMs: number;
+  sessionId: {
+    create: {
+      mode: "runner" | "explicit";
+      args: string[];
+    };
+    capture: {
+      mode: "off" | "status-command";
+      statusCommand: string;
+      pattern: string;
+      timeoutMs: number;
+      pollIntervalMs: number;
+    };
+    resume: {
+      mode: "off" | "command";
+      command?: string;
+      args: string[];
+    };
+  };
+};
 
 export type ResolvedAgentConfig = {
   agentId: string;
   sessionName: string;
   workspacePath: string;
-  runner: ClisbotConfig["agents"]["defaults"]["runner"];
-  stream: Omit<ClisbotConfig["agents"]["defaults"]["stream"], "maxRuntimeSec" | "maxRuntimeMin"> & {
+  runner: ResolvedAgentRunnerConfig;
+  stream: {
+    captureLines: number;
+    updateIntervalMs: number;
+    idleTimeoutMs: number;
+    noOutputTimeoutMs: number;
+    maxRuntimeSec?: number;
+    maxRuntimeMin?: number;
+    maxMessageChars: number;
     maxRuntimeLabel: string;
     maxRuntimeMs: number;
   };
-  session: ClisbotConfig["agents"]["defaults"]["session"];
+  session: RuntimeConfig["agents"]["defaults"]["runner"]["defaults"]["session"];
 };
 
 export function resolveMaxRuntimeMs(stream: {
@@ -36,7 +88,7 @@ export function resolveMaxRuntimeMs(stream: {
   return resolveConfigDurationMs({
     seconds: stream.maxRuntimeSec,
     minutes: stream.maxRuntimeMin,
-    defaultMinutes: 15,
+    defaultMinutes: 30,
   });
 }
 
@@ -44,7 +96,7 @@ export type LoadedConfig = {
   configPath: string;
   processedEventsPath: string;
   stateDir: string;
-  raw: ClisbotConfig;
+  raw: RuntimeConfig;
 };
 
 export type LoadConfigOptions = {
@@ -87,34 +139,65 @@ function materializeLoadedConfig(
   expandedConfigPath: string,
   validated: ClisbotConfig,
 ): LoadedConfig {
+  const runtimeRaw: RuntimeConfig = {
+    ...validated,
+    app: {
+      ...validated.app,
+      session: {
+        ...validated.app.session,
+        storePath: expandHomePath(
+          validated.app.session.storePath || getDefaultSessionStorePath(),
+        ),
+      },
+    },
+    agents: {
+      ...validated.agents,
+      defaults: {
+        ...validated.agents.defaults,
+        workspace: expandHomePath(
+          validated.agents.defaults.workspace || getDefaultWorkspaceTemplate(),
+        ),
+        runner: {
+          ...validated.agents.defaults.runner,
+          defaults: {
+            ...validated.agents.defaults.runner.defaults,
+            tmux: {
+              ...validated.agents.defaults.runner.defaults.tmux,
+              socketPath: expandHomePath(
+                validated.agents.defaults.runner.defaults.tmux.socketPath ||
+                  getDefaultTmuxSocketPath(),
+              ),
+            },
+          },
+        },
+      },
+      list: validated.agents.list.map((entry) => ({
+        ...entry,
+        workspace: entry.workspace ? expandHomePath(entry.workspace) : undefined,
+      })),
+    },
+    session: {
+      ...validated.app.session,
+      dmScope: validated.bots.defaults.dmScope,
+      storePath: expandHomePath(
+        validated.app.session.storePath || getDefaultSessionStorePath(),
+      ),
+    },
+    control: validated.app.control,
+    tmux: {
+      ...validated.agents.defaults.runner.defaults.tmux,
+      socketPath: expandHomePath(
+        validated.agents.defaults.runner.defaults.tmux.socketPath ||
+          getDefaultTmuxSocketPath(),
+      ),
+    },
+  };
+
   return {
     configPath: expandedConfigPath,
     processedEventsPath: getDefaultProcessedEventsPath(),
     stateDir: getDefaultStateDir(),
-    raw: {
-      ...validated,
-      tmux: {
-        ...validated.tmux,
-        socketPath: expandHomePath(validated.tmux.socketPath || getDefaultTmuxSocketPath()),
-      },
-      session: {
-        ...validated.session,
-        storePath: expandHomePath(validated.session.storePath || getDefaultSessionStorePath()),
-      },
-      agents: {
-        ...validated.agents,
-        defaults: {
-          ...validated.agents.defaults,
-          workspace: expandHomePath(
-            validated.agents.defaults.workspace || getDefaultWorkspaceTemplate(),
-          ),
-        },
-        list: validated.agents.list.map((entry) => ({
-          ...entry,
-          workspace: entry.workspace ? expandHomePath(entry.workspace) : undefined,
-        })),
-      },
-    },
+    raw: runtimeRaw,
   };
 }
 
@@ -126,24 +209,24 @@ export function applyDynamicPathDefaults(
     return parsed;
   }
 
-  const tmux = isRecord(parsed.tmux) ? parsed.tmux : {};
-  const session = isRecord(parsed.session) ? parsed.session : {};
+  const app = isRecord(parsed.app) ? parsed.app : {};
+  const appSession = isRecord(app.session) ? app.session : {};
   const agents = isRecord(parsed.agents) ? parsed.agents : {};
   const agentDefaults = isRecord(agents.defaults) ? agents.defaults : {};
+  const runner = isRecord(agentDefaults.runner) ? agentDefaults.runner : {};
+  const runnerDefaults = isRecord(runner.defaults) ? runner.defaults : {};
+  const tmux = isRecord(runnerDefaults.tmux) ? runnerDefaults.tmux : {};
 
   return {
     ...parsed,
-    tmux: {
-      ...tmux,
-      socketPath: typeof tmux.socketPath === "string" && tmux.socketPath.trim()
-        ? tmux.socketPath
-        : collapseHomePath(getDefaultTmuxSocketPath(env)),
-    },
-    session: {
-      ...session,
-      storePath: typeof session.storePath === "string" && session.storePath.trim()
-        ? session.storePath
-        : collapseHomePath(getDefaultSessionStorePath(env)),
+    app: {
+      ...app,
+      session: {
+        ...appSession,
+        storePath: typeof appSession.storePath === "string" && appSession.storePath.trim()
+          ? appSession.storePath
+          : collapseHomePath(getDefaultSessionStorePath(env)),
+      },
     },
     agents: {
       ...agents,
@@ -152,6 +235,18 @@ export function applyDynamicPathDefaults(
         workspace: typeof agentDefaults.workspace === "string" && agentDefaults.workspace.trim()
           ? agentDefaults.workspace
           : collapseHomePath(getDefaultWorkspaceTemplate(env)),
+        runner: {
+          ...runner,
+          defaults: {
+            ...runnerDefaults,
+            tmux: {
+              ...tmux,
+              socketPath: typeof tmux.socketPath === "string" && tmux.socketPath.trim()
+                ? tmux.socketPath
+                : collapseHomePath(getDefaultTmuxSocketPath(env)),
+            },
+          },
+        },
       },
     },
   };

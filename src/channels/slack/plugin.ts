@@ -112,9 +112,9 @@ function resolveSlackReplyTarget(params: {
 
 export const slackChannelPlugin: ChannelPlugin = {
   id: "slack",
-  isEnabled: (loadedConfig) => loadedConfig.raw.channels.slack.enabled,
+  isEnabled: (loadedConfig) => loadedConfig.raw.bots.slack.defaults.enabled,
   listAccounts: (loadedConfig) =>
-    listSlackAccounts(loadedConfig.raw.channels.slack).map(({ accountId, config }) => ({
+    listSlackAccounts(loadedConfig.raw.bots.slack).map(({ accountId, config }) => ({
       accountId,
       config,
     })),
@@ -142,7 +142,7 @@ export const slackChannelPlugin: ChannelPlugin = {
   markStartupFailure: (store, error) => store.markSlackFailure(error),
   runMessageCommand: async (loadedConfig, command) => {
     const account = resolveSlackAccountConfig(
-      loadedConfig.raw.channels.slack,
+      loadedConfig.raw.bots.slack,
       command.account,
     );
     const shared = {

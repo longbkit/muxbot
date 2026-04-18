@@ -1,20 +1,16 @@
 import { join } from "node:path";
-import type { ClisbotConfig } from "./schema.ts";
+import type {
+  ClisbotConfig,
+  SlackBotConfig,
+  TelegramBotConfig,
+} from "./schema.ts";
 import { extractEnvReferenceName, normalizeEnvReference } from "../shared/env-references.ts";
 import { getDefaultCredentialsDir } from "../shared/paths.ts";
 
-const ENV_REFERENCE_PATHS = [
-  "channels.slack.appToken",
-  "channels.slack.botToken",
-  "channels.telegram.botToken",
-];
-
 const TOKEN_ENV_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
 
-export type SlackPersistentAccountConfig =
-  ClisbotConfig["channels"]["slack"]["accounts"][string];
-export type TelegramPersistentAccountConfig =
-  ClisbotConfig["channels"]["telegram"]["accounts"][string];
+export type SlackPersistentAccountConfig = SlackBotConfig;
+export type TelegramPersistentAccountConfig = TelegramBotConfig;
 
 export type RuntimeCredentialDocument = {
   slack?: Record<string, { appToken?: string; botToken?: string }>;
@@ -69,16 +65,23 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function getAccountsRecord(accounts: unknown) {
-  if (!isRecord(accounts)) {
-    return {} as Record<string, unknown>;
-  }
-  return accounts;
-}
-
 export function normalizeAccountId(accountId?: string | null) {
   const trimmed = accountId?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+export function getSlackBotsRecord(
+  config: ClisbotConfig["bots"]["slack"],
+) {
+  const { defaults, ...bots } = config;
+  return bots;
+}
+
+export function getTelegramBotsRecord(
+  config: ClisbotConfig["bots"]["telegram"],
+) {
+  const { defaults, ...bots } = config;
+  return bots;
 }
 
 function normalizeAccountEnvSegment(accountId: string) {
@@ -92,19 +95,25 @@ function normalizeAccountEnvSegment(accountId: string) {
 
 export function getConfiguredDefaultAccountId(params: {
   defaultAccount?: string;
-  accounts: unknown;
+  defaultBotId?: string;
+  accounts?: unknown;
+  bots?: Record<string, unknown>;
 }) {
-  const accounts = getAccountsRecord(params.accounts);
-  const explicit = normalizeAccountId(params.defaultAccount);
+  const explicit =
+    normalizeAccountId(params.defaultBotId) ??
+    normalizeAccountId(params.defaultAccount);
   if (explicit) {
     return explicit;
   }
 
-  if ("default" in accounts) {
+  const bots = params.bots ??
+    (isRecord(params.accounts) ? (params.accounts as Record<string, unknown>) : {});
+
+  if ("default" in bots) {
     return "default";
   }
 
-  const firstAccountId = Object.keys(accounts)[0];
+  const firstAccountId = Object.keys(bots)[0];
   return normalizeAccountId(firstAccountId) ?? "default";
 }
 
@@ -125,66 +134,66 @@ export function trimString(value?: string) {
 }
 
 export function getTelegramAccountConfig(
-  config: ClisbotConfig["channels"]["telegram"],
+  config: ClisbotConfig["bots"]["telegram"],
   accountId: string,
 ) {
-  return getAccountsRecord(config.accounts)[accountId] as TelegramPersistentAccountConfig | undefined;
+  return getTelegramBotsRecord(config)[accountId] as TelegramPersistentAccountConfig | undefined;
 }
 
 export function getSlackAccountConfig(
-  config: ClisbotConfig["channels"]["slack"],
+  config: ClisbotConfig["bots"]["slack"],
   accountId: string,
 ) {
-  return getAccountsRecord(config.accounts)[accountId] as SlackPersistentAccountConfig | undefined;
+  return getSlackBotsRecord(config)[accountId] as SlackPersistentAccountConfig | undefined;
 }
 
 export function getTelegramEnvReference(
-  config: ClisbotConfig["channels"]["telegram"],
+  config: ClisbotConfig["bots"]["telegram"],
   accountId: string,
 ) {
   const account = getTelegramAccountConfig(config, accountId);
-  const accountToken = trimString(account?.botToken);
-  if (accountToken) {
-    return accountToken;
-  }
-  return trimString(config.botToken);
+  return trimString(account?.botToken);
 }
 
 export function getSlackEnvReference(
-  config: ClisbotConfig["channels"]["slack"],
+  config: ClisbotConfig["bots"]["slack"],
   accountId: string,
 ) {
   const account = getSlackAccountConfig(config, accountId);
   return {
-    appToken: trimString(account?.appToken) || trimString(config.appToken),
-    botToken: trimString(account?.botToken) || trimString(config.botToken),
+    appToken: trimString(account?.appToken),
+    botToken: trimString(account?.botToken),
   };
 }
 
 export function getCredentialSkipPaths(parsed: unknown) {
-  const skipPaths = [...ENV_REFERENCE_PATHS];
-  const channels = isRecord(parsed) ? parsed.channels : undefined;
+  const skipPaths: string[] = [];
+  const bots = isRecord(parsed) ? parsed.bots : undefined;
 
-  if (!isRecord(channels)) {
+  if (!isRecord(bots)) {
     return skipPaths;
   }
 
-  const slack = isRecord(channels.slack) ? channels.slack : undefined;
-  const slackAccounts = isRecord(slack?.accounts) ? slack.accounts : undefined;
-  if (slackAccounts) {
-    for (const accountId of Object.keys(slackAccounts)) {
+  const slack = isRecord(bots.slack) ? bots.slack : undefined;
+  if (slack) {
+    for (const [botId, bot] of Object.entries(slack)) {
+      if (botId === "defaults" || !isRecord(bot)) {
+        continue;
+      }
       skipPaths.push(
-        `channels.slack.accounts.${accountId}.appToken`,
-        `channels.slack.accounts.${accountId}.botToken`,
+        `bots.slack.${botId}.appToken`,
+        `bots.slack.${botId}.botToken`,
       );
     }
   }
 
-  const telegram = isRecord(channels.telegram) ? channels.telegram : undefined;
-  const telegramAccounts = isRecord(telegram?.accounts) ? telegram.accounts : undefined;
-  if (telegramAccounts) {
-    for (const accountId of Object.keys(telegramAccounts)) {
-      skipPaths.push(`channels.telegram.accounts.${accountId}.botToken`);
+  const telegram = isRecord(bots.telegram) ? bots.telegram : undefined;
+  if (telegram) {
+    for (const [botId, bot] of Object.entries(telegram)) {
+      if (botId === "defaults" || !isRecord(bot)) {
+        continue;
+      }
+      skipPaths.push(`bots.telegram.${botId}.botToken`);
     }
   }
 

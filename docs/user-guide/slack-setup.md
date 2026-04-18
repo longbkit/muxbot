@@ -60,8 +60,9 @@ Then:
 1. DM the bot in Slack
 2. approve the pairing code with `clisbot pairing approve slack <CODE>`
 3. invite the bot to a Slack channel
-4. add that route with `clisbot channels add slack-channel <channelId>`
-5. test `@clisbot hello`
+4. add that route with `clisbot routes add --channel slack channel:<channelId> --bot default`
+5. bind that route with `clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent default`
+6. test `@clisbot hello`
 
 The rest of this page explains each step in detail.
 
@@ -218,19 +219,26 @@ Practical ways:
 Then add the route:
 
 ```bash
-clisbot channels add slack-channel <channelId>
+clisbot routes add --channel slack channel:<channelId> --bot default
 ```
 
 Example:
 
 ```bash
-clisbot channels add slack-channel C1234567890
+clisbot routes add --channel slack channel:C1234567890 --bot default
 ```
 
 If you want to make mention optional:
 
 ```bash
-clisbot channels add slack-channel C1234567890 --require-mention false
+clisbot routes add --channel slack channel:C1234567890 --bot default
+clisbot routes set-require-mention --channel slack channel:C1234567890 --bot default --value false
+```
+
+Then bind the route to the agent that should answer there:
+
+```bash
+clisbot routes set-agent --channel slack channel:C1234567890 --bot default --agent default
 ```
 
 Practical default:
@@ -245,13 +253,19 @@ For a private Slack channel, the route command is different.
 Use:
 
 ```bash
-clisbot channels add slack-group <groupId>
+clisbot routes add --channel slack group:<groupId> --bot default
 ```
 
 Example:
 
 ```bash
-clisbot channels add slack-group G1234567890
+clisbot routes add --channel slack group:G1234567890 --bot default
+```
+
+Then bind that private channel route:
+
+```bash
+clisbot routes set-agent --channel slack group:G1234567890 --bot default --agent default
 ```
 
 Use this when the Slack conversation id starts with `G`.
@@ -272,10 +286,11 @@ Use this order:
 3. approve pairing with `clisbot pairing approve slack <CODE>`
 4. verify DM reply works
 5. invite the bot into the target Slack channel
-6. add the route with `clisbot channels add slack-channel <channelId>`
-7. send `@clisbot hello`
-8. open the bot reply thread
-9. send one plain follow-up reply in that same thread
+6. add the route with `clisbot routes add --channel slack channel:<channelId> --bot default`
+7. bind the route with `clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent default`
+8. send `@clisbot hello`
+9. open the bot reply thread
+10. send one plain follow-up reply in that same thread
 
 Good test prompts:
 
@@ -325,11 +340,19 @@ clisbot pairing approve slack <CODE>
 ```
 
 ```bash
-clisbot channels add slack-channel <channelId>
+clisbot routes add --channel slack channel:<channelId> --bot default
 ```
 
 ```bash
-clisbot channels add slack-group <groupId>
+clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent default
+```
+
+```bash
+clisbot routes add --channel slack group:<groupId> --bot default
+```
+
+```bash
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
 ```
 
 ## Troubleshooting
@@ -367,13 +390,15 @@ Most common cause:
 Fix:
 
 ```bash
-clisbot channels add slack-channel <channelId>
+clisbot routes add --channel slack channel:<channelId> --bot default
+clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent default
 ```
 
 For a private channel:
 
 ```bash
-clisbot channels add slack-group <groupId>
+clisbot routes add --channel slack group:<groupId> --bot default
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
 ```
 
 ### The first mention works but plain thread follow-up does not
@@ -419,7 +444,8 @@ Fix:
 3. run:
 
 ```bash
-clisbot channels add slack-group <groupId>
+clisbot routes add --channel slack group:<groupId> --bot default
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
 ```
 
 ### I changed scopes or events and nothing improved

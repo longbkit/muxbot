@@ -2,227 +2,83 @@ import { describe, expect, test } from "bun:test";
 import { resolveTelegramConversationRoute } from "../src/channels/telegram/route-config.ts";
 import { resolveTelegramConversationTarget } from "../src/channels/telegram/session-routing.ts";
 import type { LoadedConfig } from "../src/config/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 function createLoadedConfig(): LoadedConfig {
+  const config = clisbotConfigSchema.parse(
+    JSON.parse(
+      renderDefaultConfigTemplate({
+        slackEnabled: false,
+        telegramEnabled: true,
+      }),
+    ),
+  );
+  config.bots.defaults.dmScope = "per-channel-peer";
+  config.bots.telegram.defaults.allowBots = false;
+  config.bots.telegram.defaults.groupPolicy = "allowlist";
+  config.bots.telegram.defaults.streaming = "all";
+  config.bots.telegram.defaults.response = "final";
+  config.bots.telegram.defaults.responseMode = "message-tool";
+  config.bots.telegram.defaults.additionalMessageMode = "steer";
+  config.bots.telegram.defaults.verbose = "minimal";
+  config.bots.telegram.defaults.followUp = {
+    mode: "auto",
+    participationTtlMin: 5,
+  };
+  config.bots.telegram.defaults.timezone = "UTC";
+  config.bots.telegram.default = {
+    ...config.bots.telegram.default,
+    enabled: true,
+    botToken: "telegram-token",
+    groups: {
+      "-1001": {
+        enabled: true,
+        requireMention: true,
+        allowBots: false,
+        agentId: "default",
+        allowUsers: [],
+        blockUsers: [],
+        topics: {
+          "4": {
+            enabled: true,
+            requireMention: false,
+            allowBots: false,
+            agentId: "claude",
+            allowUsers: [],
+            blockUsers: [],
+            verbose: "off",
+            timezone: "Asia/Ho_Chi_Minh",
+          },
+        },
+      },
+    },
+    directMessages: {
+      "dm:*": {
+        enabled: true,
+        policy: "open",
+        allowUsers: [],
+        blockUsers: [],
+        requireMention: false,
+        allowBots: false,
+        agentId: "default",
+      },
+    },
+  };
+  config.agents.list = [{ id: "default" }, { id: "claude" }];
+
   return {
     configPath: "/tmp/clisbot.json",
     processedEventsPath: "/tmp/processed.json",
     stateDir: "/tmp",
     raw: {
-      meta: {
-        schemaVersion: 1,
-      },
-      tmux: {
-        socketPath: "~/.clisbot/state/clisbot.sock",
-      },
+      ...config,
       session: {
-        mainKey: "main",
-        dmScope: "per-channel-peer",
-        identityLinks: {},
-        storePath: "/tmp/sessions.json",
+        ...config.app.session,
+        dmScope: config.bots.defaults.dmScope,
       },
-      app: {
-        auth: {
-          ownerClaimWindowMinutes: 30,
-          defaultRole: "member",
-          roles: {
-            owner: { allow: ["configManage"], users: [] },
-            admin: { allow: ["configManage"], users: [] },
-            member: { allow: [], users: [] },
-          },
-        },
-      },
-      agents: {
-        defaults: {
-          workspace: "~/.clisbot/workspaces/{agentId}",
-          auth: {
-            defaultRole: "member",
-            roles: {
-              admin: { allow: ["shellExecute"], users: [] },
-              member: { allow: ["sendMessage"], users: [] },
-            },
-          },
-          runner: {
-            command: "codex",
-            args: ["-C", "{workspace}"],
-            trustWorkspace: true,
-            startupDelayMs: 1,
-            startupRetryCount: 2,
-            startupRetryDelayMs: 0,
-            promptSubmitDelayMs: 1,
-            sessionId: {
-              create: {
-                mode: "runner",
-                args: [],
-              },
-              capture: {
-                mode: "off",
-                statusCommand: "/status",
-                pattern:
-                  "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
-                timeoutMs: 1000,
-                pollIntervalMs: 100,
-              },
-              resume: {
-                mode: "off",
-                args: ["resume", "{sessionId}", "-C", "{workspace}"],
-              },
-            },
-          },
-          stream: {
-            captureLines: 10,
-            updateIntervalMs: 10,
-            idleTimeoutMs: 10,
-            noOutputTimeoutMs: 10,
-            maxRuntimeSec: 10,
-            maxMessageChars: 100,
-          },
-          session: {
-            createIfMissing: true,
-            staleAfterMinutes: 60,
-            name: "{sessionKey}",
-          },
-        },
-        list: [{ id: "default" }, { id: "claude" }],
-      },
-      bindings: [],
-      control: {
-        configReload: {
-          watch: false,
-          watchDebounceMs: 250,
-        },
-        sessionCleanup: {
-          enabled: true,
-          intervalMinutes: 5,
-        },
-        loop: {
-          maxRunsPerLoop: 20,
-          maxActiveLoops: 10,
-        },
-        runtimeMonitor: {
-          restartBackoff: {
-            fastRetry: { delaySeconds: 10, maxRestarts: 3 },
-            stages: [
-              { delayMinutes: 15, maxRestarts: 4 },
-              { delayMinutes: 30, maxRestarts: 4 },
-            ],
-          },
-          ownerAlerts: { enabled: true, minIntervalMinutes: 30 },
-        },
-      },
-      channels: {
-        slack: {
-          enabled: false,
-          mode: "socket",
-          appToken: "app-token",
-          botToken: "bot-token",
-          defaultAccount: "default",
-          accounts: {
-            default: {
-              appToken: "app-token",
-              botToken: "bot-token",
-            },
-          },
-          agentPrompt: {
-            enabled: true,
-            maxProgressMessages: 3,
-            requireFinalResponse: true,
-          },
-          ackReaction: ":heavy_check_mark:",
-          typingReaction: "",
-          processingStatus: {
-            enabled: true,
-            status: "Working...",
-            loadingMessages: [],
-          },
-          allowBots: false,
-          replyToMode: "thread",
-          channelPolicy: "allowlist",
-          groupPolicy: "allowlist",
-          defaultAgentId: "default",
-          commandPrefixes: {
-            slash: ["::", "\\"],
-            bash: ["!"],
-          },
-          streaming: "all",
-          response: "final",
-          responseMode: "message-tool",
-          additionalMessageMode: "steer",
-          verbose: "minimal",
-          followUp: {
-            mode: "auto",
-            participationTtlMin: 5,
-          },
-          channels: {},
-          groups: {},
-          directMessages: {
-            enabled: true,
-            policy: "open",
-            allowFrom: [],
-            requireMention: false,
-          },
-        },
-        telegram: {
-          enabled: true,
-          mode: "polling",
-          botToken: "telegram-token",
-          defaultAccount: "default",
-          accounts: {
-            default: {
-              botToken: "telegram-token",
-            },
-          },
-          agentPrompt: {
-            enabled: true,
-            maxProgressMessages: 3,
-            requireFinalResponse: true,
-          },
-          allowBots: false,
-          groupPolicy: "allowlist",
-          defaultAgentId: "default",
-          commandPrefixes: {
-            slash: ["::", "\\"],
-            bash: ["!"],
-          },
-          streaming: "all",
-          response: "final",
-          responseMode: "message-tool",
-          additionalMessageMode: "steer",
-          verbose: "minimal",
-          followUp: {
-            mode: "auto",
-            participationTtlMin: 5,
-          },
-          timezone: "UTC",
-          polling: {
-            timeoutSeconds: 20,
-            retryDelayMs: 1000,
-          },
-          groups: {
-            "-1001": {
-              requireMention: true,
-              allowBots: false,
-              agentId: "default",
-              topics: {
-                "4": {
-                  requireMention: false,
-                  agentId: "claude",
-                  verbose: "off",
-                  timezone: "Asia/Ho_Chi_Minh",
-                },
-              },
-            },
-          },
-          directMessages: {
-            enabled: true,
-            policy: "open",
-            allowFrom: [],
-            requireMention: false,
-            allowBots: false,
-            agentId: "default",
-          },
-        },
-      },
+      control: config.app.control,
+      tmux: config.agents.defaults.runner.defaults.tmux,
     },
   };
 }
@@ -247,7 +103,7 @@ describe("Telegram route resolution", () => {
 
   test("uses agent additionalMessageMode when the route does not override it", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.channels.telegram.groupPolicy = "open";
+    loadedConfig.raw.bots.telegram.defaults.groupPolicy = "open";
     loadedConfig.raw.agents.list = [
       {
         id: "default",
@@ -311,17 +167,10 @@ describe("Telegram route resolution", () => {
     expect("privilegeCommands" in (resolved.route ?? {})).toBe(false);
   });
 
-  test("uses top-level telegram binding when route agent is not overridden", () => {
+  test("uses bot fallback agent when route agent is not overridden", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.channels.telegram.directMessages.agentId = undefined;
-    loadedConfig.raw.bindings = [
-      {
-        match: {
-          channel: "telegram",
-        },
-        agentId: "bound-agent",
-      },
-    ];
+    loadedConfig.raw.bots.telegram.default.directMessages["dm:*"]!.agentId = undefined;
+    loadedConfig.raw.bots.telegram.default.agentId = "bound-agent";
 
     const resolved = resolveTelegramConversationRoute({
       loadedConfig,
@@ -333,18 +182,24 @@ describe("Telegram route resolution", () => {
     expect(resolved.route?.agentId).toBe("bound-agent");
   });
 
-  test("uses account-specific telegram binding when the bound account id is provided", () => {
+  test("uses account-specific telegram bot fallback when the bot id is provided", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.channels.telegram.directMessages.agentId = undefined;
-    loadedConfig.raw.bindings = [
-      {
-        match: {
-          channel: "telegram",
-          accountId: "ops",
+    loadedConfig.raw.bots.telegram.ops = {
+      enabled: true,
+      botToken: "ops-telegram-token",
+      agentId: "ops-agent",
+      directMessages: {
+        "dm:*": {
+          enabled: true,
+          policy: "open",
+          allowUsers: [],
+          blockUsers: [],
+          requireMention: false,
+          allowBots: false,
         },
-        agentId: "ops-agent",
       },
-    ];
+      groups: {},
+    };
 
     const resolved = resolveTelegramConversationRoute({
       loadedConfig,

@@ -10,22 +10,18 @@ function createConfig(): ClisbotConfig {
   return JSON.parse(renderDefaultConfigTemplate()) as ClisbotConfig;
 }
 
-function createTelegramTopicTarget(chatId: string, topicId: string): ConfiguredSurfaceModeTarget & {
-  conversationKind: "topic";
-} {
+function createTelegramTopicTarget(chatId: string, topicId: string): ConfiguredSurfaceModeTarget {
   return {
     channel: "telegram",
-    target: chatId,
-    topic: topicId,
-    conversationKind: "topic",
+    target: `topic:${chatId}:${topicId}`,
   };
 }
 
 describe("resolveConfiguredSurfaceModeTarget", () => {
   test("telegram topic inherits group mode values without requiring an explicit topic override", () => {
     const config = createConfig();
-    config.channels.telegram.groups["-1001"] = {
-      ...config.channels.telegram.groups["-1001"],
+    config.bots.telegram.default.groups["-1001"] = {
+      ...config.bots.telegram.default.groups["-1001"],
       requireMention: true,
       allowBots: false,
       streaming: "latest",
@@ -47,8 +43,8 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
 
   test("telegram topic writes create a topic override even when the topic previously only inherited", () => {
     const config = createConfig();
-    config.channels.telegram.groups["-1001"] = {
-      ...config.channels.telegram.groups["-1001"],
+    config.bots.telegram.default.groups["-1001"] = {
+      ...config.bots.telegram.default.groups["-1001"],
       requireMention: true,
       allowBots: false,
       streaming: "latest",
@@ -60,19 +56,21 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
     resolveConfiguredSurfaceModeTarget(config, "responseMode", target).set("capture-pane");
     resolveConfiguredSurfaceModeTarget(config, "additionalMessageMode", target).set("steer");
 
-    expect(config.channels.telegram.groups["-1001"]?.topics["4"]?.streaming).toBe("off");
-    expect(config.channels.telegram.groups["-1001"]?.topics["4"]?.responseMode).toBe(
+    expect(config.bots.telegram.default.groups["-1001"]?.topics["4"]?.streaming).toBe("off");
+    expect(config.bots.telegram.default.groups["-1001"]?.topics["4"]?.responseMode).toBe(
       "capture-pane",
     );
-    expect(config.channels.telegram.groups["-1001"]?.topics["4"]?.additionalMessageMode).toBe(
+    expect(
+      config.bots.telegram.default.groups["-1001"]?.topics["4"]?.additionalMessageMode,
+    ).toBe(
       "steer",
     );
   });
 
   test("telegram open-group topic can read from channel defaults and materialize a topic override on write", () => {
     const config = createConfig();
-    config.channels.telegram.groupPolicy = "open";
-    config.channels.telegram.streaming = "all";
+    config.bots.telegram.defaults.groupPolicy = "open";
+    config.bots.telegram.default.streaming = "all";
 
     const target = createTelegramTopicTarget("-1009", "7");
     const binding = resolveConfiguredSurfaceModeTarget(config, "streaming", target);
@@ -80,6 +78,6 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
     expect(binding.get()).toBe("all");
     binding.set("off");
 
-    expect(config.channels.telegram.groups["-1009"]?.topics["7"]?.streaming).toBe("off");
+    expect(config.bots.telegram.default.groups["-1009"]?.topics["7"]?.streaming).toBe("off");
   });
 });

@@ -155,26 +155,20 @@ Important distinction:
 
 ## Agents CLI
 
-Use `clisbot agents ...` to manage configured agents and top-level channel bindings.
+Use `clisbot agents ...` to manage configured agents, bootstrap files, and agent-local mode overrides.
 
-For the focused syntax summary, run:
+Focused help:
 
 ```bash
 clisbot agents --help
 ```
 
-Current subcommands:
+Most-used commands:
 
 - `clisbot agents list`
-- `clisbot agents list --bindings`
 - `clisbot agents list --json`
 - `clisbot agents add <id> --cli <codex|claude|gemini>`
 - `clisbot agents bootstrap <id> --bot-type <personal|team>`
-- `clisbot agents bindings`
-- `clisbot agents bindings --agent <id>`
-- `clisbot agents bind --agent <id> --bind <channel[:accountId]>`
-- `clisbot agents unbind --agent <id> --bind <channel[:accountId]>`
-- `clisbot agents unbind --agent <id> --all`
 - `clisbot agents response-mode status --agent <id>`
 - `clisbot agents response-mode set <capture-pane|message-tool> --agent <id>`
 - `clisbot agents response-mode clear --agent <id>`
@@ -186,118 +180,74 @@ Important rules:
 
 - `agents add` requires `--cli`
 - supported tools are `codex`, `claude`, and `gemini`
-- `--startup-option` may be repeated
-- when `--startup-option` is omitted, clisbot uses the built-in startup options for the selected CLI
-- `start`, `init`, `agents add`, and `agents bootstrap` all use the same public flag: `--bot-type personal|team`
-- `--bot-type personal` fits one assistant for one human
-- `--bot-type team` fits one shared assistant for a team, channel, or group workflow
 - `agents bootstrap` requires `--bot-type`
-- `agents bootstrap` uses the agent's configured CLI tool to decide which tool-specific bootstrap file is required
-- `agents bootstrap` runs a dry conflict check first and asks for `--force` before overwriting any template markdown file
-- `--bind` may be repeated and currently accepts `slack`, `telegram`, `slack:<accountId>`, or `telegram:<accountId>`
-- `agents response-mode` sets or clears `agents.list[].responseMode`
-- `agents additional-message-mode` sets or clears `agents.list[].additionalMessageMode`
-
-Examples:
-
-```bash
-clisbot agents add work --cli claude --bind telegram
-```
-
-```bash
-clisbot agents add gem --cli gemini --bot-type personal
-```
-
-```bash
-clisbot agents bind --agent work --bind slack:ops
-```
-
-```bash
-clisbot agents add ops --cli codex --startup-option --dangerously-skip-permissions --bot-type team --bind telegram:ops
-```
-
-```bash
-clisbot agents bootstrap ops --bot-type team --force
-```
-
-Binding behavior:
-
-- top-level `bindings` are a fallback route lookup layer
-- explicit route `agentId` on a Slack channel, Slack group, Telegram group, or Telegram topic still wins first
-- account-specific bindings are accepted in config and CLI now even though current Slack and Telegram runtime routing mostly uses channel-level context
+- first-run public choices stay `--bot-type personal|team`
+- bot fallback routing now belongs to `clisbot bots ...`
+- route-level routing now belongs to `clisbot routes ...`
 
 Bootstrap behavior:
 
-- `personal-assistant` and `team-assistant` copy `templates/openclaw`, `templates/customized/default`, and the matching folder under `templates/customized/`
-- those internal template modes map to the public first-run choices `--bot-type personal` and `--bot-type team`
+- `personal-assistant` and `team-assistant` copy the matching bootstrap templates
 - codex bootstrap requires `AGENTS.md` and `IDENTITY.md`
 - claude bootstrap requires `CLAUDE.md` and `IDENTITY.md`
 - gemini bootstrap requires `GEMINI.md` and `IDENTITY.md`
-- bootstrap state is `missing` when the tool-specific file or `IDENTITY.md` is absent
-- bootstrap state is `not-bootstrapped` when the required files exist but `BOOTSTRAP.md` is still present
-- bootstrap state becomes `bootstrapped` after the required files exist and `BOOTSTRAP.md` is gone
-- seeded files include `BOOTSTRAP.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`, `MEMORY.md`, `LOOP.md`, and tool guidance files
-- Gemini operational note: `clisbot` can create and route Gemini agents, but the underlying `gemini` CLI still needs direct prior auth or a headless auth path before routed prompts can succeed
+- bootstrap state is `missing`, `not-bootstrapped`, or `bootstrapped`
+- Gemini still needs its own direct auth or headless auth path before routed prompts can succeed
 
 Operational note:
 
-- the default generated channel config still points to the `default` agent
-- if your first agent uses another id, update `channels.*.defaultAgentId` and any route `agentId` values in `~/.clisbot/clisbot.json`
+- the default generated bot config still points at the `default` agent
+- if your first useful agent uses another id, update the fallback with `clisbot bots set-agent ...` or override it on a specific route with `clisbot routes set-agent ...`
 
-## Channels CLI
+## Bots CLI
 
-Use `clisbot channels ...` to flip channel enablement in config without editing JSON by hand.
+Use `clisbot bots ...` to manage provider bot identities, credentials, default bot selection, and bot-level fallback policy.
 
-Current subcommands:
+Focused help:
 
-- `clisbot channels enable slack`
-- `clisbot channels disable slack`
-- `clisbot channels enable telegram`
-- `clisbot channels disable telegram`
-- `clisbot channels add telegram-group <chatId> [--topic <topicId>] [--agent <id>] [--require-mention true|false]`
-- `clisbot channels remove telegram-group <chatId> [--topic <topicId>]`
-- `clisbot channels add slack-channel <channelId> [--agent <id>] [--require-mention true|false]`
-- `clisbot channels remove slack-channel <channelId>`
-- `clisbot channels add slack-group <groupId> [--agent <id>] [--require-mention true|false]`
-- `clisbot channels remove slack-group <groupId>`
-- `clisbot channels set-token <slack-app|slack-bot|telegram-bot> <value>`
-- `clisbot channels clear-token <slack-app|slack-bot|telegram-bot>`
-- `clisbot channels response-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
-- `clisbot channels response-mode set <capture-pane|message-tool> --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
-- `clisbot channels additional-message-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
-- `clisbot channels additional-message-mode set <queue|steer> --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
+```bash
+clisbot bots --help
+```
+
+Most-used commands:
+
+- `clisbot bots list`
+- `clisbot bots add --channel telegram --bot default --bot-token TELEGRAM_BOT_TOKEN --persist`
+- `clisbot bots add --channel slack --bot default --app-token SLACK_APP_TOKEN --bot-token SLACK_BOT_TOKEN --persist`
+- `clisbot bots set-agent --channel telegram --bot default --agent support`
+- `clisbot bots set-default --channel slack --bot ops`
+- `clisbot bots get-credentials-source --channel slack --bot default`
+- `clisbot bots set-dm-policy --channel telegram --bot default --policy pairing`
+
+## Routes CLI
+
+Use `clisbot routes ...` to admit specific Slack or Telegram surfaces under a bot.
+
+Focused help:
+
+```bash
+clisbot routes --help
+```
+
+Most-used commands:
+
+- `clisbot routes list`
+- `clisbot routes add --channel slack channel:C1234567890 --bot default`
+- `clisbot routes add --channel slack group:G1234567890 --bot default`
+- `clisbot routes add --channel telegram group:-1001234567890 --bot default`
+- `clisbot routes add --channel telegram topic:-1001234567890:42 --bot default`
+- `clisbot routes add --channel telegram dm:* --bot default`
+- `clisbot routes set-agent --channel slack channel:C1234567890 --bot default --agent support`
+- `clisbot routes set-require-mention --channel telegram group:-1001234567890 --bot default --value false`
+- `clisbot routes set-response-mode --channel slack channel:C1234567890 --bot default --mode message-tool`
+- `clisbot routes set-additional-message-mode --channel telegram topic:-1001234567890:42 --bot default --mode queue`
 
 Important behavior:
 
-- `enable` and `disable` only update `channels.slack.enabled` or `channels.telegram.enabled`
-- `add telegram-group` writes `channels.telegram.groups.<chatId>` or `channels.telegram.groups.<chatId>.topics.<topicId>`
-- `add slack-channel` writes `channels.slack.channels.<channelId>`
-- `add slack-group` writes `channels.slack.groups.<groupId>`
-- `set-token` and `clear-token` update the existing channel token fields in config without changing env names elsewhere
-- `enable` and `disable` do not inject routes, group mappings, or topic mappings
-- `add telegram-group` defaults to `requireMention: true`
-- `add slack-channel` and `add slack-group` default to `requireMention: true`
-- `channels response-mode` uses message-style addressing:
-  - Slack targets: `channel:<id>`, `group:<id>`, `dm:<id>`
-  - Telegram direct messages: positive chat id
-  - Telegram groups: negative chat id
-  - Telegram topics: negative chat id plus `--topic <topicId>`
-- channel and topic response-mode overrides require the route to exist first
-- routed auth now lives in `app.auth` and `agents.<id>.auth`; see [Authorization And Roles](auth-and-roles.md)
-- transcript visibility is controlled separately by route-level `verbose`
-- conversation-level busy-session tools are available on routed Slack and Telegram conversations:
-  - `/queue <message>` or `\q <message>`
-  - `/steer <message>` or `\s <message>`
-  - `/queue list`
-  - `/queue clear`
-  - `/nudge`
-  - `/loop 5m check CI`
-  - `/loop 5m`
-  - `/loop 1m --force check deploy`
-  - `/loop check deploy every 1m --force`
-  - `/loop every day at 07:00 check deploy`
-  - `/loop every weekday at 07:00 standup`
-  - `/loop every mon at 09:00 weekly review`
+- route ids are explicit: `channel:<id>`, `group:<id>`, `topic:<chatId>:<topicId>`, `dm:<id|*>`
+- `add` is create-only
+- if the route already exists, use the matching `set-<key>` command
+- route-local auth visibility still depends on `verbose` and resolved auth roles
   - `/loop 3 /codereview`
   - `/loop 3`
   - `/loop status`
@@ -333,14 +283,16 @@ Timezone config examples:
 
 ```json
 {
-  "channels": {
+  "bots": {
     "telegram": {
-      "groups": {
-        "-1001234567890": {
-          "timezone": "Asia/Ho_Chi_Minh",
-          "topics": {
-            "4": {
-              "timezone": "America/Los_Angeles"
+      "default": {
+        "groups": {
+          "-1001234567890": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "topics": {
+              "4": {
+                "timezone": "America/Los_Angeles"
+              }
             }
           }
         }
@@ -353,7 +305,7 @@ Timezone config examples:
 - route `timezone` overrides `control.loop.defaultTimezone`
 - once a wall-clock loop is created, its effective timezone is persisted on that loop record
 - if the service is already running, restart it after changing channel enablement
-- `clisbot channels` and `clisbot channels --help` print setup guidance for Slack ids, Telegram group or topic ids, allowlists, and routed auth docs
+- `clisbot routes` and `clisbot routes --help` print setup guidance for Slack ids, Telegram group or topic ids, allowlists, and routed auth docs
 
 ## Loops CLI
 
@@ -383,7 +335,7 @@ Important behavior:
 
 What it includes:
 
-- configured agents with tool, bootstrap state, bindings, and last activity
+- configured agents with tool, bootstrap state, routed usage, and last activity
 - configured Slack and Telegram channel summaries with connection state and last activity
 - first-run guidance when no agents are configured
 - bootstrap follow-up guidance when an agent workspace is `missing` or `not-bootstrapped`
@@ -444,7 +396,8 @@ That page now holds:
 
 - turn execution timeout semantics
 - long-running session commands such as `/attach`, `/detach`, and `/watch`
-- dedicated tmux socket usage and common tmux commands
+- runner debug commands such as `clisbot runner list|inspect|watch`
+- dedicated tmux socket usage and raw tmux fallback commands
 - runtime state file locations and Codex trust troubleshooting
 - stale tmux cleanup behavior
 - config reload rules and follow-up-state notes
@@ -455,5 +408,5 @@ That page now holds:
 - tmux session names now derive from session keys, so one agent can have multiple tmux sessions at once
 - the default session name template is `agents.defaults.session.name = "{sessionKey}"`
 - tmux session names are created by normalizing the rendered value into a tmux-safe name, replacing every non-alphanumeric character with `-`
-- list sessions first, then attach to the specific one you want
+- prefer `clisbot runner list` and `clisbot runner watch --latest|--next` before dropping to raw tmux
 - if the Codex trust screen appears stale after attaching, press `Ctrl-L` inside the tmux session to redraw the pane

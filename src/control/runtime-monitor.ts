@@ -126,12 +126,13 @@ function summarizeExit(params: { code: number | null; signal: NodeJS.Signals | n
 }
 
 function getRestartPlan(
-  config: ClisbotConfig["control"]["runtimeMonitor"]["restartBackoff"],
+  config: ClisbotConfig["app"]["control"]["runtimeMonitor"]["restartBackoff"],
   restartNumber: number,
 ) {
   const fastRetryMaxRestarts = config.fastRetry.maxRestarts;
   const totalRestarts =
-    fastRetryMaxRestarts + config.stages.reduce((sum, stage) => sum + stage.maxRestarts, 0);
+    fastRetryMaxRestarts +
+    config.stages.reduce((sum: number, stage) => sum + stage.maxRestarts, 0);
 
   if (restartNumber >= 1 && restartNumber <= fastRetryMaxRestarts) {
     return {
@@ -323,7 +324,7 @@ async function sendOwnerAlert(params: {
 }
 
 function renderBackoffAlertMessage(params: {
-  config: ClisbotConfig["control"]["runtimeMonitor"];
+  config: ClisbotConfig["app"]["control"]["runtimeMonitor"];
   restartNumber: number;
   stageIndex: number;
   restartAttemptInStage: number;
@@ -567,7 +568,7 @@ class RuntimeMonitor {
 
   private async maybeSendAlert(
     kind: RuntimeMonitorAlertKind,
-    monitorConfig: ClisbotConfig["control"]["runtimeMonitor"],
+    monitorConfig: ClisbotConfig["app"]["control"]["runtimeMonitor"],
     message: string,
   ) {
     if (!monitorConfig.ownerAlerts.enabled) {

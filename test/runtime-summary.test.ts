@@ -77,7 +77,7 @@ describe("runtime summaries", () => {
     config.agents.list = [
       {
         id: "default",
-        cliTool: "codex",
+        cli: "codex",
       },
     ];
     await writeEditableConfig(configPath, config);
@@ -89,8 +89,8 @@ describe("runtime summaries", () => {
     const text = renderStartSummary(summary);
 
     expect(text).toContain("DM the Telegram bot first to confirm it responds normally");
-    expect(text).toContain("clisbot channels add telegram-group <chatId>");
-    expect(text).toContain("clisbot channels bind telegram-group <chatId> --agent <id>");
+    expect(text).toContain("clisbot routes add --channel telegram group:<chatId> --bot default");
+    expect(text).toContain("clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>");
     expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock list-sessions");
     expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock attach -t <session-name>");
   });
@@ -113,22 +113,14 @@ describe("runtime summaries", () => {
     config.agents.list = [
       {
         id: "work",
-        cliTool: "codex",
-        startupOptions: ["--dangerously-bypass-approvals-and-sandbox", "--no-alt-screen"],
+        cli: "codex",
         workspace: join(tempDir, "workspaces", "work"),
         bootstrap: {
-          mode: "team-assistant",
+          botType: "team-assistant",
         },
       },
     ];
-    config.bindings = [
-      {
-        match: {
-          channel: "slack",
-        },
-        agentId: "work",
-      },
-    ];
+    config.bots.slack.default.agentId = "work";
     await writeEditableConfig(configPath, config);
 
     const activityStore = new ActivityStore(join(tempDir, "activity.json"));
@@ -162,10 +154,10 @@ describe("runtime summaries", () => {
     expect(startText).toContain("DM the Telegram or Slack bot first to confirm it responds normally");
     expect(startText).toContain("after DM works, add the bot to the target Slack channel or Telegram group/topic");
     expect(startText).toContain(
-      "add the route with `clisbot channels add slack-channel <channelId>` or `clisbot channels add telegram-group <chatId>`",
+      "add the route with `clisbot routes add --channel slack channel:<channelId> --bot default` or `clisbot routes add --channel telegram group:<chatId> --bot default`",
     );
     expect(startText).toContain(
-      "bind the agent with `clisbot channels bind slack-channel <channelId> --agent <id>` or `clisbot channels bind telegram-group <chatId> --agent <id>`",
+      "bind the agent with `clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent <id>` or `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`",
     );
     expect(startText).toContain(
       "Telegram: send `/start` in the target DM, group, or topic to get onboarding or pairing guidance",
@@ -203,7 +195,7 @@ describe("runtime summaries", () => {
     config.agents.list = [
       {
         id: "work",
-        cliTool: "codex",
+        cli: "codex",
       },
     ];
     await writeEditableConfig(configPath, config);
@@ -229,7 +221,7 @@ describe("runtime summaries", () => {
         2,
       ),
     );
-    config.session.storePath = join(tempDir, "sessions.json");
+    config.app.session.storePath = join(tempDir, "sessions.json");
     await writeEditableConfig(configPath, config);
 
     const summary = await getRuntimeOperatorSummary({
@@ -352,27 +344,27 @@ describe("runtime summaries", () => {
     config.agents.list = [
       {
         id: "codex-missing",
-        cliTool: "codex",
+        cli: "codex",
         workspace: join(baseWorkspace, "codex-missing"),
-        bootstrap: { mode: "personal-assistant" },
+        bootstrap: { botType: "personal-assistant" },
       },
       {
         id: "claude-pending",
-        cliTool: "claude",
+        cli: "claude",
         workspace: join(baseWorkspace, "claude-pending"),
-        bootstrap: { mode: "team-assistant" },
+        bootstrap: { botType: "team-assistant" },
       },
       {
         id: "codex-ready",
-        cliTool: "codex",
+        cli: "codex",
         workspace: join(baseWorkspace, "codex-ready"),
-        bootstrap: { mode: "personal-assistant" },
+        bootstrap: { botType: "personal-assistant" },
       },
       {
         id: "gemini-ready",
-        cliTool: "gemini",
+        cli: "gemini",
         workspace: join(baseWorkspace, "gemini-ready"),
-        bootstrap: { mode: "team-assistant" },
+        bootstrap: { botType: "team-assistant" },
       },
     ];
     await writeEditableConfig(configPath, config);
@@ -410,7 +402,7 @@ describe("runtime summaries", () => {
     expect(startText).toContain("follow: BOOTSTRAP.md and the team-assistant personality files");
     expect(startText).toContain("Next steps after bootstrap:");
     expect(startText).toContain(
-      "run `clisbot channels enable <slack|telegram>` for the first channel you want to expose",
+      "run `clisbot bots add --channel <slack|telegram> ...` for the first provider bot you want to expose",
     );
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock list-sessions");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>");
@@ -435,8 +427,8 @@ describe("runtime summaries", () => {
     config.agents.list = [
       {
         id: "default",
-        cliTool: "codex",
-        bootstrap: { mode: "team-assistant" },
+        cli: "codex",
+        bootstrap: { botType: "team-assistant" },
       },
     ];
     await writeEditableConfig(configPath, config);
@@ -470,8 +462,8 @@ describe("runtime summaries", () => {
     config.agents.list = [
       {
         id: "default",
-        cliTool: "codex",
-        bootstrap: { mode: "team-assistant" },
+        cli: "codex",
+        bootstrap: { botType: "team-assistant" },
       },
     ];
     await writeEditableConfig(configPath, config);
@@ -489,7 +481,7 @@ describe("runtime summaries", () => {
     expect(text).toContain("slack enabled=yes connection=failed");
     expect(text).toContain("Channel health:");
     expect(text).toContain("Socket Mode app token was rejected.");
-    expect(text).toContain("action: verify `channels.slack.appToken` resolves to an `xapp-` token");
+    expect(text).toContain("action: verify `bots.slack.<botId>.appToken` resolves to an `xapp-` token");
   });
 
   test("renders active runtime channel identities from health metadata", async () => {
@@ -509,8 +501,8 @@ describe("runtime summaries", () => {
     config.agents.list = [
       {
         id: "default",
-        cliTool: "codex",
-        bootstrap: { mode: "team-assistant" },
+        cli: "codex",
+        bootstrap: { botType: "team-assistant" },
       },
     ];
     await writeEditableConfig(configPath, config);

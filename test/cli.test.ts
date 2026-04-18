@@ -189,10 +189,11 @@ describe("renderCliHelp", () => {
     expect(help).toContain("clisbot runner watch --latest");
     expect(help).toContain("clisbot version");
     expect(help).toContain("clisbot logs [--lines N]");
-    expect(help).toContain("clisbot channels <subcommand>");
+    expect(help).toContain("clisbot bots <subcommand>");
+    expect(help).toContain("clisbot bots --help");
     expect(help).toContain("clisbot start --help");
-    expect(help).toContain("clisbot accounts <subcommand>");
-    expect(help).toContain("clisbot accounts --help");
+    expect(help).toContain("clisbot routes <subcommand>");
+    expect(help).toContain("clisbot routes --help");
     expect(help).toContain("clisbot loops <subcommand>");
     expect(help).toContain("clisbot message <subcommand>");
     expect(help).toContain("clisbot agents <subcommand>");

@@ -9,11 +9,16 @@ import {
   loadConfig,
   loadConfigWithoutEnvResolution,
 } from "../config/load-config.ts";
-import { formatBinding } from "../config/bindings.ts";
 import {
   DEFAULT_AGENT_TOOL_TEMPLATES,
   inferAgentCliToolId,
 } from "../config/agent-tool-presets.ts";
+import {
+  resolveSlackBotConfig,
+  resolveSlackDirectMessageConfig,
+  resolveTelegramBotConfig,
+  resolveTelegramDirectMessageConfig,
+} from "../config/channel-accounts.ts";
 import { ActivityStore } from "./activity-store.ts";
 import {
   collapseHomePath,
@@ -104,13 +109,10 @@ function deriveAgentTool(
   agentId: string,
 ) {
   const entry = loadedConfig.raw.agents.list.find((item) => item.id === agentId);
-  if (entry?.cliTool) {
+  if (entry?.cli) {
     return {
-      cliTool: entry.cliTool,
-      startupOptions:
-        entry.startupOptions ??
-        DEFAULT_AGENT_TOOL_TEMPLATES[entry.cliTool]?.startupOptions ??
-        [],
+      cliTool: entry.cli,
+      startupOptions: entry.runner?.args ?? DEFAULT_AGENT_TOOL_TEMPLATES[entry.cli].startupOptions,
     };
   }
 
@@ -122,16 +124,23 @@ function deriveAgentTool(
 }
 
 function countTelegramSurfaces(loadedConfig: LoadedConfig) {
-  return Object.values(loadedConfig.raw.channels.telegram.groups).reduce((total, group) => {
-    return total + 1 + Object.keys(group.topics ?? {}).length;
-  }, 0);
+  return Object.entries(loadedConfig.raw.bots.telegram)
+    .filter(([botId]) => botId !== "defaults")
+    .reduce((total, [, bot]) => {
+      const groups = "groups" in bot ? bot.groups ?? {} : {};
+      return total + Object.values(groups).reduce((groupTotal: number, group) => {
+        return groupTotal + 1 + Object.keys(group.topics ?? {}).length;
+      }, 0);
+    }, 0);
 }
 
 function countSlackSurfaces(loadedConfig: LoadedConfig) {
-  return (
-    Object.keys(loadedConfig.raw.channels.slack.channels).length +
-    Object.keys(loadedConfig.raw.channels.slack.groups).length
-  );
+  return Object.entries(loadedConfig.raw.bots.slack)
+    .filter(([botId]) => botId !== "defaults")
+    .reduce((total, [, bot]) => {
+      const groups = "groups" in bot ? bot.groups ?? {} : {};
+      return total + Object.keys(groups).length;
+    }, 0);
 }
 
 async function getRunnerSessions(loadedConfig: LoadedConfig) {
@@ -157,13 +166,23 @@ export async function getRuntimeOperatorSummary(params: {
   );
   const runtimeHealth = await runtimeHealthStore.read();
   const runnerSessions = await getRunnerSessions(loadedConfig);
+  const defaultSlackBot = resolveSlackBotConfig(
+    loadedConfig.raw.bots.slack,
+    loadedConfig.raw.bots.slack.defaults.defaultBotId,
+  );
+  const defaultTelegramBot = resolveTelegramBotConfig(
+    loadedConfig.raw.bots.telegram,
+    loadedConfig.raw.bots.telegram.defaults.defaultBotId,
+  );
+  const defaultSlackDmConfig = resolveSlackDirectMessageConfig(defaultSlackBot);
+  const defaultTelegramDmConfig = resolveTelegramDirectMessageConfig(defaultTelegramBot);
 
   const agentSummaries = loadedConfig.raw.agents.list.map((entry) => {
     const resolved = new AgentService(loadedConfig).getResolvedAgentConfig(entry.id);
     const tool = deriveAgentTool(loadedConfig, entry.id);
     const bootstrapState = getBootstrapWorkspaceState(
       resolved.workspacePath,
-      entry.bootstrap?.mode,
+      entry.bootstrap?.botType,
       tool.cliTool === "codex" || tool.cliTool === "claude" || tool.cliTool === "gemini"
         ? tool.cliTool
         : undefined,
@@ -176,22 +195,20 @@ export async function getRuntimeOperatorSummary(params: {
       startupOptions: tool.startupOptions,
       responseMode: entry.responseMode,
       additionalMessageMode: entry.additionalMessageMode,
-      bootstrapMode: entry.bootstrap?.mode,
+      bootstrapMode: entry.bootstrap?.botType,
       bootstrapState,
-      bindings: loadedConfig.raw.bindings
-        .filter((binding) => binding.agentId === entry.id)
-        .map((binding) => formatBinding(binding.match)),
+      bindings: [],
       lastActivityAt: activities.agents[entry.id]?.updatedAt,
     } satisfies AgentOperatorSummary;
   });
 
   const slackConnection = deriveChannelConnection({
-    enabled: loadedConfig.raw.channels.slack.enabled,
+    enabled: loadedConfig.raw.bots.slack.defaults.enabled,
     runtimeRunning: params.runtimeRunning,
     recordedConnection: runtimeHealth.channels.slack?.connection,
   });
   const telegramConnection = deriveChannelConnection({
-    enabled: loadedConfig.raw.channels.telegram.enabled,
+    enabled: loadedConfig.raw.bots.telegram.defaults.enabled,
     runtimeRunning: params.runtimeRunning,
     recordedConnection: runtimeHealth.channels.telegram?.connection,
   });
@@ -199,17 +216,18 @@ export async function getRuntimeOperatorSummary(params: {
   const channelSummaries = [
     {
       channel: "slack" as const,
-      enabled: loadedConfig.raw.channels.slack.enabled,
+      enabled: loadedConfig.raw.bots.slack.defaults.enabled,
       connection: slackConnection,
-      defaultAgentId: loadedConfig.raw.channels.slack.defaultAgentId,
-      streaming: loadedConfig.raw.channels.slack.streaming,
-      response: loadedConfig.raw.channels.slack.response,
-      responseMode: loadedConfig.raw.channels.slack.responseMode,
-      additionalMessageMode: loadedConfig.raw.channels.slack.additionalMessageMode,
+      defaultAgentId:
+        defaultSlackBot.agentId ?? loadedConfig.raw.agents.defaults.defaultAgentId,
+      streaming: defaultSlackBot.streaming,
+      response: defaultSlackBot.response,
+      responseMode: defaultSlackBot.responseMode,
+      additionalMessageMode: defaultSlackBot.additionalMessageMode,
       configuredSurfaceCount: countSlackSurfaces(loadedConfig),
-      directMessagesEnabled: loadedConfig.raw.channels.slack.directMessages.enabled,
-      directMessagesPolicy: loadedConfig.raw.channels.slack.directMessages.policy,
-      groupPolicy: loadedConfig.raw.channels.slack.groupPolicy,
+      directMessagesEnabled: defaultSlackDmConfig?.enabled !== false,
+      directMessagesPolicy: defaultSlackDmConfig?.policy ?? "disabled",
+      groupPolicy: defaultSlackBot.groupPolicy,
       lastActivityAt: activities.channels.slack?.updatedAt,
       lastActivityAgentId: activities.channels.slack?.agentId,
       healthSummary: deriveHealthSummary({
@@ -224,17 +242,18 @@ export async function getRuntimeOperatorSummary(params: {
     },
     {
       channel: "telegram" as const,
-      enabled: loadedConfig.raw.channels.telegram.enabled,
+      enabled: loadedConfig.raw.bots.telegram.defaults.enabled,
       connection: telegramConnection,
-      defaultAgentId: loadedConfig.raw.channels.telegram.defaultAgentId,
-      streaming: loadedConfig.raw.channels.telegram.streaming,
-      response: loadedConfig.raw.channels.telegram.response,
-      responseMode: loadedConfig.raw.channels.telegram.responseMode,
-      additionalMessageMode: loadedConfig.raw.channels.telegram.additionalMessageMode,
+      defaultAgentId:
+        defaultTelegramBot.agentId ?? loadedConfig.raw.agents.defaults.defaultAgentId,
+      streaming: defaultTelegramBot.streaming,
+      response: defaultTelegramBot.response,
+      responseMode: defaultTelegramBot.responseMode,
+      additionalMessageMode: defaultTelegramBot.additionalMessageMode,
       configuredSurfaceCount: countTelegramSurfaces(loadedConfig),
-      directMessagesEnabled: loadedConfig.raw.channels.telegram.directMessages.enabled,
-      directMessagesPolicy: loadedConfig.raw.channels.telegram.directMessages.policy,
-      groupPolicy: loadedConfig.raw.channels.telegram.groupPolicy,
+      directMessagesEnabled: defaultTelegramDmConfig?.enabled !== false,
+      directMessagesPolicy: defaultTelegramDmConfig?.policy ?? "disabled",
+      groupPolicy: defaultTelegramBot.groupPolicy,
       lastActivityAt: activities.channels.telegram?.updatedAt,
       lastActivityAgentId: activities.channels.telegram?.agentId,
       healthSummary: deriveHealthSummary({

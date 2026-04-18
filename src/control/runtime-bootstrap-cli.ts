@@ -88,8 +88,8 @@ function renderBootstrapCommandHelp(commandName: "init" | "start") {
     "",
     "Related help:",
     "  - `clisbot agents --help` for lower-level agent bootstrap and binding control",
-    "  - `clisbot accounts --help` for account persistence after first run",
-    "  - `clisbot channels --help` for route setup after bootstrap",
+    "  - `clisbot bots --help` for bot credentials and fallback agent setup",
+    "  - `clisbot routes --help` for route setup after bootstrap",
   ].join("\n");
 }
 
