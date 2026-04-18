@@ -107,7 +107,10 @@ function appendChannelNextStepLines(
     `${prefix}- after DM works, add the bot to the target Slack channel or Telegram group/topic`,
   );
   lines.push(
-    `${prefix}- route that surface with \`clisbot channels add slack-channel <channelId> --agent <id>\` or \`clisbot channels add telegram-group <chatId> --agent <id>\``,
+    `${prefix}- add the route with \`clisbot channels add slack-channel <channelId>\` or \`clisbot channels add telegram-group <chatId>\``,
+  );
+  lines.push(
+    `${prefix}- bind the agent with \`clisbot channels bind slack-channel <channelId> --agent <id>\` or \`clisbot channels bind telegram-group <chatId> --agent <id>\``,
   );
 
   if (telegramEnabled) {
@@ -251,6 +254,35 @@ function renderActiveRunSummaryLines(summary: RuntimeOperatorSummary) {
   ];
 }
 
+function formatSessionTimestamp(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return "unknown";
+  }
+  return new Date(value).toISOString();
+}
+
+function renderRunnerSessionSummaryLines(summary: RuntimeOperatorSummary) {
+  if (summary.runnerSessions.length === 0) {
+    return ["", "Runner sessions:", "  none"];
+  }
+
+  const visibleSessions = summary.runnerSessions.slice(0, 5);
+  const hiddenCount = Math.max(0, summary.runnerSessions.length - visibleSessions.length);
+
+  return [
+    "",
+    "Runner sessions:",
+    ...visibleSessions.map((session) => {
+      if (!session.entry) {
+        return `  - ${session.sessionName}`;
+      }
+      return `  - ${session.sessionName} agent=${session.entry.agentId} sessionKey=${session.entry.sessionKey} lastAdmittedPromptAt=${formatSessionTimestamp(session.entry.lastAdmittedPromptAt)}`;
+    }),
+    ...(hiddenCount > 0 ? [`  (${hiddenCount}) sessions more`] : []),
+    "  hint: `clisbot runner list` or `clisbot runner watch --latest`",
+  ];
+}
+
 function appendChannelSetupNotes(
   lines: string[],
   summary: RuntimeOperatorSummary,
@@ -281,9 +313,13 @@ function appendChannelSetupNote(
     lines.push(
       `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
     );
-    lines.push(`${prefix}    add group: \`clisbot channels add telegram-group <chatId> --agent <id>\``);
+    lines.push(`${prefix}    add group: \`clisbot channels add telegram-group <chatId>\``);
+    lines.push(`${prefix}    bind group: \`clisbot channels bind telegram-group <chatId> --agent <id>\``);
     lines.push(
-      `${prefix}    add topic: \`clisbot channels add telegram-group <chatId> --topic <topicId> --agent <id>\``,
+      `${prefix}    add topic: \`clisbot channels add telegram-group <chatId> --topic <topicId>\``,
+    );
+    lines.push(
+      `${prefix}    bind topic: \`clisbot channels bind telegram-group <chatId> --topic <topicId> --agent <id>\``,
     );
     lines.push(
       `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,
@@ -296,8 +332,10 @@ function appendChannelSetupNote(
     `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
   );
   lines.push(`${prefix}    groups: ${channel.groupPolicy ?? "n/a"}`);
-  lines.push(`${prefix}    add channel: \`clisbot channels add slack-channel <channelId> --agent <id>\``);
-  lines.push(`${prefix}    add group: \`clisbot channels add slack-group <groupId> --agent <id>\``);
+  lines.push(`${prefix}    add channel: \`clisbot channels add slack-channel <channelId>\``);
+  lines.push(`${prefix}    bind channel: \`clisbot channels bind slack-channel <channelId> --agent <id>\``);
+  lines.push(`${prefix}    add group: \`clisbot channels add slack-group <groupId>\``);
+  lines.push(`${prefix}    bind group: \`clisbot channels bind slack-group <groupId> --agent <id>\``);
   lines.push(
     `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,
   );
@@ -428,6 +466,7 @@ export function renderStatusSummary(summary: RuntimeOperatorSummary) {
     ...renderAgentSummaryLines(summary),
     ...renderChannelSummaryLines(summary),
     ...renderChannelDiagnosticLines(summary),
+    ...renderRunnerSessionSummaryLines(summary),
     ...renderActiveRunSummaryLines(summary),
   ];
 

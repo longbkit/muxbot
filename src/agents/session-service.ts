@@ -224,6 +224,7 @@ export class SessionService {
       startedAt: Date.now(),
     });
     try {
+      await this.sessionState.markPromptAdmitted(provisionalResolved);
       const { resolved, initialSnapshot } = await this.runnerSessions.ensureRunnerReady(
         target,
         {

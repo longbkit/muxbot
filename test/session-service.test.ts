@@ -373,6 +373,7 @@ describe("SessionService observer delivery", () => {
     const manager = new SessionService(
       {} as TmuxClient,
       {
+        markPromptAdmitted: async () => undefined,
         setSessionRuntime,
       } as unknown as AgentSessionState,
       {
@@ -418,6 +419,7 @@ describe("SessionService observer delivery", () => {
         capturePane,
       } as unknown as TmuxClient,
       {
+        markPromptAdmitted: async () => undefined,
         getEntry: async () => ({
           agentId: resolved.agentId,
           sessionKey: resolved.sessionKey,
@@ -469,6 +471,7 @@ describe("SessionService observer delivery", () => {
         hasSession: async () => false,
       } as unknown as TmuxClient,
       {
+        markPromptAdmitted: async () => undefined,
         getEntry: async () => ({
           agentId: resolved.agentId,
           sessionKey: resolved.sessionKey,
@@ -519,6 +522,7 @@ describe("SessionService observer delivery", () => {
         hasSession: async () => false,
       } as unknown as TmuxClient,
       {
+        markPromptAdmitted: async () => undefined,
         getEntry: async () => ({
           agentId: resolved.agentId,
           sessionKey: resolved.sessionKey,

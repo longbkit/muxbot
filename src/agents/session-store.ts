@@ -14,6 +14,7 @@ export type StoredSessionEntry = {
   sessionId?: string;
   workspacePath: string;
   runnerCommand: string;
+  lastAdmittedPromptAt?: number;
   followUp?: StoredFollowUpState;
   runtime?: StoredSessionRuntime;
   intervalLoops?: StoredIntervalLoop[];
@@ -87,6 +88,7 @@ export class SessionStore {
       sessionId,
       workspacePath: params.workspacePath,
       runnerCommand: params.runnerCommand,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: existing?.followUp,
       runtime: existing?.runtime,
       intervalLoops: existing?.intervalLoops,

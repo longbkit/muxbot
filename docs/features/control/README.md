@@ -6,7 +6,7 @@ Control is the operator-facing system for inspecting and intervening in `clisbot
 
 ## State
 
-Planned
+In Progress
 
 ## Why It Exists
 
@@ -46,6 +46,7 @@ Those belong to auth, because control is a surface that consumes auth decisions 
 ## Related Feature Docs
 
 - [loops-cli.md](./loops-cli.md)
+- [runner-debug-cli.md](./runner-debug-cli.md)
 
 ## Related Test Docs
 
@@ -59,7 +60,13 @@ Those belong to auth, because control is a surface that consumes auth decisions 
 
 ## Current Focus
 
-Turn the current ad hoc tmux inspection and recovery path into an explicit operator control surface.
+The tmux inspection path now has a first-class runner debug CLI for list, inspect, and watch.
+
+Current control follow-on work is still broader than that shipped slice:
+
+- richer intervention actions
+- explicit health and recovery flows
+- config reload watch behavior
 
 Current control-owned config is:
 

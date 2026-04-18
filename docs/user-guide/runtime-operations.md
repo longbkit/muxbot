@@ -82,25 +82,49 @@ Use the socket-aware commands below instead.
 
 ## Common Commands
 
-List sessions managed by `clisbot`:
+Prefer the operator runner CLI first:
+
+```bash
+clisbot runner list
+```
+
+`clisbot status` now includes the newest five runner sessions by default, with a `(n) sessions more` tail when the socket has more than five.
+
+```bash
+clisbot runner inspect <session-name> --lines 40
+```
+
+```bash
+clisbot runner watch <session-name> --lines 20 --interval 1s
+```
+
+```bash
+clisbot runner watch --latest --lines 20 --interval 1s
+```
+
+```bash
+clisbot runner watch --next --timeout 120s --lines 20 --interval 1s
+```
+
+Meaning:
+
+- `watch --latest`: session that most recently admitted a new prompt
+- `watch --next`: first newly admitted prompt after the command starts
+- these commands choose sessions by logical prompt flow, not by tmux create time
+
+Raw tmux remains available as the lower-level fallback:
 
 ```bash
 tmux -S ~/.clisbot/state/clisbot.sock list-sessions
 ```
 
-Attach to the default agent session:
-
 ```bash
 tmux -S ~/.clisbot/state/clisbot.sock attach-session -t <session-name>
 ```
 
-Kill the default agent session:
-
 ```bash
 tmux -S ~/.clisbot/state/clisbot.sock kill-session -t <session-name>
 ```
-
-Kill the entire `clisbot` tmux server:
 
 ```bash
 tmux -S ~/.clisbot/state/clisbot.sock kill-server
@@ -122,11 +146,15 @@ Important runtime paths:
 Useful checks:
 
 ```bash
-tmux -S ~/.clisbot/state/clisbot.sock list-sessions
+clisbot runner list
 ```
 
 ```bash
-tmux -S ~/.clisbot/state/clisbot.sock attach -t agent-default-main
+clisbot runner watch --latest --lines 20 --interval 1s
+```
+
+```bash
+clisbot runner watch --next --timeout 120s --lines 20 --interval 1s
 ```
 
 ```bash
@@ -190,7 +218,11 @@ Example:
 trust_level = "trusted"
 ```
 
-- if the trust screen is still visible, attach to the tmux session and continue from there:
+- if the trust screen is still visible, inspect or attach to the tmux session and continue from there:
+
+```bash
+clisbot runner inspect agent-default-main --lines 40
+```
 
 ```bash
 tmux -S ~/.clisbot/state/clisbot.sock attach -t agent-default-main

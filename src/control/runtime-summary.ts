@@ -15,7 +15,6 @@ import {
   inferAgentCliToolId,
 } from "../config/agent-tool-presets.ts";
 import { ActivityStore } from "./activity-store.ts";
-import { TmuxClient } from "../runners/tmux/client.ts";
 import {
   collapseHomePath,
   getDefaultActivityStorePath,
@@ -35,6 +34,7 @@ import {
   renderStartSummary,
   renderStatusSummary,
 } from "./runtime-summary-rendering.ts";
+import { listRunnerSessions, type RunnerSessionSummary } from "./runner-debug-state.ts";
 export {
   renderRuntimeDiagnosticsSummary,
   renderStartSummary,
@@ -96,6 +96,7 @@ export type RuntimeOperatorSummary = {
   bootstrapPendingAgents: number;
   bootstrappedAgents: number;
   runningTmuxSessions: number;
+  runnerSessions: RunnerSessionSummary[];
 };
 
 function deriveAgentTool(
@@ -133,13 +134,11 @@ function countSlackSurfaces(loadedConfig: LoadedConfig) {
   );
 }
 
-async function getRunningTmuxSessions(loadedConfig: LoadedConfig) {
-  const tmux = new TmuxClient(loadedConfig.raw.tmux.socketPath);
+async function getRunnerSessions(loadedConfig: LoadedConfig) {
   try {
-    const sessions = await tmux.listSessions();
-    return sessions.length;
+    return await listRunnerSessions(loadedConfig);
   } catch {
-    return 0;
+    return [];
   }
 }
 
@@ -157,7 +156,7 @@ export async function getRuntimeOperatorSummary(params: {
     params.healthPath ?? getDefaultRuntimeHealthPath(),
   );
   const runtimeHealth = await runtimeHealthStore.read();
-  const runningTmuxSessions = params.runtimeRunning ? await getRunningTmuxSessions(loadedConfig) : 0;
+  const runnerSessions = await getRunnerSessions(loadedConfig);
 
   const agentSummaries = loadedConfig.raw.agents.list.map((entry) => {
     const resolved = new AgentService(loadedConfig).getResolvedAgentConfig(entry.id);
@@ -266,7 +265,8 @@ export async function getRuntimeOperatorSummary(params: {
     ).length,
     bootstrappedAgents: agentSummaries.filter((item) => item.bootstrapState === "bootstrapped")
       .length,
-    runningTmuxSessions,
+    runningTmuxSessions: runnerSessions.length,
+    runnerSessions,
   } satisfies RuntimeOperatorSummary;
 }
 

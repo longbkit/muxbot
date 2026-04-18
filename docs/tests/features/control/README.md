@@ -6,7 +6,7 @@ These test cases define the operator-facing control surface for inspecting and r
 
 They should stay separate from end-user channel behavior.
 
-## Test Case 1: Operator Can Inspect And Attach To A Live Session
+## Test Case 1: Operator Can Discover And Inspect A Live Runner Session
 
 ### Preconditions
 
@@ -14,14 +14,34 @@ They should stay separate from end-user channel behavior.
 
 ### Steps
 
-1. Run `tmux -S ~/.clisbot/state/clisbot.sock list-sessions`
-2. Run `tmux -S ~/.clisbot/state/clisbot.sock attach -t default`
+1. Run `clisbot runner list`
+2. Run `clisbot runner inspect <session-name> --lines 40`
+3. Run `clisbot runner watch <session-name> --lines 20 --interval 1s`
 
 ### Expected Results
 
-- the operator can discover the active session using the documented socket
-- attach connects to the live backend session
-- the operator sees the current prompt and transcript state needed for debugging
+- the operator can discover the active session without raw tmux commands
+- inspect shows one truthful pane snapshot for the selected tmux session
+- watch polls the same pane continuously with the configured tail window
+
+## Test Case 1A: Operator Can Watch The Latest Or Next Admitted Prompt
+
+### Preconditions
+
+- at least one conversation has already admitted a prompt
+- the operator may want to start watching before the next test prompt is sent
+
+### Steps
+
+1. Run `clisbot runner watch --latest --lines 20 --interval 1s`
+2. Stop it and run `clisbot runner watch --next --timeout 120s --lines 20 --interval 1s`
+3. Send one new prompt from a routed surface while the second watch command is waiting
+
+### Expected Results
+
+- `watch --latest` selects the session with the newest admitted prompt, not the newest tmux spawn
+- `watch --next` attaches to the first newly admitted prompt after the command starts
+- once `watch --next` selects a session, it stays on that session instead of flapping to later traffic
 
 ## Test Case 2: Operator Can Restart A Broken Session Safely
 

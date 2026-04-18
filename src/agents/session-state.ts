@@ -21,6 +21,7 @@ export type ConversationReplySource = "channel" | "message-tool";
 
 type SessionEntryUpdate = (existing: {
   sessionId?: string;
+  lastAdmittedPromptAt?: number;
   followUp?: StoredFollowUpState;
   runnerCommand?: string;
   runtime?: StoredSessionRuntime;
@@ -28,6 +29,7 @@ type SessionEntryUpdate = (existing: {
   recentConversation?: StoredRecentConversationState;
 } | null) => {
   sessionId?: string;
+  lastAdmittedPromptAt?: number;
   followUp?: StoredFollowUpState;
   runnerCommand?: string;
   runtime?: StoredSessionRuntime;
@@ -56,6 +58,7 @@ export class AgentSessionState {
   ) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: params.sessionId?.trim() || existing?.sessionId,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: existing?.followUp,
       runnerCommand: params.runnerCommand ?? existing?.runnerCommand ?? resolved.runner.command,
       runtime: params.runtime ?? existing?.runtime,
@@ -70,6 +73,7 @@ export class AgentSessionState {
   ) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: undefined,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: existing?.followUp,
       runnerCommand: params.runnerCommand ?? existing?.runnerCommand ?? resolved.runner.command,
       runtime: {
@@ -86,9 +90,25 @@ export class AgentSessionState {
   ) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: existing?.sessionId,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime,
+      intervalLoops: existing?.intervalLoops,
+      recentConversation: existing?.recentConversation,
+    }));
+  }
+
+  async markPromptAdmitted(
+    resolved: ResolvedAgentTarget,
+    admittedAt = Date.now(),
+  ) {
+    return this.upsertSessionEntry(resolved, (existing) => ({
+      sessionId: existing?.sessionId,
+      lastAdmittedPromptAt: admittedAt,
+      followUp: existing?.followUp,
+      runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
+      runtime: existing?.runtime,
       intervalLoops: existing?.intervalLoops,
       recentConversation: existing?.recentConversation,
     }));
@@ -180,6 +200,7 @@ export class AgentSessionState {
         sessionId: existing?.sessionId,
         workspacePath: resolved.workspacePath,
         runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
+        lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
         followUp: existing?.followUp,
         runtime: existing?.runtime,
         intervalLoops: currentLoops.map((item) => (item.id === loop.id ? loop : item)),
@@ -229,6 +250,7 @@ export class AgentSessionState {
 
         return {
           ...existing,
+          lastAdmittedPromptAt: existing.lastAdmittedPromptAt,
           intervalLoops: (existing.intervalLoops ?? []).filter((loop) => loop.id !== loopId),
           updatedAt: Date.now(),
         };
@@ -257,6 +279,7 @@ export class AgentSessionState {
 
         return {
           ...existing,
+          lastAdmittedPromptAt: existing.lastAdmittedPromptAt,
           intervalLoops: [],
           updatedAt: Date.now(),
         };
@@ -272,6 +295,7 @@ export class AgentSessionState {
   ) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: existing?.sessionId,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: {
         ...existing?.followUp,
         overrideMode: mode,
@@ -285,6 +309,7 @@ export class AgentSessionState {
   async resetConversationFollowUpMode(resolved: ResolvedAgentTarget) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: existing?.sessionId,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: existing?.followUp
         ? {
             ...existing.followUp,
@@ -313,6 +338,7 @@ export class AgentSessionState {
     const repliedAt = Date.now();
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: existing?.sessionId,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: {
         ...existing?.followUp,
         lastBotReplyAt: repliedAt,
@@ -350,6 +376,7 @@ export class AgentSessionState {
   ) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: existing?.sessionId,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime: existing?.runtime,
@@ -374,6 +401,7 @@ export class AgentSessionState {
   ) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: existing?.sessionId,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime: existing?.runtime,
@@ -394,6 +422,7 @@ export class AgentSessionState {
         sessionId: next.sessionId,
         workspacePath: resolved.workspacePath,
         runnerCommand: next.runnerCommand ?? existing?.runnerCommand ?? resolved.runner.command,
+        lastAdmittedPromptAt: next.lastAdmittedPromptAt ?? existing?.lastAdmittedPromptAt,
         followUp: next.followUp,
         runtime: next.runtime ?? existing?.runtime,
         intervalLoops: next.intervalLoops ?? existing?.intervalLoops,

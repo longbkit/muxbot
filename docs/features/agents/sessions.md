@@ -52,9 +52,19 @@ Current stored fields:
 - `sessionId`
 - `workspacePath`
 - `runnerCommand`
+- `lastAdmittedPromptAt`
 - `followUp.overrideMode`
 - `followUp.lastBotReplyAt`
 - `updatedAt`
+
+Current meaning:
+
+- `lastAdmittedPromptAt`
+  - the timestamp of the most recent prompt admitted into active execution for that logical session
+  - used by operator runner debugging commands such as `clisbot runner watch --latest` and `clisbot runner watch --next`
+- `updatedAt`
+  - broad continuity timestamp for session metadata writes
+  - not specific enough for operator "latest new turn" selection
 
 The session model also needs room for session-scoped runtime policy.
 

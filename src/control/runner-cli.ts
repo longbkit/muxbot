@@ -1,4 +1,15 @@
+import { loadConfigWithoutEnvResolution, resolveSessionStorePath } from "../config/load-config.ts";
+import { parseCommandDurationMs } from "../agents/run-observation.ts";
+import { SessionStore } from "../agents/session-store.ts";
+import { TmuxClient } from "../runners/tmux/client.ts";
+import { sleep } from "../shared/process.ts";
 import { CliCommandError } from "./runtime-cli-shared.ts";
+import {
+  buildRunnerSessionMetadata,
+  listRunnerSessions,
+  sortRunnerSessionMetadataNewestFirst,
+  type RunnerSessionMetadata,
+} from "./runner-debug-state.ts";
 
 const SMOKE_BACKENDS = ["codex", "claude", "gemini", "all"] as const;
 const SMOKE_SCENARIOS = [
@@ -24,6 +35,20 @@ type SmokeCommandOptions = {
   timeoutMs?: number;
   keepSession: boolean;
   json: boolean;
+};
+
+type RunnerInspectOptions = {
+  sessionName: string;
+  lines: number;
+};
+
+type RunnerWatchOptions = {
+  sessionName?: string;
+  latest: boolean;
+  next: boolean;
+  lines: number;
+  intervalMs: number;
+  timeoutMs?: number;
 };
 
 function parseRepeatedOption(args: string[], name: string) {
@@ -55,6 +80,63 @@ function hasFlag(args: string[], name: string) {
   return args.includes(name);
 }
 
+function parseDurationOption(
+  args: string[],
+  name: string,
+  defaultMs?: number,
+) {
+  const raw = parseSingleOption(args, name);
+  if (!raw) {
+    return defaultMs;
+  }
+
+  const parsed = parseCommandDurationMs(raw);
+  if (parsed == null) {
+    throw new CliCommandError(`Invalid value for ${name}: ${raw}`, 2);
+  }
+  return parsed;
+}
+
+function parsePositiveIntOption(
+  args: string[],
+  names: string[],
+  defaultValue: number,
+) {
+  for (const name of names) {
+    const raw = parseSingleOption(args, name);
+    if (!raw) {
+      continue;
+    }
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new CliCommandError(`Invalid value for ${name}: ${raw}`, 2);
+    }
+    return parsed;
+  }
+  return defaultValue;
+}
+
+function parsePositionalArgument(
+  args: string[],
+  optionNamesWithValues: string[] = [],
+) {
+  const valueOptions = new Set(optionNamesWithValues);
+  for (let index = 0; index < args.length; index += 1) {
+    const current = args[index];
+    if (!current) {
+      continue;
+    }
+    if (valueOptions.has(current)) {
+      index += 1;
+      continue;
+    }
+    if (!current.startsWith("-")) {
+      return current;
+    }
+  }
+  return undefined;
+}
+
 function isOneOf<T extends readonly string[]>(value: string, allowed: T): value is T[number] {
   return allowed.includes(value);
 }
@@ -78,8 +160,19 @@ export function renderRunnerHelp() {
     "Usage:",
     "  clisbot runner",
     "  clisbot runner --help",
+    "  clisbot runner list",
+    "  clisbot runner inspect <session-name> [--lines <n>]",
+    "  clisbot runner watch <session-name> [--lines <n>] [--interval <duration>]",
+    "  clisbot runner watch --latest [--lines <n>] [--interval <duration>] [--timeout <duration>]",
+    "  clisbot runner watch --next [--lines <n>] [--interval <duration>] [--timeout <duration>]",
     "  clisbot runner smoke --backend <codex|claude|gemini> --scenario <name> [--workspace <path>] [--agent <id>] [--artifact-dir <path>] [--timeout-ms <n>] [--keep-session] [--json]",
     "  clisbot runner smoke --backend all --suite launch-trio [--workspace <path>] [--agent <id>] [--artifact-dir <path>] [--timeout-ms <n>] [--keep-session] [--json]",
+    "",
+    "Operator session debugging:",
+    "  - `list` shows current tmux runner sessions, newest admitted turn first when known",
+    "  - `inspect` captures one snapshot from a named tmux session",
+    "  - `watch --latest` follows the session that most recently admitted a new prompt",
+    "  - `watch --next` waits for the next newly admitted prompt, then follows that session",
     "",
     "Smoke scenarios:",
     "  - startup_ready",
@@ -92,9 +185,53 @@ export function renderRunnerHelp() {
     "  - launch-trio",
     "",
     "Current status:",
-    "  - the `runner` CLI surface now validates the smoke command contract",
-    "  - real smoke execution is the next implementation batch",
+    "  - runner debug commands are available for operator tmux inspection",
+    "  - `runner smoke` still validates the smoke command contract only",
   ].join("\n");
+}
+
+function parseInspectCommand(args: string[]): RunnerInspectOptions {
+  const sessionName = parsePositionalArgument(args, ["--lines", "-n"]);
+  if (!sessionName) {
+    throw new CliCommandError(
+      "Usage: clisbot runner inspect <session-name> [--lines <n>]",
+      2,
+    );
+  }
+
+  return {
+    sessionName,
+    lines: parsePositiveIntOption(args, ["--lines", "-n"], 40),
+  };
+}
+
+function parseWatchCommand(args: string[]): RunnerWatchOptions {
+  const latest = hasFlag(args, "--latest");
+  const next = hasFlag(args, "--next");
+  if (latest && next) {
+    throw new CliCommandError("--latest and --next are mutually exclusive", 2);
+  }
+
+  const sessionName = parsePositionalArgument(args, ["--lines", "-n", "--interval", "--timeout"]);
+  if ((latest || next) && sessionName) {
+    throw new CliCommandError("watch does not accept <session-name> with --latest or --next", 2);
+  }
+
+  if (!latest && !next && !sessionName) {
+    throw new CliCommandError(
+      "Usage: clisbot runner watch <session-name> [--lines <n>] [--interval <duration>]\n       clisbot runner watch --latest [--lines <n>] [--interval <duration>] [--timeout <duration>]\n       clisbot runner watch --next [--lines <n>] [--interval <duration>] [--timeout <duration>]",
+      2,
+    );
+  }
+
+  return {
+    sessionName,
+    latest,
+    next,
+    lines: parsePositiveIntOption(args, ["--lines", "-n"], 20),
+    intervalMs: parseDurationOption(args, "--interval", 1000) ?? 1000,
+    timeoutMs: parseDurationOption(args, "--timeout", next ? 120_000 : undefined),
+  };
 }
 
 function parseSmokeCommand(args: string[]): SmokeCommandOptions {
@@ -203,10 +340,228 @@ async function runSmokeCli(args: string[]) {
   process.exitCode = 3;
 }
 
+function formatTimestamp(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return "unknown";
+  }
+  return new Date(value).toISOString();
+}
+
+function isTmuxSessionMissingError(error: unknown) {
+  return error instanceof Error &&
+    /can't find session:|no server running|failed with code \d+: .*can't find session:/i.test(error.message);
+}
+
+function renderWatchFrame(params: {
+  sessionName: string;
+  lines: number;
+  intervalMs: number;
+  sessionKey?: string;
+  agentId?: string;
+  status: string;
+  snapshot: string;
+}) {
+  return [
+    "clisbot runner watch",
+    "",
+    `session: ${params.sessionName}`,
+    params.agentId ? `agent: ${params.agentId}` : null,
+    params.sessionKey ? `sessionKey: ${params.sessionKey}` : null,
+    `lines: ${params.lines}`,
+    `intervalMs: ${params.intervalMs}`,
+    `status: ${params.status}`,
+    "",
+    params.snapshot.trimEnd() || "(empty pane)",
+  ].filter((line): line is string => Boolean(line)).join("\n");
+}
+
+async function loadRunnerContext() {
+  const loadedConfig = await loadConfigWithoutEnvResolution(process.env.CLISBOT_CONFIG_PATH);
+  const sessionStore = new SessionStore(resolveSessionStorePath(loadedConfig));
+  const entries = await sessionStore.list();
+  const tmux = new TmuxClient(loadedConfig.raw.tmux.socketPath);
+  return {
+    loadedConfig,
+    sessionStore,
+    entries,
+    tmux,
+  };
+}
+
+async function runListCli() {
+  const loadedConfig = await loadConfigWithoutEnvResolution(process.env.CLISBOT_CONFIG_PATH);
+  const sessions = await listRunnerSessions(loadedConfig);
+  if (sessions.length === 0) {
+    console.log(`No tmux runner sessions on ${loadedConfig.raw.tmux.socketPath}`);
+    return;
+  }
+
+  console.log([
+    "clisbot runner list",
+    "",
+    ...sessions.map((session) => {
+      if (!session.entry) {
+        return `- ${session.sessionName}`;
+      }
+      return [
+        `- ${session.sessionName}`,
+        `  agent: ${session.entry.agentId}`,
+        `  sessionKey: ${session.entry.sessionKey}`,
+        `  lastAdmittedPromptAt: ${formatTimestamp(session.entry.lastAdmittedPromptAt)}`,
+      ].join("\n");
+    }),
+  ].join("\n"));
+}
+
+async function runInspectCli(args: string[]) {
+  const options = parseInspectCommand(args);
+  const { tmux } = await loadRunnerContext();
+  if (!(await tmux.hasSession(options.sessionName))) {
+    throw new CliCommandError(`tmux session "${options.sessionName}" does not exist`, 1);
+  }
+  const snapshot = await tmux.capturePane(options.sessionName, options.lines);
+  console.log(snapshot.trimEnd());
+}
+
+function resolveLatestSessionMetadata(entries: RunnerSessionMetadata[]) {
+  return sortRunnerSessionMetadataNewestFirst(entries).find((item) =>
+    typeof item.entry.lastAdmittedPromptAt === "number" && item.entry.lastAdmittedPromptAt > 0
+  ) ?? null;
+}
+
+async function resolveWatchSelection(options: RunnerWatchOptions) {
+  const context = await loadRunnerContext();
+  const sessionMetadata = buildRunnerSessionMetadata(context.loadedConfig, context.entries);
+
+  if (options.sessionName) {
+    return {
+      sessionName: options.sessionName,
+      metadata: sessionMetadata.find((item) => item.sessionName === options.sessionName) ?? null,
+      tmux: context.tmux,
+    };
+  }
+
+  if (options.latest) {
+    const latest = resolveLatestSessionMetadata(sessionMetadata);
+    if (!latest) {
+      throw new CliCommandError(
+        "No admitted prompt is recorded yet. Use `clisbot runner watch --next` or watch a named session.",
+        1,
+      );
+    }
+    return {
+      sessionName: latest.sessionName,
+      metadata: latest,
+      tmux: context.tmux,
+    };
+  }
+
+  const deadline = typeof options.timeoutMs === "number" ? Date.now() + options.timeoutMs : Number.POSITIVE_INFINITY;
+  let baseline = Math.max(
+    0,
+    ...sessionMetadata.map((item) => item.entry.lastAdmittedPromptAt ?? 0),
+  );
+
+  while (Date.now() <= deadline) {
+    const nextEntries = buildRunnerSessionMetadata(
+      context.loadedConfig,
+      await context.sessionStore.list(),
+    );
+    const admittedAfterBaseline = nextEntries
+      .filter((item) => (item.entry.lastAdmittedPromptAt ?? 0) > baseline)
+      .sort((left, right) => {
+        const leftPromptAt = left.entry.lastAdmittedPromptAt ?? 0;
+        const rightPromptAt = right.entry.lastAdmittedPromptAt ?? 0;
+        if (leftPromptAt !== rightPromptAt) {
+          return leftPromptAt - rightPromptAt;
+        }
+        return left.sessionName.localeCompare(right.sessionName);
+      });
+    if (admittedAfterBaseline[0]) {
+      return {
+        sessionName: admittedAfterBaseline[0].sessionName,
+        metadata: admittedAfterBaseline[0],
+        tmux: context.tmux,
+      };
+    }
+
+    baseline = Math.max(
+      baseline,
+      ...nextEntries.map((item) => item.entry.lastAdmittedPromptAt ?? 0),
+    );
+    await sleep(Math.min(options.intervalMs, 250));
+  }
+
+  throw new CliCommandError(
+    `No session admitted a new prompt within ${options.timeoutMs ?? 120_000}ms.`,
+    1,
+  );
+}
+
+async function runWatchCli(args: string[]) {
+  const options = parseWatchCommand(args);
+  const selection = await resolveWatchSelection(options);
+  const startedAt = Date.now();
+  let lastRendered = "";
+
+  while (true) {
+    const timedOut = typeof options.timeoutMs === "number" && Date.now() - startedAt >= options.timeoutMs;
+    if (timedOut) {
+      return;
+    }
+
+    let status = "waiting for tmux session";
+    let snapshot = "";
+    try {
+      snapshot = (await selection.tmux.capturePane(selection.sessionName, options.lines)).trimEnd();
+      status = "watching";
+    } catch (error) {
+      if (!isTmuxSessionMissingError(error)) {
+        throw error;
+      }
+    }
+
+    const frame = renderWatchFrame({
+      sessionName: selection.sessionName,
+      sessionKey: selection.metadata?.entry.sessionKey,
+      agentId: selection.metadata?.entry.agentId,
+      lines: options.lines,
+      intervalMs: options.intervalMs,
+      status,
+      snapshot,
+    });
+
+    if (process.stdout.isTTY) {
+      process.stdout.write("\x1Bc");
+      process.stdout.write(`${frame}\n`);
+    } else if (frame !== lastRendered) {
+      console.log(frame);
+    }
+    lastRendered = frame;
+
+    await sleep(options.intervalMs);
+  }
+}
+
 export async function runRunnerCli(args: string[]) {
   const subcommand = args[0];
   if (!subcommand || subcommand === "--help" || subcommand === "-h" || subcommand === "help") {
     console.log(renderRunnerHelp());
+    return;
+  }
+
+  if (subcommand === "list") {
+    await runListCli();
+    return;
+  }
+
+  if (subcommand === "inspect") {
+    await runInspectCli(args.slice(1));
+    return;
+  }
+
+  if (subcommand === "watch") {
+    await runWatchCli(args.slice(1));
     return;
   }
 

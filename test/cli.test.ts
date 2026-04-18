@@ -185,6 +185,8 @@ describe("renderCliHelp", () => {
     expect(help).toContain("clisbot restart");
     expect(help).toContain("clisbot stop [--hard]");
     expect(help).toContain("clisbot status");
+    expect(help).toContain("Use `clisbot status` to see runtime state and the most recent runner sessions.");
+    expect(help).toContain("clisbot runner watch --latest");
     expect(help).toContain("clisbot version");
     expect(help).toContain("clisbot logs [--lines N]");
     expect(help).toContain("clisbot channels <subcommand>");
@@ -199,6 +201,7 @@ describe("renderCliHelp", () => {
     expect(help).toContain("clisbot auth --help");
     expect(help).toContain("clisbot runner <subcommand>");
     expect(help).toContain("clisbot runner --help");
+    expect(help).toContain("runner shortcuts");
     expect(help).toContain("clisbot pairing --help");
     expect(help).toContain("clisbot init [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]");
     expect(help).not.toContain("print-config-path");

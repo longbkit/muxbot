@@ -6,6 +6,8 @@ Current runtime command inventory.
 
 This page is the canonical overview for operator CLI surfaces and a quick reference for auth and permission planning.
 
+CLI flag convention: use kebab-case only on the command line, and support aliases only when they are declared explicitly.
+
 ## Source Of Truth
 
 - Top-level parse and help: `src/cli.ts`
@@ -14,6 +16,7 @@ This page is the canonical overview for operator CLI surfaces and a quick refere
   - `src/control/channels-cli.ts`
   - `src/control/accounts-cli.ts`
   - `src/control/loops-cli.ts`
+  - `src/control/runner-cli.ts`
   - `src/control/message-cli.ts`
   - `src/control/agents-cli.ts`
   - `src/control/auth-cli.ts`
@@ -29,6 +32,7 @@ If this page and runtime ever disagree, runtime wins.
 - `clisbot status`
 - `clisbot version`
 - `clisbot logs`
+- `clisbot runner ...`
 - `clisbot channels ...`
 - `clisbot accounts ...`
 - `clisbot loops ...`
@@ -43,8 +47,13 @@ If this page and runtime ever disagree, runtime wins.
 - `clisbot start [bootstrap flags...]`: seed config if needed and start the detached runtime
 - `clisbot restart`: stop then start again
 - `clisbot stop [--hard]`: stop runtime, optionally clean all tmux sessions on the clisbot socket
-- `clisbot status`: inspect runtime, config, log, and tmux state
+- `clisbot status`: inspect runtime, config, log, tmux state, and the five most recent runner sessions
 - `clisbot logs [--lines N]`: print recent logs
+- `clisbot runner list`: list current tmux runner sessions
+- `clisbot runner inspect <session-name> [--lines N]`: capture one pane snapshot
+- `clisbot runner watch <session-name> [--lines N] [--interval <duration>]`: poll one named tmux session
+- `clisbot runner watch --latest [--lines N] [--interval <duration>] [--timeout <duration>]`: watch the session that most recently admitted a new prompt
+- `clisbot runner watch --next [--lines N] [--interval <duration>] [--timeout <duration>]`: wait for the next newly admitted prompt, then watch that session
 - `clisbot init [bootstrap flags...]`: seed config and optionally first agent without starting runtime
 
 Focused help:
@@ -56,12 +65,26 @@ Focused help:
 
 - `clisbot channels enable <slack|telegram>`
 - `clisbot channels disable <slack|telegram>`
-- `clisbot channels add telegram-group <chatId> [--topic <topicId>] [--agent <id>] [--require-mention true|false]`
+- `clisbot channels add telegram-group <chatId> [--topic <topicId>] [--require-mention true|false]`
 - `clisbot channels remove telegram-group <chatId> [--topic <topicId>]`
-- `clisbot channels add slack-channel <channelId> [--agent <id>] [--require-mention true|false]`
+- `clisbot channels add slack-channel <channelId> [--require-mention true|false]`
 - `clisbot channels remove slack-channel <channelId>`
-- `clisbot channels add slack-group <groupId> [--agent <id>] [--require-mention true|false]`
+- `clisbot channels add slack-group <groupId> [--require-mention true|false]`
 - `clisbot channels remove slack-group <groupId>`
+- `clisbot channels bind slack-account --agent <id> [--account <accountId>]`
+- `clisbot channels bind telegram-account --agent <id> [--account <accountId>]`
+- `clisbot channels bind slack-channel <channelId> --agent <id>`
+- `clisbot channels bind slack-group <groupId> --agent <id>`
+- `clisbot channels bind slack-dm --agent <id>`
+- `clisbot channels bind telegram-group <chatId> [--topic <topicId>] --agent <id>`
+- `clisbot channels bind telegram-dm --agent <id>`
+- `clisbot channels unbind slack-account [--account <accountId>]`
+- `clisbot channels unbind telegram-account [--account <accountId>]`
+- `clisbot channels unbind slack-channel <channelId>`
+- `clisbot channels unbind slack-group <groupId>`
+- `clisbot channels unbind slack-dm`
+- `clisbot channels unbind telegram-group <chatId> [--topic <topicId>]`
+- `clisbot channels unbind telegram-dm`
 - `clisbot channels response-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
 - `clisbot channels response-mode set <capture-pane|message-tool> --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
 - `clisbot channels additional-message-mode status --channel <slack|telegram> [--target <target>] [--topic <topicId>]`
@@ -73,6 +96,11 @@ Important behavior:
 
 - route adds for Slack channels, Slack groups, Telegram groups, and Telegram topics default to `requireMention: true`
 - pass `--require-mention false` only when that surface should accept plain non-mention follow-up immediately
+- preferred mapping is:
+  - `accounts add` for credentials
+  - `channels add` for route admission
+  - `channels bind` for specific route and DM agent routing
+  - `agents bind` for account-level fallback compatibility
 
 ## Accounts
 
@@ -100,6 +128,25 @@ Examples:
 
 - recurring loops are created from chat with `/loop 5m check CI` or `/loop every day at 07:00 check CI`
 - use `clisbot loops ...` only to inspect or cancel persisted loops later from the operator CLI
+
+## Runner Debugging
+
+- `clisbot runner list`
+- `clisbot runner inspect <session-name> [--lines <n>]`
+- `clisbot runner watch <session-name> [--lines <n>] [--interval <duration>]`
+- `clisbot runner watch --latest [--lines <n>] [--interval <duration>] [--timeout <duration>]`
+- `clisbot runner watch --next [--lines <n>] [--interval <duration>] [--timeout <duration>]`
+- `clisbot runner smoke ...`
+
+Important behavior:
+
+- main help now promotes `clisbot runner list` and `clisbot runner watch --latest` as the fastest tmux debug entry points
+- `clisbot status` includes the newest five runner sessions by default; if there are more, it prints `(n) sessions more`
+- `watch --latest` means the session with the newest admitted prompt, not the newest tmux spawn
+- `watch --next` waits for the first newly admitted prompt after the command starts, then sticks to that session
+- `--lines` controls the pane tail window for both `inspect` and `watch`
+- `--interval` controls polling cadence for `watch`
+- use raw tmux only when you need lower-level actions beyond this control surface
 
 ## Message Tooling
 

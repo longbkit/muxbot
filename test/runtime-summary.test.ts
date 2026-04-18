@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ActivityStore } from "../src/control/activity-store.ts";
 import { RuntimeHealthStore } from "../src/control/runtime-health-store.ts";
-import { getRuntimeOperatorSummary, renderStartSummary, renderStatusSummary } from "../src/control/runtime-summary.ts";
+import {
+  getRuntimeOperatorSummary,
+  renderStartSummary,
+  renderStatusSummary,
+  type RuntimeOperatorSummary,
+} from "../src/control/runtime-summary.ts";
 import { writeEditableConfig } from "../src/config/config-file.ts";
 import { clisbotConfigSchema } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
@@ -84,7 +89,8 @@ describe("runtime summaries", () => {
     const text = renderStartSummary(summary);
 
     expect(text).toContain("DM the Telegram bot first to confirm it responds normally");
-    expect(text).toContain("clisbot channels add telegram-group <chatId> --agent <id>");
+    expect(text).toContain("clisbot channels add telegram-group <chatId>");
+    expect(text).toContain("clisbot channels bind telegram-group <chatId> --agent <id>");
     expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock list-sessions");
     expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock attach -t <session-name>");
   });
@@ -156,7 +162,10 @@ describe("runtime summaries", () => {
     expect(startText).toContain("DM the Telegram or Slack bot first to confirm it responds normally");
     expect(startText).toContain("after DM works, add the bot to the target Slack channel or Telegram group/topic");
     expect(startText).toContain(
-      "route that surface with `clisbot channels add slack-channel <channelId> --agent <id>` or `clisbot channels add telegram-group <chatId> --agent <id>`",
+      "add the route with `clisbot channels add slack-channel <channelId>` or `clisbot channels add telegram-group <chatId>`",
+    );
+    expect(startText).toContain(
+      "bind the agent with `clisbot channels bind slack-channel <channelId> --agent <id>` or `clisbot channels bind telegram-group <chatId> --agent <id>`",
     );
     expect(startText).toContain(
       "Telegram: send `/start` in the target DM, group, or topic to get onboarding or pairing guidance",
@@ -236,6 +245,102 @@ describe("runtime summaries", () => {
     expect(text).toContain("agent=work");
     expect(text).toContain("state=detached");
     expect(text).toContain("sessionKey=agent:work:slack:channel:C123:thread:1.2");
+  });
+
+  test("shows only the five most recent runner sessions in status output", () => {
+    const summary = {
+      loadedConfig: {} as RuntimeOperatorSummary["loadedConfig"],
+      ownerSummary: {
+        ownerPrincipals: [],
+        adminPrincipals: [],
+        ownerClaimWindowMinutes: 30,
+      },
+      agentSummaries: [],
+      channelSummaries: [],
+      activeRuns: [],
+      configuredAgents: 0,
+      bootstrapPendingAgents: 0,
+      bootstrappedAgents: 0,
+      runningTmuxSessions: 6,
+      runnerSessions: [
+        {
+          sessionName: "session-6",
+          entry: {
+            agentId: "default",
+            sessionKey: "session-6",
+            workspacePath: "/tmp/session-6",
+            runnerCommand: "codex",
+            lastAdmittedPromptAt: 1_700_000_006_000,
+            updatedAt: 1_700_000_006_000,
+          },
+        },
+        {
+          sessionName: "session-5",
+          entry: {
+            agentId: "default",
+            sessionKey: "session-5",
+            workspacePath: "/tmp/session-5",
+            runnerCommand: "codex",
+            lastAdmittedPromptAt: 1_700_000_005_000,
+            updatedAt: 1_700_000_005_000,
+          },
+        },
+        {
+          sessionName: "session-4",
+          entry: {
+            agentId: "default",
+            sessionKey: "session-4",
+            workspacePath: "/tmp/session-4",
+            runnerCommand: "codex",
+            lastAdmittedPromptAt: 1_700_000_004_000,
+            updatedAt: 1_700_000_004_000,
+          },
+        },
+        {
+          sessionName: "session-3",
+          entry: {
+            agentId: "default",
+            sessionKey: "session-3",
+            workspacePath: "/tmp/session-3",
+            runnerCommand: "codex",
+            lastAdmittedPromptAt: 1_700_000_003_000,
+            updatedAt: 1_700_000_003_000,
+          },
+        },
+        {
+          sessionName: "session-2",
+          entry: {
+            agentId: "default",
+            sessionKey: "session-2",
+            workspacePath: "/tmp/session-2",
+            runnerCommand: "codex",
+            lastAdmittedPromptAt: 1_700_000_002_000,
+            updatedAt: 1_700_000_002_000,
+          },
+        },
+        {
+          sessionName: "session-1",
+          entry: {
+            agentId: "default",
+            sessionKey: "session-1",
+            workspacePath: "/tmp/session-1",
+            runnerCommand: "codex",
+            lastAdmittedPromptAt: 1_700_000_001_000,
+            updatedAt: 1_700_000_001_000,
+          },
+        },
+      ],
+    } satisfies RuntimeOperatorSummary;
+
+    const text = renderStatusSummary(summary);
+
+    expect(text).toContain("Runner sessions:");
+    expect(text).toContain("session-6");
+    expect(text).toContain("session-2");
+    expect(text).not.toContain("session-1");
+    expect(text).toContain("(1) sessions more");
+    expect(text).toContain("clisbot runner list");
+    expect(text).toContain("clisbot runner watch --latest");
   });
 
   test("distinguishes missing, not-bootstrapped, and bootstrapped bootstrap states", async () => {
