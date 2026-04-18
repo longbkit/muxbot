@@ -189,14 +189,14 @@ function parseOwnerPrincipal(principal: string) {
 
 function buildOwnerAlertCommand(params: {
   platform: "slack" | "telegram";
-  accountId: string;
+  botId: string;
   userId: string;
   message: string;
 }): ParsedMessageCommand {
   return {
     action: "send",
     channel: params.platform,
-    account: params.accountId,
+    account: params.botId,
     target: params.platform === "slack" ? `user:${params.userId}` : params.userId,
     message: params.message,
     messageFile: undefined,
@@ -281,24 +281,24 @@ async function sendOwnerAlert(params: {
       continue;
     }
 
-    const accountIds = dedupe(
-      plugin.listAccounts(loaded).map((entry) => entry.accountId),
+    const botIds = dedupe(
+      plugin.listBots(loaded).map((entry) => entry.botId),
     );
     for (const userId of ownerIds) {
       let deliveredToPrincipal = false;
       const principal = `${platform}:${userId}`;
-      for (const accountId of accountIds) {
+      for (const botId of botIds) {
         try {
           await plugin.runMessageCommand(
             loaded,
             buildOwnerAlertCommand({
               platform,
-              accountId,
+              botId,
               userId,
               message: params.message,
             }),
           );
-          delivered.push(`${principal} via ${platform}/${accountId}`);
+          delivered.push(`${principal} via ${platform}/${botId}`);
           deliveredToPrincipal = true;
           break;
         } catch (error) {
@@ -308,10 +308,10 @@ async function sendOwnerAlert(params: {
           });
         }
       }
-      if (!deliveredToPrincipal && accountIds.length === 0) {
+      if (!deliveredToPrincipal && botIds.length === 0) {
         failed.push({
           principal,
-          detail: "no enabled accounts were available for this platform",
+          detail: "no enabled bots were available for this platform",
         });
       }
     }

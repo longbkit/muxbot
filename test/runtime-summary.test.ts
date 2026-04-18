@@ -511,10 +511,10 @@ describe("runtime summaries", () => {
     await healthStore.setChannel({
       channel: "slack",
       connection: "active",
-      summary: "Slack Socket Mode connected for 1 account(s).",
+      summary: "Slack Socket Mode connected for 1 bot(s).",
       instances: [
         {
-          accountId: "default",
+          botId: "default",
           label: "bot=@longluong2bot",
           appLabel: "app=A123",
           tokenHint: "deadbeef",
@@ -530,7 +530,7 @@ describe("runtime summaries", () => {
     const text = renderStatusSummary(summary);
 
     expect(text).toContain("Channel health:");
-    expect(text).toContain("Slack Socket Mode connected for 1 account(s).");
-    expect(text).toContain("instances: default bot=@longluong2bot app=A123 token#deadbeef");
+    expect(text).toContain("Slack Socket Mode connected for 1 bot(s).");
+    expect(text).toContain("instances: bot=default bot=@longluong2bot app=A123 token#deadbeef");
   });
 });

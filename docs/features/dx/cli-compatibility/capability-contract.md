@@ -6,7 +6,7 @@ Draft v0
 
 ## Summary
 
-This document defines the first normalized compatibility contract for upstream interactive CLI backends.
+This document defines the first normalized compatibility contract for upstream interactive CLIs.
 
 The contract is for machine-readable DX and operator surfaces first.
 
@@ -15,8 +15,8 @@ It is intentionally stricter about normalized facts than raw terminal text.
 ## Design Rules
 
 - Normalize facts, not full transcripts.
-- Prefer capability and state invariants over backend-specific banner matching.
-- Make unsupported behavior explicit instead of pretending every backend works the same.
+- Prefer capability and state invariants over CLI-specific banner matching.
+- Make unsupported behavior explicit instead of pretending every CLI works the same.
 - Separate conversation identity from runner instance identity.
 - Keep the contract usable by tmux-backed runners now and non-tmux runners later.
 
@@ -26,17 +26,17 @@ It is intentionally stricter about normalized facts than raw terminal text.
 
 The logical conversation identity chosen by the agents layer.
 
-This is not a tmux target and not a backend-native session id.
+This is not a tmux target and not a CLI-native session id.
 
 ### `sessionId`
 
-The backend-native conversation id when the upstream CLI exposes one.
+The CLI-native conversation id when the upstream CLI exposes one.
 
 It may be absent, delayed, unsupported, or only recoverable after startup.
 
 ### `runnerInstanceId`
 
-The live execution-host identity for the current backend process.
+The live execution-host identity for the current CLI process.
 
 Today that usually maps to a tmux-backed runner instance.
 
@@ -79,7 +79,7 @@ Every capability response should normalize to this envelope:
 {
   "ok": true,
   "capability": "probe",
-  "backendId": "codex",
+  "cli": "codex",
   "observedAt": "2026-04-17T13:20:00.000Z",
   "session": {
     "sessionKey": "telegram:default:-1003455688247:1207",
@@ -108,7 +108,7 @@ Error responses should keep the same top-level keys and fill:
 {
   "ok": false,
   "capability": "resume",
-  "backendId": "codex",
+  "cli": "codex",
   "observedAt": "2026-04-17T13:20:00.000Z",
   "session": {
     "sessionKey": "telegram:default:-1003455688247:1207",
@@ -133,7 +133,7 @@ Error responses should keep the same top-level keys and fill:
 
 ## Standard Error Codes
 
-Use stable error codes instead of backend-specific free text:
+Use stable error codes instead of CLI-specific free text:
 
 - `UNSUPPORTED`
 - `NOT_FOUND`
@@ -171,7 +171,7 @@ Start a fresh runner instance for a logical conversation, optionally with a requ
 ```json
 {
   "capability": "start",
-  "backendId": "codex",
+  "cli": "codex",
   "sessionKey": "telegram:default:-1003455688247:1207",
   "workspacePath": "/home/node/projects/clisbot",
   "agentId": "default",
@@ -187,7 +187,7 @@ Start a fresh runner instance for a logical conversation, optionally with a requ
 {
   "ok": true,
   "capability": "start",
-  "backendId": "codex",
+  "cli": "codex",
   "session": {
     "sessionKey": "telegram:default:-1003455688247:1207",
     "sessionId": null,
@@ -220,14 +220,14 @@ Start a fresh runner instance for a logical conversation, optionally with a requ
 
 ### 2. `probe`
 
-Inspect the live runner instance and return normalized readiness, running state, waiting-input truth, pane-loss truth, and session-id capture truth.
+Inspect the live runner instance and return normalized readiness, running state, waiting-input truth, pane-loss truth, and session id capture truth.
 
 #### Input
 
 ```json
 {
   "capability": "probe",
-  "backendId": "codex",
+  "cli": "codex",
   "locator": {
     "runnerInstanceId": "runner_default_abc123",
     "hostKind": "tmux",
@@ -244,7 +244,7 @@ Inspect the live runner instance and return normalized readiness, running state,
 {
   "ok": true,
   "capability": "probe",
-  "backendId": "codex",
+  "cli": "codex",
   "session": {
     "sessionKey": "telegram:default:-1003455688247:1207",
     "sessionId": "sess_abc123",
@@ -277,7 +277,7 @@ Inspect the live runner instance and return normalized readiness, running state,
 #### Invariants
 
 - `probe` is the source of truth for `ready`, `waiting_input`, `running`, `blocked`, and `lost`.
-- `probe` must expose session-id capture as one of:
+- `probe` must expose session id capture as one of:
   - `captured`
   - `pending`
   - `unsupported`
@@ -293,7 +293,7 @@ Submit prompt or control input to the currently targeted live runner instance.
 ```json
 {
   "capability": "send",
-  "backendId": "codex",
+  "cli": "codex",
   "locator": {
     "runnerInstanceId": "runner_default_abc123",
     "hostKind": "tmux",
@@ -318,7 +318,7 @@ Submit prompt or control input to the currently targeted live runner instance.
 {
   "ok": true,
   "capability": "send",
-  "backendId": "codex",
+  "cli": "codex",
   "session": {
     "sessionKey": "telegram:default:-1003455688247:1207",
     "sessionId": "sess_abc123",
@@ -359,7 +359,7 @@ Attach an observation stream or snapshot view to the live runner instance withou
 ```json
 {
   "capability": "attach",
-  "backendId": "codex",
+  "cli": "codex",
   "locator": {
     "runnerInstanceId": "runner_default_abc123",
     "hostKind": "tmux",
@@ -377,7 +377,7 @@ Attach an observation stream or snapshot view to the live runner instance withou
 {
   "ok": true,
   "capability": "attach",
-  "backendId": "codex",
+  "cli": "codex",
   "session": {
     "sessionKey": "telegram:default:-1003455688247:1207",
     "sessionId": "sess_abc123",
@@ -426,14 +426,14 @@ Attach an observation stream or snapshot view to the live runner instance withou
 
 ### 5. `resume`
 
-Create or restore a live runner instance for a previously known backend-native session id.
+Create or restore a live runner instance for a previously known CLI-native session id.
 
 #### Input
 
 ```json
 {
   "capability": "resume",
-  "backendId": "codex",
+  "cli": "codex",
   "sessionKey": "telegram:default:-1003455688247:1207",
   "sessionId": "sess_abc123",
   "workspacePath": "/home/node/projects/clisbot",
@@ -448,7 +448,7 @@ Create or restore a live runner instance for a previously known backend-native s
 {
   "ok": true,
   "capability": "resume",
-  "backendId": "codex",
+  "cli": "codex",
   "session": {
     "sessionKey": "telegram:default:-1003455688247:1207",
     "sessionId": "sess_abc123",
@@ -490,7 +490,7 @@ Recover from host-level loss, especially pane loss or runner-instance disappeara
 ```json
 {
   "capability": "recover",
-  "backendId": "codex",
+  "cli": "codex",
   "sessionKey": "telegram:default:-1003455688247:1207",
   "lastKnownSessionId": "sess_abc123",
   "recoveryReason": "pane-lost",
@@ -504,7 +504,7 @@ Recover from host-level loss, especially pane loss or runner-instance disappeara
 {
   "ok": true,
   "capability": "recover",
-  "backendId": "codex",
+  "cli": "codex",
   "session": {
     "sessionKey": "telegram:default:-1003455688247:1207",
     "sessionId": "sess_abc123",
@@ -537,14 +537,14 @@ Recover from host-level loss, especially pane loss or runner-instance disappeara
 
 ### 7. `interrupt`
 
-Ask the backend to stop or yield the current run.
+Ask the CLI to stop or yield the current run.
 
 #### Input
 
 ```json
 {
   "capability": "interrupt",
-  "backendId": "codex",
+  "cli": "codex",
   "locator": {
     "runnerInstanceId": "runner_default_abc123",
     "hostKind": "tmux",
@@ -562,7 +562,7 @@ Ask the backend to stop or yield the current run.
 {
   "ok": true,
   "capability": "interrupt",
-  "backendId": "codex",
+  "cli": "codex",
   "session": {
     "sessionKey": "telegram:default:-1003455688247:1207",
     "sessionId": "sess_abc123",
@@ -606,7 +606,7 @@ The first machine-readable operator surface should align like this:
 
 `probe` should remain the canonical place to answer:
 
-- is this backend ready
+- is this CLI ready
 - is it waiting for input
 - is it still running
 - did session id capture succeed
@@ -618,4 +618,4 @@ The first machine-readable operator surface should align like this:
 - channel rendering policy
 - transcript history semantics
 - tmux-only terminology in public capability names
-- pretending every backend supports resume, interrupt, or session ids equally well
+- pretending every CLI supports resume, interrupt, or session ids equally well

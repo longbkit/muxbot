@@ -1,7 +1,8 @@
 import { applyTemplate, sanitizeSessionName } from "../shared/paths.ts";
 
 export const DEFAULT_MAIN_KEY = "main";
-export const DEFAULT_ACCOUNT_ID = "default";
+export const DEFAULT_BOT_ID = "default";
+export const DEFAULT_ACCOUNT_ID = DEFAULT_BOT_ID;
 
 export type SessionDmScope =
   | "main"
@@ -34,8 +35,12 @@ export function normalizeAgentId(value: string | undefined | null) {
   );
 }
 
-export function normalizeAccountId(value: string | undefined | null) {
+export function normalizeBotId(value: string | undefined | null) {
   return normalizeToken(value) || DEFAULT_ACCOUNT_ID;
+}
+
+export function normalizeAccountId(value: string | undefined | null) {
+  return normalizeBotId(value);
 }
 
 export function buildAgentMainSessionKey(params: {
@@ -86,6 +91,7 @@ export function buildAgentPeerSessionKey(params: {
   agentId: string;
   mainKey?: string | undefined;
   channel: string;
+  botId?: string | null;
   accountId?: string | null;
   peerKind?: AgentPeerKind | null;
   peerId?: string | null;
@@ -103,7 +109,7 @@ export function buildAgentPeerSessionKey(params: {
     const peerId = (linkedPeerId ?? params.peerId ?? "").trim().toLowerCase();
 
     if (dmScope === "per-account-channel-peer" && peerId) {
-      return `agent:${normalizeAgentId(params.agentId)}:${normalizeToken(params.channel) || "unknown"}:${normalizeAccountId(params.accountId)}:dm:${peerId}`;
+      return `agent:${normalizeAgentId(params.agentId)}:${normalizeToken(params.channel) || "unknown"}:${normalizeBotId(params.botId ?? params.accountId)}:dm:${peerId}`;
     }
 
     if (dmScope === "per-channel-peer" && peerId) {

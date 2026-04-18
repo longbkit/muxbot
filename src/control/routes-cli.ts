@@ -40,6 +40,38 @@ function hasFlag(args: string[], name: string) {
   return args.includes(name);
 }
 
+const ROUTE_ARGUMENT_FLAGS = new Set([
+  "--channel",
+  "--bot",
+  "--policy",
+  "--require-mention",
+  "--allow-bots",
+  "--agent",
+  "--value",
+  "--mode",
+  "--minutes",
+  "--user",
+]);
+
+function findRouteArgument(args: string[]) {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (!arg) {
+      continue;
+    }
+    if (ROUTE_ARGUMENT_FLAGS.has(arg)) {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--")) {
+      continue;
+    }
+    return arg;
+  }
+
+  return undefined;
+}
+
 function parseBoolean(value: string | undefined, fallback?: boolean) {
   if (value === undefined) {
     if (fallback !== undefined) {
@@ -58,6 +90,17 @@ function parseBoolean(value: string | undefined, fallback?: boolean) {
 
 function parseProvider(args: string[]) {
   const channel = parseOptionValue(args, "--channel");
+  if (channel === "slack" || channel === "telegram") {
+    return channel;
+  }
+  throw new Error(renderRoutesHelp());
+}
+
+function parseOptionalProvider(args: string[]) {
+  const channel = parseOptionValue(args, "--channel");
+  if (channel === undefined) {
+    return undefined;
+  }
   if (channel === "slack" || channel === "telegram") {
     return channel;
   }
@@ -133,6 +176,10 @@ function parseRouteId(provider: Provider, raw: string | undefined): ParsedRouteI
     return { provider, routeId, storage: "directMessages", key: routeId, kind: "dm" };
   }
   throw new Error("Telegram route ids must use group:<chatId>, topic:<chatId>:<topicId>, or dm:<id|*>.");
+}
+
+function parseCommandRoute(args: string[], provider: Provider) {
+  return parseRouteId(provider, findRouteArgument(args));
 }
 
 function createBaseRoute(kind: ParsedRouteId["kind"], policy?: string): BotRouteConfig {
@@ -252,7 +299,7 @@ function renderRoutesHelp() {
 
 async function listRoutes(args: string[]) {
   const { config } = await readEditableConfig(getEditableConfigPath());
-  const provider = parseOptionValue(args, "--channel");
+  const provider = parseOptionalProvider(args);
   const botIdFilter = parseOptionValue(args, "--bot");
   const printJson = hasFlag(args, "--json");
   const rows: Array<Record<string, unknown>> = [];
@@ -316,8 +363,7 @@ async function listRoutes(args: string[]) {
 async function addRoute(args: string[]) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
-  const routeRaw = args.find((arg) => !arg.startsWith("--") && arg !== "slack" && arg !== "telegram");
-  const parsed = parseRouteId(provider, routeRaw);
+  const parsed = parseCommandRoute(args, provider);
   const policy = parseOptionValue(args, "--policy");
   const requireMention = parseOptionValue(args, "--require-mention");
   const allowBots = parseOptionValue(args, "--allow-bots");
@@ -346,8 +392,7 @@ async function addRoute(args: string[]) {
 async function getRoute(args: string[]) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
-  const routeRaw = args.find((arg) => !arg.startsWith("--") && arg !== "slack" && arg !== "telegram");
-  const parsed = parseRouteId(provider, routeRaw);
+  const parsed = parseCommandRoute(args, provider);
   const printJson = hasFlag(args, "--json");
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   const route = ensureRoute(config, provider, botId, parsed);
@@ -362,8 +407,7 @@ async function getRoute(args: string[]) {
 async function setRouteEnabled(args: string[], enabled: boolean) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
-  const routeRaw = args.find((arg) => !arg.startsWith("--") && arg !== "slack" && arg !== "telegram");
-  const parsed = parseRouteId(provider, routeRaw);
+  const parsed = parseCommandRoute(args, provider);
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   const route = ensureRoute(config, provider, botId, parsed);
   route.enabled = enabled;
@@ -375,9 +419,9 @@ async function setRouteEnabled(args: string[], enabled: boolean) {
 async function removeRoute(args: string[]) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
-  const routeRaw = args.find((arg) => !arg.startsWith("--") && arg !== "slack" && arg !== "telegram");
-  const parsed = parseRouteId(provider, routeRaw);
+  const parsed = parseCommandRoute(args, provider);
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
+  ensureRoute(config, provider, botId, parsed);
 
   if (provider === "slack") {
     const bot = ensureSlackBot(config, botId);
@@ -405,8 +449,7 @@ async function removeRoute(args: string[]) {
 async function getSetClearRouteField(args: string[], action: string) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
-  const routeRaw = args.find((arg) => !arg.startsWith("--") && arg !== "slack" && arg !== "telegram");
-  const parsed = parseRouteId(provider, routeRaw);
+  const parsed = parseCommandRoute(args, provider);
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   const route = ensureRoute(config, provider, botId, parsed);
 
@@ -508,8 +551,7 @@ async function getSetClearRouteField(args: string[], action: string) {
 async function mutateRouteUsers(args: string[], action: string) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
-  const routeRaw = args.find((arg) => !arg.startsWith("--") && arg !== "slack" && arg !== "telegram");
-  const parsed = parseRouteId(provider, routeRaw);
+  const parsed = parseCommandRoute(args, provider);
   const user = parseOptionValue(args, "--user");
   if (!user) {
     throw new Error(renderRoutesHelp());

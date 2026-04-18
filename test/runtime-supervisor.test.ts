@@ -139,7 +139,7 @@ describe("RuntimeSupervisor", () => {
       {
         id: "slack",
         isEnabled: () => true,
-        listAccounts: () => [{ accountId: "default", config: {} }],
+        listBots: () => [{ botId: "default", config: {} }],
         createRuntimeService: () => ({
           start: async () => undefined,
           stop: async () => {
@@ -152,15 +152,15 @@ describe("RuntimeSupervisor", () => {
             : state === "disabled"
               ? "Slack channel is disabled in config."
               : "Slack channel is stopped.",
-        renderActiveHealthSummary: () => "Slack Socket Mode connected for 1 account(s).",
+        renderActiveHealthSummary: () => "Slack Socket Mode connected for 1 bot(s).",
         markStartupFailure: (store, error) => store.markSlackFailure(error),
-        runMessageCommand: async () => ({ accountId: "default", result: { ok: true } }),
+        runMessageCommand: async () => ({ botId: "default", result: { ok: true } }),
         resolveMessageReplyTarget: () => null,
       },
       {
         id: "telegram",
         isEnabled: () => true,
-        listAccounts: () => [{ accountId: "default", config: {} }],
+        listBots: () => [{ botId: "default", config: {} }],
         createRuntimeService: () => ({
           start: async () => {
             throw new Error("telegram startup boom");
@@ -175,9 +175,9 @@ describe("RuntimeSupervisor", () => {
             : state === "disabled"
               ? "Telegram channel is disabled in config."
               : "Telegram channel is stopped.",
-        renderActiveHealthSummary: () => "Telegram polling connected for 1 account(s).",
+        renderActiveHealthSummary: () => "Telegram polling connected for 1 bot(s).",
         markStartupFailure: (store, error) => store.markTelegramFailure(error),
-        runMessageCommand: async () => ({ accountId: "default", result: { ok: true } }),
+        runMessageCommand: async () => ({ botId: "default", result: { ok: true } }),
         resolveMessageReplyTarget: () => null,
       },
     ];
@@ -205,7 +205,7 @@ describe("RuntimeSupervisor", () => {
     expect(stopCalls).toEqual(["slack", "telegram"]);
   });
 
-  test("records runtime account identity for active channel services", async () => {
+  test("records runtime bot identity for active channel services", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-supervisor-"));
     const runtimeHealthStore = new RuntimeHealthStore(join(tempDir, "runtime-health.json"));
 
@@ -213,12 +213,12 @@ describe("RuntimeSupervisor", () => {
       {
         id: "slack",
         isEnabled: () => true,
-        listAccounts: () => [{ accountId: "default", config: {} }],
+        listBots: () => [{ botId: "default", config: {} }],
         createRuntimeService: () => ({
           start: async () => undefined,
           stop: async () => undefined,
           getRuntimeIdentity: () => ({
-            accountId: "default",
+            botId: "default",
             label: "bot=@longluong2bot",
             appLabel: "app=A123",
             tokenHint: "deadbeef",
@@ -230,9 +230,9 @@ describe("RuntimeSupervisor", () => {
             : state === "disabled"
               ? "Slack channel is disabled in config."
               : "Slack channel is stopped.",
-        renderActiveHealthSummary: () => "Slack Socket Mode connected for 1 account(s).",
+        renderActiveHealthSummary: () => "Slack Socket Mode connected for 1 bot(s).",
         markStartupFailure: (store, error) => store.markSlackFailure(error),
-        runMessageCommand: async () => ({ accountId: "default", result: { ok: true } }),
+        runMessageCommand: async () => ({ botId: "default", result: { ok: true } }),
         resolveMessageReplyTarget: () => null,
       },
     ];
@@ -259,7 +259,7 @@ describe("RuntimeSupervisor", () => {
     expect(document.channels.slack?.connection).toBe("active");
     expect(document.channels.slack?.instances).toEqual([
       {
-        accountId: "default",
+        botId: "default",
         label: "bot=@longluong2bot",
         appLabel: "app=A123",
         tokenHint: "deadbeef",
@@ -276,7 +276,7 @@ describe("RuntimeSupervisor", () => {
       {
         id: "telegram",
         isEnabled: () => true,
-        listAccounts: () => [{ accountId: "default", config: {} }],
+        listBots: () => [{ botId: "default", config: {} }],
         createRuntimeService: (context) => {
           reportFailure = async (error?: unknown) =>
             await context.reportLifecycle({
@@ -289,7 +289,7 @@ describe("RuntimeSupervisor", () => {
             start: async () => undefined,
             stop: async () => undefined,
             getRuntimeIdentity: () => ({
-              accountId: "default",
+              botId: "default",
               label: "bot=@longluong2bot",
             }),
           };
@@ -300,9 +300,9 @@ describe("RuntimeSupervisor", () => {
             : state === "disabled"
               ? "Telegram channel is disabled in config."
               : "Telegram channel is stopped.",
-        renderActiveHealthSummary: () => "Telegram polling connected for 1 account(s).",
+        renderActiveHealthSummary: () => "Telegram polling connected for 1 bot(s).",
         markStartupFailure: (store, error) => store.markTelegramFailure(error),
-        runMessageCommand: async () => ({ accountId: "default", result: { ok: true } }),
+        runMessageCommand: async () => ({ botId: "default", result: { ok: true } }),
         resolveMessageReplyTarget: () => null,
       },
     ];
@@ -331,11 +331,11 @@ describe("RuntimeSupervisor", () => {
     expect(document.channels.telegram?.summary).toBe(
       "Telegram polling stopped because another instance is already using this bot token.",
     );
-    expect(document.channels.telegram?.detail).toContain("account=default");
+    expect(document.channels.telegram?.detail).toContain("bot=default");
     expect(document.channels.telegram?.detail).toContain("Conflict: terminated by other getUpdates request");
     expect(document.channels.telegram?.instances).toEqual([
       {
-        accountId: "default",
+        botId: "default",
         label: "bot=@longluong2bot",
       },
     ]);
@@ -349,12 +349,12 @@ describe("RuntimeSupervisor", () => {
       {
         id: "slack",
         isEnabled: () => true,
-        listAccounts: () => [{ accountId: "default", config: {} }],
+        listBots: () => [{ botId: "default", config: {} }],
         createRuntimeService: () => ({
           start: async () => undefined,
           stop: async () => undefined,
           getRuntimeIdentity: () => ({
-            accountId: "default",
+            botId: "default",
             label: "bot=@longluong2bot",
           }),
         }),
@@ -364,9 +364,9 @@ describe("RuntimeSupervisor", () => {
             : state === "disabled"
               ? "Slack channel is disabled in config."
               : "Slack channel is stopped.",
-        renderActiveHealthSummary: () => "Slack Socket Mode connected for 1 account(s).",
+        renderActiveHealthSummary: () => "Slack Socket Mode connected for 1 bot(s).",
         markStartupFailure: (store, error) => store.markSlackFailure(error),
-        runMessageCommand: async () => ({ accountId: "default", result: { ok: true } }),
+        runMessageCommand: async () => ({ botId: "default", result: { ok: true } }),
         resolveMessageReplyTarget: () => null,
       },
     ];
@@ -398,7 +398,7 @@ describe("RuntimeSupervisor", () => {
     );
     expect(document.channels.slack?.instances).toEqual([
       {
-        accountId: "default",
+        botId: "default",
         label: "bot=@longluong2bot",
       },
     ]);
@@ -413,7 +413,7 @@ describe("RuntimeSupervisor", () => {
       {
         id: "telegram",
         isEnabled: () => true,
-        listAccounts: () => [{ accountId: "default", config: {} }],
+        listBots: () => [{ botId: "default", config: {} }],
         createRuntimeService: (context) => {
           lifecycleReports.push(async (detail: string) =>
             await context.reportLifecycle({
@@ -425,7 +425,7 @@ describe("RuntimeSupervisor", () => {
             start: async () => undefined,
             stop: async () => undefined,
             getRuntimeIdentity: () => ({
-              accountId: "default",
+              botId: "default",
               label: `bot=@longluong2bot-${lifecycleReports.length}`,
             }),
           };
@@ -436,9 +436,9 @@ describe("RuntimeSupervisor", () => {
             : state === "disabled"
               ? "Telegram channel is disabled in config."
               : "Telegram channel is stopped.",
-        renderActiveHealthSummary: () => "Telegram polling connected for 1 account(s).",
+        renderActiveHealthSummary: () => "Telegram polling connected for 1 bot(s).",
         markStartupFailure: (store, error) => store.markTelegramFailure(error),
-        runMessageCommand: async () => ({ accountId: "default", result: { ok: true } }),
+        runMessageCommand: async () => ({ botId: "default", result: { ok: true } }),
         resolveMessageReplyTarget: () => null,
       },
     ];
@@ -469,10 +469,10 @@ describe("RuntimeSupervisor", () => {
 
     const document = await runtimeHealthStore.read();
     expect(document.channels.telegram?.connection).toBe("active");
-    expect(document.channels.telegram?.summary).toBe("Telegram polling connected for 1 account(s).");
+    expect(document.channels.telegram?.summary).toBe("Telegram polling connected for 1 bot(s).");
     expect(document.channels.telegram?.instances).toEqual([
       {
-        accountId: "default",
+        botId: "default",
         label: "bot=@longluong2bot-2",
       },
     ]);

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { AgentService } from "../src/agents/agent-service.ts";
 import { readEditableConfig } from "../src/config/config-file.ts";
 import { loadConfig, loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
-import { resolveSlackBotConfig } from "../src/config/channel-accounts.ts";
+import { resolveSlackBotConfig } from "../src/config/channel-bots.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
 function buildTemplateConfig() {

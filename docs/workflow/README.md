@@ -14,6 +14,7 @@ This folder should capture:
 ## Current Files
 
 - [brainstorm-and-ideas.md](brainstorm-and-ideas.md): current brainstorming notes for shortest-review-first output, review-loop checklists, and task-readiness specialization
+- [code-review-checklist.md](code-review-checklist.md): short high-leverage checklist for looping AI code review until naming, mental model, user flow, and risk issues are cleaned up
 - [working-prompts.md](working-prompts.md): reusable prompts that are showing good results in real `clisbot` workflow loops
 
 ## Current Direction

@@ -227,7 +227,7 @@ export async function runMessageCli(
       ? plugin.resolveMessageReplyTarget({
         loadedConfig,
         command: resolvedCommand,
-        accountId: execution.accountId,
+        botId: execution.botId,
       })
       : null;
   if (replyTarget) {

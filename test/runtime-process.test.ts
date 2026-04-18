@@ -196,7 +196,7 @@ describe("getProcessLiveness", () => {
 });
 
 describe("stopDetachedRuntime", () => {
-  test("deactivates persisted mem accounts in config even when the runtime is already gone", async () => {
+  test("deactivates persisted mem bots in config even when the runtime is already gone", async () => {
     const dir = createTempDir();
     const configPath = join(dir, "clisbot.json");
     writeFileSync(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`);

@@ -31,11 +31,11 @@ import { readEditableConfig, writeEditableConfig } from "../config/config-file.t
 import { shouldBootstrapFirstRunConfig } from "./startup-bootstrap.ts";
 import { commandExists } from "../shared/process.ts";
 import {
-  applyBootstrapAccountsToConfig,
+  applyBootstrapBotsToConfig,
   buildBootstrapRuntimeMemEnv,
-  deactivateExpiredMemAccounts,
-  persistBootstrapMemCredentials,
-} from "../config/channel-account-management.ts";
+  deactivateExpiredMemBots,
+  persistBootstrapMemBotCredentials,
+} from "../config/channel-bot-management.ts";
 import {
   printCommandOutcomeBanner,
   printCommandOutcomeFooter,
@@ -74,7 +74,7 @@ function renderBootstrapCommandHelp(commandName: "init" | "start") {
     `  - ${behavior}`,
     "  - first-run agent bootstrap needs both `--cli` and `--bot-type`",
     "  - `--bot-type personal` maps to `personal-assistant`; `--bot-type team` maps to `team-assistant`",
-    "  - explicit credential flags only enable the channels and accounts you named in this command",
+    "  - explicit credential flags only enable the channels and bots you named in this command",
     "  - env-style values such as `SLACK_APP_TOKEN` or `${SLACK_APP_TOKEN}` stay env-backed in config",
     commandName === "start"
       ? "  - literal token values without `--persist` stay runtime-only for this start invocation"
@@ -149,17 +149,17 @@ function printMissingFirstRunCredentials(commandName: "init" | "start") {
   }
 }
 
-function getMemBootstrapAccountIds(bootstrapFlags: ParsedBootstrapFlags) {
+function getMemBootstrapBotIds(bootstrapFlags: ParsedBootstrapFlags) {
   return {
     slack: new Set(
-      bootstrapFlags.slackAccounts
-        .filter((account) => account.appToken?.kind === "mem" && account.botToken?.kind === "mem")
-        .map((account) => account.accountId),
+      bootstrapFlags.slackBots
+        .filter((bot) => bot.appToken?.kind === "mem" && bot.botToken?.kind === "mem")
+        .map((bot) => bot.botId),
     ),
     telegram: new Set(
-      bootstrapFlags.telegramAccounts
-        .filter((account) => account.botToken?.kind === "mem")
-        .map((account) => account.accountId),
+      bootstrapFlags.telegramBots
+        .filter((bot) => bot.botToken?.kind === "mem")
+        .map((bot) => bot.botId),
     ),
   };
 }
@@ -182,25 +182,25 @@ async function applyBootstrapStateToConfig(params: {
     };
   }
 
-  applyBootstrapAccountsToConfig(
+  applyBootstrapBotsToConfig(
     config,
     {
-      slackAccounts: bootstrapFlags.slackAccounts,
-      telegramAccounts: bootstrapFlags.telegramAccounts,
+      slackBots: bootstrapFlags.slackBots,
+      telegramBots: bootstrapFlags.telegramBots,
     },
     { firstRun },
   );
 
   const lifecycleLines =
     commandName === "start" && !runtimeRunning
-      ? deactivateExpiredMemAccounts(config, getMemBootstrapAccountIds(bootstrapFlags))
+      ? deactivateExpiredMemBots(config, getMemBootstrapBotIds(bootstrapFlags))
       : [];
   const persistenceLines = bootstrapFlags.persist
-    ? persistBootstrapMemCredentials(
+    ? persistBootstrapMemBotCredentials(
         config,
         {
-          slackAccounts: bootstrapFlags.slackAccounts,
-          telegramAccounts: bootstrapFlags.telegramAccounts,
+          slackBots: bootstrapFlags.slackBots,
+          telegramBots: bootstrapFlags.telegramBots,
         },
         runtimeCredentialsPath,
       )
@@ -446,8 +446,8 @@ export async function start(args: string[] = []) {
 
   const runtimeMemEnv = buildBootstrapRuntimeMemEnv(
     {
-      slackAccounts: state.bootstrapFlags.slackAccounts,
-      telegramAccounts: state.bootstrapFlags.telegramAccounts,
+      slackBots: state.bootstrapFlags.slackBots,
+      telegramBots: state.bootstrapFlags.telegramBots,
     },
     process.env,
   );

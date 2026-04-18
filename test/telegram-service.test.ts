@@ -4,7 +4,7 @@ import {
   dispatchTelegramUpdates,
   renderTelegramUnroutedRouteMessage,
 } from "../src/channels/telegram/service.ts";
-import { resolveTelegramBotConfig } from "../src/config/channel-accounts.ts";
+import { resolveTelegramBotConfig } from "../src/config/channel-bots.ts";
 import type { TelegramUpdate } from "../src/channels/telegram/message.ts";
 import type { LoadedConfig } from "../src/config/load-config.ts";
 import { clisbotConfigSchema } from "../src/config/schema.ts";

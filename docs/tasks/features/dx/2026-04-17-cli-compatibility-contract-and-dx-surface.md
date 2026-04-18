@@ -10,9 +10,9 @@ Done
 
 ## Why
 
-Right now the repo has real runner behavior and many backend-specific lessons, but no single front door for:
+Right now the repo has real runner behavior and many CLI-specific lessons, but no single front door for:
 
-- what a CLI backend must support
+- what a CLI must support
 - which parts are hard requirements versus best-effort
 - which machine-readable inputs and outputs automation may rely on
 - how pane loss, delayed session ids, and running-state drift should be normalized
@@ -45,11 +45,11 @@ Without that contract, new tooling risks being tied too tightly to raw pane text
 - `dx` exists as a first-class feature area in docs
 - `cli-compatibility` has a stable front door
 - capability inputs and outputs are explicit enough for implementation planning
-- session-id capture, ready detection, pane-loss recovery, and interrupt semantics have named invariants
+- session id capture, ready detection, pane-loss recovery, and interrupt semantics have named invariants
 
 ## Follow-On Work
 
-- map Codex, Claude, and Gemini into backend profiles against this contract
+- map Codex, Claude, and Gemini into CLI profiles against this contract
 - implement `runner probe --json`, `runner send --json`, and `runner attach --json`
 - add a deterministic fake CLI harness
 - add real-CLI canary artifacts and drift classification

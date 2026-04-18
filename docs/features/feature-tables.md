@@ -28,7 +28,7 @@ Execution detail belongs in `docs/tasks/`.
 
 | State | Area | Feature | Main Doc | Tasks Folder | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Active | surface | channels | [channels](channels/README.md) | [channels tasks](../tasks/features/channels) | 2026-04-14 | Channels now share a first-class plugin seam plus an explicit observer-failure boundary, with current follow-up focused on clearer DM-first onboarding guidance from shared surfaces. |
+| Active | surface | channels | [channels](channels/README.md) | [channels tasks](../tasks/features/channels) | 2026-04-18 | Channels now share a first-class plugin seam, and the next Vietnam expansion path is explicitly split into `zalo-bot`, `zalo-oa`, and `zalo-personal` instead of one blurred Zalo provider. |
 | Active | platform | auth | [auth](auth/README.md) | [auth tasks](../tasks/features/auth) | 2026-04-15 | Auth roles, permissions, prompt protection, pairing bypass, `clisbot auth ...`, and first-owner auto-claim are live; current follow-up is auth refinement rather than missing core behavior. |
 | Active | core | agents | [agents](agents/README.md) | [agents tasks](../tasks/features/agents) | 2026-04-17 | The agents layer now explicitly owns the next self-knowledge, runtime-introspection, and work-management interface growth path without leaking it into channels or control. |
 | Active | core | runners | [runners](runners/README.md) | [runner tasks](../tasks/features/runners) | 2026-04-08 | Runners now need to keep monitoring long-running sessions after request-level detachment so channels can re-attach and still receive final settlement. |

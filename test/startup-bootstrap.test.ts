@@ -267,10 +267,10 @@ describe("startup bootstrap helpers", () => {
     }).join("\n");
 
     expect(lines).toContain(
-      "Slack account default: source=env app=CUSTOM_SLACK_APP_TOKEN bot=CUSTOM_SLACK_BOT_TOKEN",
+      "Slack bot default: source=env app=CUSTOM_SLACK_APP_TOKEN bot=CUSTOM_SLACK_BOT_TOKEN",
     );
     expect(lines).toContain(
-      "Telegram account default: unavailable (Missing env var \"CUSTOM_TELEGRAM_BOT_TOKEN\" referenced at config path: bots.telegram.default.botToken)",
+      "Telegram bot default: unavailable (Missing env var \"CUSTOM_TELEGRAM_BOT_TOKEN\" referenced at config path: bots.telegram.default.botToken)",
     );
   });
 
@@ -285,7 +285,7 @@ describe("startup bootstrap helpers", () => {
 
     expect(renderConfiguredChannelTokenIssueLines(config)).toEqual([]);
     expect(renderConfiguredChannelTokenStatusLines(config)).toContain(
-      "Telegram account default: source=cli-ephemeral available=no restartRequiresPersistence=yes",
+      "Telegram bot default: source=cli-ephemeral available=no restartRequiresPersistence=yes",
     );
   });
 });

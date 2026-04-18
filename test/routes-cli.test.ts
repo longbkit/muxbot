@@ -134,4 +134,68 @@ describe("routes cli", () => {
       ]),
     ).rejects.toThrow("Use a matching `set-<key>` command instead.");
   });
+
+  test("accepts route ids after option values instead of mistaking --bot values for the route", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "slack",
+      "--bot",
+      "default",
+      "channel:C1234567890",
+      "--policy",
+      "open",
+    ]);
+
+    await runRoutesCli([
+      "set-agent",
+      "--channel",
+      "slack",
+      "--bot",
+      "default",
+      "channel:C1234567890",
+      "--agent",
+      "support",
+    ]);
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.slack.default.groups["channel:C1234567890"]?.agentId).toBe("support");
+  });
+
+  test("remove fails when the route does not exist", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await expect(
+      runRoutesCli([
+        "remove",
+        "--channel",
+        "telegram",
+        "group:-1001234567890",
+        "--bot",
+        "default",
+      ]),
+    ).rejects.toThrow("Unknown route: telegram/default/group:-1001234567890");
+  });
+
+  test("list rejects unknown channel filters instead of silently showing empty results", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await expect(runRoutesCli(["list", "--channel", "discord"])).rejects.toThrow(
+      "clisbot routes",
+    );
+  });
 });

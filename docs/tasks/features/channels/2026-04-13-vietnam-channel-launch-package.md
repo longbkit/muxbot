@@ -7,6 +7,7 @@ Define the channel package required for a Vietnam-focused launch.
 Target package:
 
 - keep Claude, Codex, and Gemini as the core CLI trio
+- add Zalo Bot Platform
 - add Zalo Official Account
 - add Zalo Personal
 
@@ -22,9 +23,10 @@ The Vietnam package needs to be explicit instead of implicit in chat discussion.
 
 ## Scope
 
+- define the MVP scope for official Zalo Bot Platform support
 - define the MVP scope for Zalo Official Account support
 - define the MVP scope for Zalo Personal support
-- document how both Zalo surfaces should map onto the existing channel model
+- document how the three Zalo paths should map onto the existing channel model
 - identify channel-account, routing, pairing, and send-flow differences that must be handled
 - keep the Slack and Telegram package compatible with the same launch-trio CLI story
 
@@ -36,10 +38,12 @@ The Vietnam package needs to be explicit instead of implicit in chat discussion.
 ## Exit Criteria
 
 - the Vietnam launch package is explicit in backlog and roadmap docs
-- Zalo Official and Zalo Personal each have a defined MVP slice
+- Zalo Bot has a defined MVP slice
+- Zalo Official and Zalo Personal each have a defined MVP slice or explicit follow-up slice
 - the remaining implementation work can be split cleanly into follow-up tasks
 
 ## Related Docs
 
 - [Launch MVP Path](../../../overview/launch-mvp-path.md)
 - [Channels Feature](../../../features/channels/README.md)
+- [Zalo Bot, Zalo OA, And Zalo Personal Channel Strategy](2026-04-18-zalo-bot-oa-and-personal-channel-strategy.md)

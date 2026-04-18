@@ -17,8 +17,8 @@ describe("parseBootstrapFlags", () => {
 
     expect(parsed.cliTool).toBe("gemini");
     expect(parsed.bootstrap).toBe("personal-assistant");
-    expect(parsed.telegramAccounts[0]?.accountId).toBe("default");
-    expect(parsed.telegramAccounts[0]?.botToken?.kind).toBe("env");
+    expect(parsed.telegramBots[0]?.botId).toBe("default");
+    expect(parsed.telegramBots[0]?.botToken?.kind).toBe("env");
   });
 
   test("maps --bot-type team to the internal bootstrap mode", () => {
@@ -67,9 +67,9 @@ describe("parseBootstrapFlags", () => {
     ]);
 
     expect(parsed.literalWarnings).toEqual([]);
-    expect(parsed.slackAccounts[0]?.appToken?.kind).toBe("mem");
-    expect(parsed.slackAccounts[0]?.botToken?.kind).toBe("mem");
-    expect(parsed.telegramAccounts[0]?.botToken?.kind).toBe("mem");
+    expect(parsed.slackBots[0]?.appToken?.kind).toBe("mem");
+    expect(parsed.slackBots[0]?.botToken?.kind).toBe("mem");
+    expect(parsed.telegramBots[0]?.botToken?.kind).toBe("mem");
   });
 
   test("detects literal bootstrap credentials independently of warning output", () => {

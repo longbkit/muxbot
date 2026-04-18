@@ -225,7 +225,7 @@ function renderChannelDiagnosticLinesForChannel(channel: ChannelOperatorSummary)
 }
 
 function formatHealthInstance(instance: ChannelHealthInstance) {
-  const parts = [instance.accountId];
+  const parts = [`bot=${instance.botId || "unknown"}`];
   if (instance.label) {
     parts.push(instance.label);
   }

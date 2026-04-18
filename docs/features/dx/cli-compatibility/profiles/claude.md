@@ -1,4 +1,4 @@
-# Claude Backend Profile
+# Claude CLI Profile
 
 ## Summary
 
@@ -25,7 +25,7 @@ Support: `Partial`
 
 Current basis:
 
-- no backend-specific `startupReadyPattern` is configured
+- no CLI-specific `startupReadyPattern` is configured
 - readiness depends on trust-prompt dismissal plus generic startup bootstrap behavior
 
 Known stabilization already shipped:

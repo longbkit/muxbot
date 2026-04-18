@@ -231,15 +231,15 @@ export class RuntimeSupervisor {
         continue;
       }
 
-      const accounts = plugin.listAccounts(loadedConfig);
-      if (accounts.length === 0) {
-        throw new Error(`${plugin.id} is enabled but no configured accounts are available.`);
+      const bots = plugin.listBots(loadedConfig);
+      if (bots.length === 0) {
+        throw new Error(`${plugin.id} is enabled but no configured bots are available.`);
       }
 
-      for (const account of accounts) {
+      for (const bot of bots) {
         channelServices.push({
           channel: plugin.id,
-          accountId: account.accountId,
+          botId: bot.botId,
           service: plugin.createRuntimeService(
             {
               loadedConfig,
@@ -251,11 +251,11 @@ export class RuntimeSupervisor {
                   runtimeId,
                   plugin,
                   channelServices,
-                  accountId: account.accountId,
+                  botId: bot.botId,
                   event,
                 }),
             },
-            account,
+            bot,
           ),
         });
       }
@@ -350,7 +350,7 @@ export class RuntimeSupervisor {
     runtimeId: number;
     plugin: ChannelPlugin;
     channelServices: ChannelRuntimeEntry[];
-    accountId: string;
+    botId: string;
     event: ChannelRuntimeLifecycleEvent;
   }) {
     if (this.activeRuntime?.id !== params.runtimeId) {
@@ -370,7 +370,7 @@ export class RuntimeSupervisor {
       return;
     }
 
-    const detailPrefix = `account=${params.accountId}`;
+    const detailPrefix = `bot=${params.botId}`;
     await this.dependencies.runtimeHealthStore.setChannel({
       channel: params.plugin.id,
       connection: "failed",

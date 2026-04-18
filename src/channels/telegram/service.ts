@@ -45,12 +45,12 @@ import {
 import { resolveTelegramMessageContent } from "./content.ts";
 import { resolveTelegramAttachmentPaths } from "./attachments.ts";
 import { sleep } from "../../shared/process.ts";
-import type { TelegramAccountConfig } from "../../config/channel-accounts.ts";
+import type { TelegramBotCredentialConfig } from "../../config/channel-bots.ts";
 import {
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageConfig,
-} from "../../config/channel-accounts.ts";
-import type { ResolvedTelegramBotConfig } from "../../config/channel-accounts.ts";
+} from "../../config/channel-bots.ts";
+import type { ResolvedTelegramBotConfig } from "../../config/channel-bots.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
 import { buildMentionOnlyFollowUpPrompt } from "../mention-follow-up.ts";
 import { prependRecentConversationContext } from "../../shared/recent-message-context.ts";
@@ -232,13 +232,13 @@ export class TelegramPollingService {
     private readonly agentService: AgentService,
     private readonly processedEventsStore: ProcessedEventsStore,
     private readonly activityStore: ActivityStore,
-    private readonly accountId = "default",
-    private readonly accountConfig: TelegramAccountConfig,
+    private readonly botId = "default",
+    private readonly botCredentials: TelegramBotCredentialConfig,
     private readonly reportLifecycle?: (event: ChannelRuntimeLifecycleEvent) => Promise<void>,
   ) {
     this.agentService.registerSurfaceNotificationHandler({
       platform: "telegram",
-      accountId: this.accountId,
+      botId: this.botId,
       handler: async ({ binding, text }) => {
         if (!binding.chatId) {
           return;
@@ -254,7 +254,7 @@ export class TelegramPollingService {
           renderMode: "native",
         });
         await postTelegramText({
-          token: this.accountConfig.botToken,
+          token: this.botCredentials.botToken,
           chatId,
           text: renderedNotification.text,
           topicId: Number.isFinite(topicId) ? topicId : undefined,
@@ -266,7 +266,7 @@ export class TelegramPollingService {
   }
 
   private getBotConfig() {
-    return resolveTelegramBotConfig(this.loadedConfig.raw.bots.telegram, this.accountId);
+    return resolveTelegramBotConfig(this.loadedConfig.raw.bots.telegram, this.botId);
   }
 
   private getDirectMessageConfig(senderId?: string | number) {
@@ -275,13 +275,13 @@ export class TelegramPollingService {
 
   async start() {
     const me = await callTelegramApi<TelegramGetMeResult>(
-      this.accountConfig.botToken,
+      this.botCredentials.botToken,
       "getMe",
       {},
     );
     this.botUserId = me.id;
     this.botUsername = me.username ?? "";
-    console.log(`telegram bot @${this.botUsername || this.botUserId} (${this.accountId})`);
+    console.log(`telegram bot @${this.botUsername || this.botUserId} (${this.botId})`);
     await this.initializeOffset();
     await this.registerCommands();
     this.running = true;
@@ -295,7 +295,7 @@ export class TelegramPollingService {
     await Promise.allSettled([...this.inFlightUpdates]);
     this.agentService.unregisterSurfaceNotificationHandler({
       platform: "telegram",
-      accountId: this.accountId,
+      botId: this.botId,
     });
   }
 
@@ -305,9 +305,9 @@ export class TelegramPollingService {
 
   getRuntimeIdentity() {
     return {
-      accountId: this.accountId,
+      botId: this.botId,
       label: `bot=${this.getBotLabel()}`,
-      tokenHint: buildTokenHint(this.accountConfig.botToken),
+      tokenHint: buildTokenHint(this.botCredentials.botToken),
     };
   }
 
@@ -318,7 +318,7 @@ export class TelegramPollingService {
         const controller = new AbortController();
         this.activePollController = controller;
         const updates = await callTelegramApi<TelegramGetUpdatesResult>(
-          this.accountConfig.botToken,
+          this.botCredentials.botToken,
           "getUpdates",
           {
             timeout: telegramConfig.polling.timeoutSeconds,
@@ -404,7 +404,7 @@ export class TelegramPollingService {
       agentService: this.agentService,
       botUserId: this.botUserId,
       botUsername: this.botUsername,
-      accountId: this.accountId,
+      botId: this.botId,
     });
     if (!routeInfo.route) {
       if (
@@ -419,7 +419,7 @@ export class TelegramPollingService {
       ) {
           try {
             await callTelegramApi(
-            this.accountConfig.botToken,
+            this.botCredentials.botToken,
               "sendMessage",
             {
               chat_id: message.chat.id,
@@ -485,7 +485,7 @@ export class TelegramPollingService {
       if (ownerClaimed && ownerPrincipal) {
         try {
           await callTelegramApi(
-            this.accountConfig.botToken,
+            this.botCredentials.botToken,
             "sendMessage",
             {
               chat_id: message.chat.id,
@@ -535,7 +535,7 @@ export class TelegramPollingService {
             if (pairingReply) {
               try {
                 await callTelegramApi(
-                  this.accountConfig.botToken,
+                  this.botCredentials.botToken,
                   "sendMessage",
                   {
                     chat_id: message.chat.id,
@@ -613,7 +613,7 @@ export class TelegramPollingService {
         : "");
     const attachmentPaths = await resolveTelegramAttachmentPaths({
       message,
-      botToken: this.accountConfig.botToken,
+      botToken: this.botCredentials.botToken,
       workspacePath: this.agentService.getWorkspacePath(routeInfo.sessionTarget),
       sessionKey: routeInfo.sessionTarget.sessionKey,
       messageId: String(message.message_id),
@@ -654,7 +654,7 @@ export class TelegramPollingService {
         .trim();
       const identity = {
         platform: "telegram" as const,
-        accountId: this.accountId,
+        botId: this.botId,
         conversationKind: routeInfo.conversationKind,
         senderId:
           message.from?.id != null ? String(message.from.id).trim() : undefined,
@@ -697,10 +697,10 @@ export class TelegramPollingService {
       logLatencyDebug("telegram-event-accepted", timingContext, {
         conversationKind: routeInfo.conversationKind,
         responseMode: routeInfo.route.responseMode,
-        accountId: this.accountId,
+        botId: this.botId,
       });
       const processingLease = await this.processingIndicators.acquire({
-        key: `telegram:${this.accountId}:${message.chat.id}:${routeInfo.topicId ?? "root"}`,
+        key: `telegram:${this.botId}:${message.chat.id}:${routeInfo.topicId ?? "root"}`,
         activate: async () =>
           beginTelegramTypingHeartbeat({
             sendTyping: () => this.sendTyping(message.chat.id, routeInfo.topicId),
@@ -750,7 +750,7 @@ export class TelegramPollingService {
               renderMode: "native",
             });
             responseChunks = await postTelegramText({
-              token: this.accountConfig.botToken,
+              token: this.botCredentials.botToken,
               chatId: message.chat.id,
               text: renderedReply.text,
               topicId: routeInfo.topicId,
@@ -766,7 +766,7 @@ export class TelegramPollingService {
               renderMode: "native",
             });
             responseChunks = await reconcileTelegramText({
-              token: this.accountConfig.botToken,
+              token: this.botCredentials.botToken,
               chatId: message.chat.id,
               chunks,
               text: renderedReply.text,
@@ -795,7 +795,7 @@ export class TelegramPollingService {
 
   private async sendTyping(chatId: number, topicId?: number) {
     await callTelegramApi(
-      this.accountConfig.botToken,
+      this.botCredentials.botToken,
       "sendChatAction",
       {
         chat_id: chatId,
@@ -810,7 +810,7 @@ export class TelegramPollingService {
   }
 
   private async registerCommands() {
-    const token = this.accountConfig.botToken;
+    const token = this.botCredentials.botToken;
     try {
       for (const registration of buildTelegramCommandRegistrations(
         this.getBotConfig(),
@@ -834,7 +834,7 @@ export class TelegramPollingService {
     const updates = await retryTelegramPollingConflict({
       operation: () =>
         callTelegramApi<TelegramGetUpdatesResult>(
-          this.accountConfig.botToken,
+          this.botCredentials.botToken,
           "getUpdates",
           {
             timeout: 0,
@@ -858,7 +858,7 @@ function resolveRouteAndTarget(params: {
   agentService: AgentService;
   botUserId: number;
   botUsername: string;
-  accountId: string;
+  botId: string;
 }) {
   const isForum = params.message.chat.is_forum === true;
   const topicId =
@@ -871,7 +871,7 @@ function resolveRouteAndTarget(params: {
     chatId: params.message.chat.id,
     topicId,
     isForum,
-    accountId: params.accountId,
+    botId: params.botId,
   });
   const route = routeInfo.route;
   if (!route) {
@@ -890,7 +890,7 @@ function resolveRouteAndTarget(params: {
     sessionTarget: resolveTelegramConversationTarget({
       loadedConfig: params.loadedConfig,
       agentId: route.agentId,
-      accountId: params.accountId,
+      botId: params.botId,
       chatId: params.message.chat.id,
       userId: params.message.from?.id,
       conversationKind: routeInfo.conversationKind,

@@ -120,7 +120,7 @@ function createDependencies() {
       {
         id: "slack",
         isEnabled: () => true,
-        listAccounts: () => [],
+        listBots: () => [],
         createRuntimeService: () => {
           throw new Error("not used in message cli tests");
         },
@@ -149,14 +149,14 @@ function createDependencies() {
         };
           calls.push({ provider: "slack", action: command.action, params });
           return {
-            accountId: command.account ?? "work",
+            botId: command.account ?? "work",
             result:
               command.action === "send"
                 ? { ok: true, provider: "slack", action: "send" }
                 : { ok: true },
           };
         },
-        resolveMessageReplyTarget: ({ loadedConfig, command, accountId }) => {
+        resolveMessageReplyTarget: ({ loadedConfig, command, botId }) => {
           if (!command.target) {
             return null;
           }
@@ -176,7 +176,7 @@ function createDependencies() {
               channel_type: normalizedTarget.channelType,
               channel: normalizedTarget.channelId,
             },
-            { accountId },
+            { accountId: botId },
           );
           if (!resolved.route) {
             return null;
@@ -184,7 +184,7 @@ function createDependencies() {
           return resolveSlackConversationTarget({
             loadedConfig,
             agentId: resolved.route.agentId,
-            accountId,
+            accountId: botId,
             channelId: normalizedTarget.channelId,
             conversationKind: normalizedTarget.conversationKind,
             threadTs: command.threadId ?? command.replyTo,
@@ -196,7 +196,7 @@ function createDependencies() {
       {
         id: "telegram",
         isEnabled: () => true,
-        listAccounts: () => [],
+        listBots: () => [],
         createRuntimeService: () => {
           throw new Error("not used in message cli tests");
         },
@@ -237,7 +237,7 @@ function createDependencies() {
             params,
           });
           return {
-            accountId: command.account ?? "ops",
+            botId: command.account ?? "ops",
             result:
               command.action === "read" || command.action === "reactions" || command.action === "search"
                 ? { ok: false, action: command.action }
@@ -246,7 +246,7 @@ function createDependencies() {
                   : { ok: true },
           };
         },
-        resolveMessageReplyTarget: ({ loadedConfig, command, accountId }) => {
+        resolveMessageReplyTarget: ({ loadedConfig, command, botId }) => {
           if (!command.target) {
             return null;
           }
@@ -261,7 +261,7 @@ function createDependencies() {
             chatId,
             topicId: Number.isFinite(topicId) ? topicId : undefined,
             isForum: Number.isFinite(topicId),
-            accountId,
+            accountId: botId,
           });
           if (!resolved.route) {
             return null;
@@ -269,7 +269,7 @@ function createDependencies() {
           return resolveTelegramConversationTarget({
             loadedConfig,
             agentId: resolved.route.agentId,
-            accountId,
+            accountId: botId,
             chatId,
             userId: chatId > 0 ? chatId : undefined,
             conversationKind:
@@ -315,7 +315,7 @@ describe("message cli", () => {
     expect(logs[0]).toContain("Render Rules:");
   });
 
-  test("routes slack send through the resolved account config", async () => {
+  test("routes slack send through the resolved bot config", async () => {
     const { deps, logs, calls, replyTargets } = createDependencies();
 
     await runMessageCli([

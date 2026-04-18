@@ -53,6 +53,7 @@ import {
 export { ActiveRunInProgressError };
 import type { LatencyDebugContext } from "../control/latency-debug.ts";
 import type { ChannelIdentity } from "../channels/channel-identity.ts";
+import { resolveChannelIdentityBotId } from "../channels/channel-identity.ts";
 import type { StoredLoopSurfaceBinding } from "./loop-state.ts";
 import { applyTemplate } from "../shared/paths.ts";
 import type { StoredRecentConversationMessage } from "../shared/recent-message-context.ts";
@@ -61,7 +62,7 @@ import {
   resolveSlackDirectMessageConfig,
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageConfig,
-} from "../config/channel-accounts.ts";
+} from "../config/channel-bots.ts";
 
 type StreamUpdate = RunUpdate;
 
@@ -215,21 +216,23 @@ export class AgentService {
 
   registerSurfaceNotificationHandler(params: {
     platform: "slack" | "telegram";
+    botId?: string;
     accountId?: string;
     handler: SurfaceNotificationHandler;
   }) {
     this.surfaceNotificationHandlers.set(
-      this.getSurfaceNotificationHandlerKey(params.platform, params.accountId),
+      this.getSurfaceNotificationHandlerKey(params.platform, params.botId ?? params.accountId),
       params.handler,
     );
   }
 
   unregisterSurfaceNotificationHandler(params: {
     platform: "slack" | "telegram";
+    botId?: string;
     accountId?: string;
   }) {
     this.surfaceNotificationHandlers.delete(
-      this.getSurfaceNotificationHandlerKey(params.platform, params.accountId),
+      this.getSurfaceNotificationHandlerKey(params.platform, params.botId ?? params.accountId),
     );
   }
 
@@ -757,14 +760,14 @@ export class AgentService {
 
   private getSurfaceNotificationHandlerKey(
     platform: "slack" | "telegram",
-    accountId?: string,
+    botId?: string,
   ) {
-    return `${platform}:${accountId?.trim() || "default"}`;
+    return `${platform}:${botId?.trim() || "default"}`;
   }
 
   private async notifySurface(request: SurfaceNotificationRequest) {
     const handler = this.surfaceNotificationHandlers.get(
-      this.getSurfaceNotificationHandlerKey(request.binding.platform, request.binding.accountId),
+      this.getSurfaceNotificationHandlerKey(request.binding.platform, request.binding.botId),
     );
     if (!handler) {
       return;
@@ -776,7 +779,7 @@ export class AgentService {
     if (identity.platform === "slack") {
       const channelConfig = resolveSlackBotConfig(
         this.loadedConfig.raw.bots.slack,
-        identity.accountId,
+        resolveChannelIdentityBotId(identity),
       );
       let resolved: SurfaceNotificationsConfig = {
         queueStart: channelConfig.surfaceNotifications?.queueStart ?? "brief",
@@ -809,7 +812,7 @@ export class AgentService {
 
     const channelConfig = resolveTelegramBotConfig(
       this.loadedConfig.raw.bots.telegram,
-      identity.accountId,
+      resolveChannelIdentityBotId(identity),
     );
     let resolved: SurfaceNotificationsConfig = {
       queueStart: channelConfig.surfaceNotifications?.queueStart ?? "brief",
@@ -975,8 +978,14 @@ export class AgentService {
     const identity = this.buildLoopChannelIdentity(loop.surfaceBinding);
     const channelConfig =
       identity.platform === "slack"
-        ? resolveSlackBotConfig(this.loadedConfig.raw.bots.slack, identity.accountId)
-        : resolveTelegramBotConfig(this.loadedConfig.raw.bots.telegram, identity.accountId);
+        ? resolveSlackBotConfig(
+            this.loadedConfig.raw.bots.slack,
+            resolveChannelIdentityBotId(identity),
+          )
+        : resolveTelegramBotConfig(
+            this.loadedConfig.raw.bots.telegram,
+            resolveChannelIdentityBotId(identity),
+          );
     const { responseMode, streaming } = this.resolveLoopSurfaceModes(identity);
 
     return buildAgentPromptText({
@@ -993,7 +1002,7 @@ export class AgentService {
   private buildLoopChannelIdentity(binding: StoredLoopSurfaceBinding): ChannelIdentity {
     return {
       platform: binding.platform,
-      accountId: binding.accountId,
+      botId: binding.botId ?? binding.accountId,
       conversationKind: binding.conversationKind,
       channelId: binding.channelId,
       chatId: binding.chatId,
@@ -1009,7 +1018,7 @@ export class AgentService {
     if (identity.platform === "slack") {
       const channelConfig = resolveSlackBotConfig(
         this.loadedConfig.raw.bots.slack,
-        identity.accountId,
+        resolveChannelIdentityBotId(identity),
       );
       responseMode = channelConfig.responseMode;
       streaming = channelConfig.streaming;
@@ -1025,7 +1034,7 @@ export class AgentService {
     } else {
       const channelConfig = resolveTelegramBotConfig(
         this.loadedConfig.raw.bots.telegram,
-        identity.accountId,
+        resolveChannelIdentityBotId(identity),
       );
       responseMode = channelConfig.responseMode;
       streaming = channelConfig.streaming;

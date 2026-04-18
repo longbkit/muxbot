@@ -59,7 +59,7 @@ This field is updated when a prompt is admitted into active execution, before ru
 
 It is intentionally separate from `updatedAt` because:
 
-- `updatedAt` also changes for runtime settlement, session-id sync, loop persistence, and other continuity updates
+- `updatedAt` also changes for runtime settlement, session id sync, loop persistence, and other continuity updates
 - operators need `latest` and `next` to mean "latest new turn" rather than "last metadata write"
 
 ## Command Contract

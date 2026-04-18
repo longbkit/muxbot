@@ -73,7 +73,7 @@ North star:
   - `test/startup-bootstrap.test.ts`
   - `test/channel-credentials.test.ts`
   - `test/runtime-process.test.ts`
-  - `test/channel-accounts.test.ts`
+  - `test/channel-bots.test.ts`
 - broad migration verification is now green at `277 pass, 0 fail`
 - `bunx tsc --noEmit` is now green in this workspace
 
@@ -179,8 +179,8 @@ These files define or materialize the current old shape:
 
 ## Bot Credential And Bootstrap Writers
 
-- `src/config/channel-account-management.ts`
-- `src/config/channel-accounts.ts`
+- `src/config/channel-bot-management.ts`
+- `src/config/channel-bots.ts`
 - `src/config/channel-credentials.ts`
 - `src/config/channel-credentials-shared.ts`
 - `src/config/channel-runtime-credentials.ts`
@@ -209,10 +209,10 @@ These files define or materialize the current old shape:
 - `src/config/schema.ts`
 - `src/config/template.ts`
 - `src/config/load-config.ts`
-- `src/config/channel-account-management.ts`
+- `src/config/channel-bot-management.ts`
 - `src/config/channel-credentials.ts`
 - `src/config/channel-credentials-shared.ts`
-- `src/config/channel-accounts.ts`
+- `src/config/channel-bots.ts`
 - `src/config/bindings.ts`
 - `src/control/channel-bootstrap-flags.ts`
 - `src/control/runtime-bootstrap-cli.ts`
@@ -305,7 +305,7 @@ High-confidence impacted tests:
 - `test/bootstrap.test.ts`
 - `test/startup-bootstrap.test.ts`
 - `test/runtime-summary.test.ts`
-- `test/channel-accounts.test.ts`
+- `test/channel-bots.test.ts`
 - `test/channel-credentials.test.ts`
 - `test/cli.test.ts`
 
@@ -448,7 +448,7 @@ Slack uses two credentials per bot. Telegram uses one. A shape cleanup must not 
 2. `src/config/load-config.ts`
 3. `src/config/template.ts`
 4. `src/config/channel-credentials*.ts`
-5. `src/config/channel-account-management.ts`
+5. `src/config/channel-bot-management.ts`
 6. `src/control/runtime-bootstrap-cli.ts`
 7. `src/control/accounts-cli.ts` -> target `bots` surface
 8. `src/control/channels-cli.ts` -> target `routes` surface

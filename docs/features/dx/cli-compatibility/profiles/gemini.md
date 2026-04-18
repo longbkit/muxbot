@@ -1,4 +1,4 @@
-# Gemini Backend Profile
+# Gemini CLI Profile
 
 ## Summary
 
@@ -90,7 +90,7 @@ Current basis:
 Current implication:
 
 - running-state observation is reasonably explicit
-- interrupt confirmation is still best-effort until a stronger backend confirmation path exists
+- interrupt confirmation is still best-effort until a stronger CLI confirmation path exists
 
 ## Running Snapshot Signals
 

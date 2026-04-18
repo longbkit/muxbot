@@ -1,11 +1,12 @@
 import type { ClisbotConfig } from "../config/schema.ts";
 import type { ChannelIdentity } from "./channel-identity.ts";
+import { resolveChannelIdentityBotId } from "./channel-identity.ts";
 import {
-  getSlackBotConfig,
-  getTelegramBotConfig,
-  resolveSlackAccountId,
-  resolveTelegramAccountId,
-} from "../config/channel-accounts.ts";
+  getSlackBotRecord,
+  getTelegramBotRecord,
+  resolveSlackBotId,
+  resolveTelegramBotId,
+} from "../config/channel-bots.ts";
 
 export type ResponseMode = "capture-pane" | "message-tool";
 export type AdditionalMessageMode = "queue" | "steer";
@@ -44,7 +45,7 @@ function createTelegramRouteOverride() {
 }
 
 function getOrCreateTelegramGroupRoute(
-  bot: NonNullable<ReturnType<typeof getTelegramBotConfig>>,
+  bot: NonNullable<ReturnType<typeof getTelegramBotRecord>>,
   chatId: string,
 ) {
   const existingGroup = bot.groups[chatId];
@@ -60,7 +61,7 @@ function getOrCreateTelegramGroupRoute(
 }
 
 function getOrCreateTelegramTopicRoute(
-  bot: NonNullable<ReturnType<typeof getTelegramBotConfig>>,
+  bot: NonNullable<ReturnType<typeof getTelegramBotRecord>>,
   chatId: string,
   topicId: string,
 ) {
@@ -105,8 +106,8 @@ function resolveSlackConfigTarget<TField extends SurfaceModeField>(
   field: TField,
   params: ConfiguredSurfaceModeTarget,
 ): SurfaceModeTargetBinding<TField> {
-  const botId = resolveSlackAccountId(config.bots.slack, params.botId);
-  const bot = getSlackBotConfig(config.bots.slack, botId);
+  const botId = resolveSlackBotId(config.bots.slack, params.botId);
+  const bot = getSlackBotRecord(config.bots.slack, botId);
   if (!bot) {
     throw new Error(`Unknown Slack bot: ${botId}`);
   }
@@ -168,8 +169,8 @@ function resolveTelegramConfigTarget<TField extends SurfaceModeField>(
   field: TField,
   params: ConfiguredSurfaceModeTarget,
 ): SurfaceModeTargetBinding<TField> {
-  const botId = resolveTelegramAccountId(config.bots.telegram, params.botId);
-  const bot = getTelegramBotConfig(config.bots.telegram, botId);
+  const botId = resolveTelegramBotId(config.bots.telegram, params.botId);
+  const bot = getTelegramBotRecord(config.bots.telegram, botId);
   if (!bot) {
     throw new Error(`Unknown Telegram bot: ${botId}`);
   }
@@ -280,7 +281,7 @@ export function buildConfiguredTargetFromIdentity(identity: ChannelIdentity) {
 
     return {
       channel: "slack" as const,
-      botId: identity.accountId,
+      botId: resolveChannelIdentityBotId(identity),
       target,
     };
   }
@@ -294,7 +295,7 @@ export function buildConfiguredTargetFromIdentity(identity: ChannelIdentity) {
 
   return {
     channel: "telegram" as const,
-    botId: identity.accountId,
+    botId: resolveChannelIdentityBotId(identity),
     target,
   };
 }

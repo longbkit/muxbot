@@ -170,7 +170,7 @@ clisbot logs
 
 What you want to see in `clisbot status`:
 
-- `Slack account default: ...`
+- `Slack bot default: ...`
 - `slack enabled=yes`
 - `connection=active`
 

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
-  listSlackAccounts,
-  resolveSlackAccountConfig,
-  resolveTelegramAccountConfig,
-} from "../src/config/channel-accounts.ts";
+  listSlackBots,
+  resolveSlackBotCredentials,
+  resolveTelegramBotCredentials,
+} from "../src/config/channel-bots.ts";
 import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
@@ -32,15 +32,15 @@ function createConfig(): ClisbotConfig {
   return config;
 }
 
-describe("channel accounts", () => {
-  test("resolves explicit slack account config", () => {
+describe("channel bots", () => {
+  test("resolves explicit slack bot credentials", () => {
     const config = createConfig();
-    const resolved = resolveSlackAccountConfig(config.bots.slack, "work");
-    expect(resolved.accountId).toBe("work");
+    const resolved = resolveSlackBotCredentials(config.bots.slack, "work");
+    expect(resolved.botId).toBe("work");
     expect(resolved.config.botToken).toBe("work-bot");
   });
 
-  test("falls back to root slack tokens when no account map is configured", () => {
+  test("falls back to root slack tokens when no bot map is configured", () => {
     const config = createConfig();
     config.bots.slack.default = {
       ...config.bots.slack.work,
@@ -49,22 +49,22 @@ describe("channel accounts", () => {
     };
     delete config.bots.slack.work;
     config.bots.slack.defaults.defaultBotId = "default";
-    const resolved = resolveSlackAccountConfig(config.bots.slack);
-    expect(resolved.accountId).toBe("default");
+    const resolved = resolveSlackBotCredentials(config.bots.slack);
+    expect(resolved.botId).toBe("default");
     expect(resolved.config.botToken).toBe("root-bot");
   });
 
-  test("resolves telegram default account config", () => {
+  test("resolves telegram default bot credentials", () => {
     const config = createConfig();
-    const resolved = resolveTelegramAccountConfig(config.bots.telegram);
-    expect(resolved.accountId).toBe("alerts");
+    const resolved = resolveTelegramBotCredentials(config.bots.telegram);
+    expect(resolved.botId).toBe("alerts");
     expect(resolved.config.botToken).toBe("alerts-token");
   });
 
-  test("lists only valid slack accounts", () => {
+  test("lists only valid slack bots", () => {
     const config = createConfig();
     config.bots.slack.empty = { ...config.bots.slack.work, appToken: "", botToken: "" };
-    expect(listSlackAccounts(config.bots.slack).map((entry) => entry.accountId)).toEqual([
+    expect(listSlackBots(config.bots.slack).map((entry) => entry.botId)).toEqual([
       "work",
     ]);
   });

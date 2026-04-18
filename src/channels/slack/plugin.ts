@@ -2,10 +2,10 @@ import type { AgentSessionTarget } from "../../agents/agent-service.ts";
 import type { ChannelPlugin } from "../channel-plugin.ts";
 import type { ParsedMessageCommand } from "../message-command.ts";
 import {
-  resolveSlackAccountConfig,
-  listSlackAccounts,
-  type SlackAccountConfig,
-} from "../../config/channel-accounts.ts";
+  listSlackBots,
+  resolveSlackBotCredentials,
+  type SlackBotCredentialConfig,
+} from "../../config/channel-bots.ts";
 import { SlackSocketService } from "./service.ts";
 import { deleteSlackMessageAction, editSlackMessage, getSlackReactions, listSlackPins, pinSlackMessage, reactSlackMessage, readSlackMessages, searchSlackMessages, sendSlackMessage, sendSlackPoll, unpinSlackMessage } from "./message-actions.ts";
 import { resolveSlackConversationRoute } from "./route-config.ts";
@@ -73,7 +73,7 @@ function normalizeSlackFollowUpTarget(rawTarget: string) {
 function resolveSlackReplyTarget(params: {
   loadedConfig: Parameters<ChannelPlugin["resolveMessageReplyTarget"]>[0]["loadedConfig"];
   command: ParsedMessageCommand;
-  accountId: string;
+  botId: string;
 }): AgentSessionTarget | null {
   if (!params.command.target) {
     return null;
@@ -91,7 +91,7 @@ function resolveSlackReplyTarget(params: {
       channel: normalized.channelId,
     },
     {
-      accountId: params.accountId,
+      botId: params.botId,
     },
   );
   if (!resolved.route) {
@@ -101,7 +101,7 @@ function resolveSlackReplyTarget(params: {
   return resolveSlackConversationTarget({
     loadedConfig: params.loadedConfig,
     agentId: resolved.route.agentId,
-    accountId: params.accountId,
+    botId: params.botId,
     channelId: normalized.channelId,
     conversationKind: normalized.conversationKind,
     threadTs: params.command.threadId ?? params.command.replyTo,
@@ -113,19 +113,19 @@ function resolveSlackReplyTarget(params: {
 export const slackChannelPlugin: ChannelPlugin = {
   id: "slack",
   isEnabled: (loadedConfig) => loadedConfig.raw.bots.slack.defaults.enabled,
-  listAccounts: (loadedConfig) =>
-    listSlackAccounts(loadedConfig.raw.bots.slack).map(({ accountId, config }) => ({
-      accountId,
+  listBots: (loadedConfig) =>
+    listSlackBots(loadedConfig.raw.bots.slack).map(({ botId, config }) => ({
+      botId,
       config,
     })),
-  createRuntimeService: (context, account) =>
+  createRuntimeService: (context, bot) =>
     new SlackSocketService(
       context.loadedConfig,
       context.agentService,
       context.processedEventsStore,
       context.activityStore,
-      account.accountId,
-      account.config as SlackAccountConfig,
+      bot.botId,
+      bot.config as SlackBotCredentialConfig,
     ),
   renderHealthSummary: (state) => {
     switch (state) {
@@ -138,15 +138,15 @@ export const slackChannelPlugin: ChannelPlugin = {
     }
   },
   renderActiveHealthSummary: (serviceCount) =>
-    `Slack Socket Mode connected for ${serviceCount} account(s).`,
+    `Slack Socket Mode connected for ${serviceCount} bot(s).`,
   markStartupFailure: (store, error) => store.markSlackFailure(error),
   runMessageCommand: async (loadedConfig, command) => {
-    const account = resolveSlackAccountConfig(
+    const bot = resolveSlackBotCredentials(
       loadedConfig.raw.bots.slack,
       command.account,
     );
     const shared = {
-      botToken: account.config.botToken,
+      botToken: bot.config.botToken,
       target: command.target!,
       threadId: command.threadId,
       replyTo: command.replyTo,
@@ -165,27 +165,27 @@ export const slackChannelPlugin: ChannelPlugin = {
 
     switch (command.action) {
       case "send":
-        return { accountId: account.accountId, result: await sendSlackMessage(shared) };
+        return { botId: bot.botId, result: await sendSlackMessage(shared) };
       case "poll":
-        return { accountId: account.accountId, result: await sendSlackPoll(shared) };
+        return { botId: bot.botId, result: await sendSlackPoll(shared) };
       case "react":
-        return { accountId: account.accountId, result: await reactSlackMessage(shared) };
+        return { botId: bot.botId, result: await reactSlackMessage(shared) };
       case "reactions":
-        return { accountId: account.accountId, result: await getSlackReactions(shared) };
+        return { botId: bot.botId, result: await getSlackReactions(shared) };
       case "read":
-        return { accountId: account.accountId, result: await readSlackMessages(shared) };
+        return { botId: bot.botId, result: await readSlackMessages(shared) };
       case "edit":
-        return { accountId: account.accountId, result: await editSlackMessage(shared) };
+        return { botId: bot.botId, result: await editSlackMessage(shared) };
       case "delete":
-        return { accountId: account.accountId, result: await deleteSlackMessageAction(shared) };
+        return { botId: bot.botId, result: await deleteSlackMessageAction(shared) };
       case "pin":
-        return { accountId: account.accountId, result: await pinSlackMessage(shared) };
+        return { botId: bot.botId, result: await pinSlackMessage(shared) };
       case "unpin":
-        return { accountId: account.accountId, result: await unpinSlackMessage(shared) };
+        return { botId: bot.botId, result: await unpinSlackMessage(shared) };
       case "pins":
-        return { accountId: account.accountId, result: await listSlackPins(shared) };
+        return { botId: bot.botId, result: await listSlackPins(shared) };
       case "search":
-        return { accountId: account.accountId, result: await searchSlackMessages(shared) };
+        return { botId: bot.botId, result: await searchSlackMessages(shared) };
     }
   },
   resolveMessageReplyTarget: resolveSlackReplyTarget,

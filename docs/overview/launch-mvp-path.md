@@ -31,7 +31,9 @@ Detailed execution still belongs in the linked task docs.
    - current shared channel package stays Slack plus Telegram
 3. Vietnam launch package:
    - keep the same CLI trio
-   - add Zalo Official Account plus Zalo Personal
+   - add Zalo Bot Platform
+   - add Zalo Official Account
+   - add Zalo Personal
 4. Next expansion wave:
    - add more channels such as Discord, WhatsApp, Google Workspace, and Microsoft Teams
    - add more agentic CLIs such as Cursor, Amp, OpenCode, Qwen, Kilo, and Minimax based on real userbase demand
@@ -70,6 +72,7 @@ Later CLI support should not dilute this first gate.
 
 For Vietnam, the product package should extend the same core trio with:
 
+- Zalo Bot Platform
 - Zalo Official Account
 - Zalo Personal
 
@@ -106,6 +109,7 @@ The open question is whether broader public launch should also include:
 ## Backlog Links
 
 - [Common CLI Launch Coverage And Validation](../tasks/features/runners/2026-04-13-common-cli-launch-coverage-and-validation.md)
+- [Zalo Bot, Zalo OA, And Zalo Personal Channel Strategy](../tasks/features/channels/2026-04-18-zalo-bot-oa-and-personal-channel-strategy.md)
 - [Vietnam Channel Launch Package](../tasks/features/channels/2026-04-13-vietnam-channel-launch-package.md)
 - [Secondary CLI Expansion Prioritization](../tasks/features/runners/2026-04-13-secondary-cli-expansion-prioritization.md)
 - [Post-MVP Channel Expansion Wave](../tasks/features/channels/2026-04-13-post-mvp-channel-expansion-wave.md)

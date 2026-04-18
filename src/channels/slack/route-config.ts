@@ -2,7 +2,7 @@ import { type LoadedConfig } from "../../config/load-config.ts";
 import {
   resolveSlackBotConfig,
   resolveSlackDirectMessageConfig,
-} from "../../config/channel-accounts.ts";
+} from "../../config/channel-bots.ts";
 import {
   buildSharedChannelRoute,
   type SharedChannelRoute,
@@ -28,11 +28,12 @@ function isAdmittedRoute(route: SlackRouteOverride | undefined | null) {
 function buildRoute(loadedConfig: LoadedConfig, params: {
   route?: SlackRouteOverride | null;
   requireMention: boolean;
+  botId?: string;
   accountId?: string;
 }): SlackRoute {
   const slackConfig = resolveSlackBotConfig(
     loadedConfig.raw.bots.slack,
-    params.accountId,
+    params.botId ?? params.accountId,
   );
   return {
     ...buildSharedChannelRoute({
@@ -41,7 +42,6 @@ function buildRoute(loadedConfig: LoadedConfig, params: {
       channelConfig: slackConfig,
       route: params.route,
       requireMention: params.requireMention,
-      accountId: params.accountId,
     }),
     replyToMode: slackConfig.replyToMode,
   };
@@ -50,22 +50,24 @@ function buildRoute(loadedConfig: LoadedConfig, params: {
 function resolveChannelRoute(
   loadedConfig: LoadedConfig,
   channelId: string,
+  botId?: string,
   accountId?: string,
 ): SlackRoute | null {
-  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, accountId);
+  const resolvedBotId = botId ?? accountId;
+  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, resolvedBotId);
   const route = slackConfig.groups[`channel:${channelId}`] ?? slackConfig.groups["*"];
   if (isAdmittedRoute(route)) {
     return buildRoute(loadedConfig, {
       route,
       requireMention: false,
-      accountId,
+      botId: resolvedBotId,
     });
   }
 
   if (slackConfig.channelPolicy === "open") {
     return buildRoute(loadedConfig, {
       requireMention: true,
-      accountId,
+      botId: resolvedBotId,
     });
   }
 
@@ -75,22 +77,24 @@ function resolveChannelRoute(
 function resolveGroupRoute(
   loadedConfig: LoadedConfig,
   channelId: string,
+  botId?: string,
   accountId?: string,
 ): SlackRoute | null {
-  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, accountId);
+  const resolvedBotId = botId ?? accountId;
+  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, resolvedBotId);
   const route = slackConfig.groups[`group:${channelId}`] ?? slackConfig.groups["*"];
   if (isAdmittedRoute(route)) {
     return buildRoute(loadedConfig, {
       route,
       requireMention: false,
-      accountId,
+      botId: resolvedBotId,
     });
   }
 
   if (slackConfig.groupPolicy === "open") {
     return buildRoute(loadedConfig, {
       requireMention: true,
-      accountId,
+      botId: resolvedBotId,
     });
   }
 
@@ -100,9 +104,11 @@ function resolveGroupRoute(
 function resolveDirectMessageRoute(
   loadedConfig: LoadedConfig,
   userId?: string,
+  botId?: string,
   accountId?: string,
 ): SlackRoute | null {
-  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, accountId);
+  const resolvedBotId = botId ?? accountId;
+  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, resolvedBotId);
   const route = resolveSlackDirectMessageConfig(slackConfig, userId);
   if (!isAdmittedRoute(route)) {
     return null;
@@ -111,7 +117,7 @@ function resolveDirectMessageRoute(
   return buildRoute(loadedConfig, {
     route,
     requireMention: false,
-    accountId,
+    botId: resolvedBotId,
   });
 }
 
@@ -119,6 +125,7 @@ export function resolveSlackConversationRoute(
   loadedConfig: LoadedConfig,
   event: any,
   options: {
+    botId?: string;
     accountId?: string;
   } = {},
 ): SlackResolvedRoute {
@@ -131,6 +138,7 @@ export function resolveSlackConversationRoute(
       route: resolveDirectMessageRoute(
         loadedConfig,
         typeof event.user === "string" ? event.user.trim().toUpperCase() : undefined,
+        options.botId,
         options.accountId,
       ),
     };
@@ -140,7 +148,7 @@ export function resolveSlackConversationRoute(
     return {
       conversationKind: "group",
       route: channelId
-        ? resolveGroupRoute(loadedConfig, channelId, options.accountId)
+        ? resolveGroupRoute(loadedConfig, channelId, options.botId, options.accountId)
         : null,
     };
   }
@@ -148,7 +156,7 @@ export function resolveSlackConversationRoute(
   return {
     conversationKind: "channel",
     route: channelId
-      ? resolveChannelRoute(loadedConfig, channelId, options.accountId)
+      ? resolveChannelRoute(loadedConfig, channelId, options.botId, options.accountId)
       : null,
   };
 }

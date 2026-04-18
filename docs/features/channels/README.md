@@ -9,6 +9,10 @@ It owns every external conversation surface:
 - Slack today
 - Telegram today
 - API-compatible access as another channel
+- planned Zalo expansion as three distinct paths:
+  - `zalo-bot`
+  - `zalo-oa`
+  - `zalo-personal`
 - future Discord and similar integrations
 
 ## State
@@ -64,6 +68,7 @@ Channels is where those surfaces live.
 - [OpenClaw CLI Command Surfaces And Slack Telegram Send Syntax](../../research/channels/2026-04-09-openclaw-cli-command-surfaces-and-slack-telegram-send-syntax.md)
 - [OpenClaw Channel Standardization Vs Clisbot Gaps](../../research/channels/2026-04-10-openclaw-channel-standardization-vs-clisbot-gaps.md)
 - [OpenClaw Structured Channel Rendering Techniques For Slack And Telegram](../../research/channels/2026-04-14-openclaw-structured-channel-rendering-techniques.md)
+- [OpenClaw Zalo Paths And Official Zalo Bot Platform](../../research/channels/2026-04-18-openclaw-zalo-paths-and-official-zalo-bot-platform.md)
 
 ## Related Feature Docs
 
@@ -76,6 +81,8 @@ Channels is where those surfaces live.
 - [Structured Channel Rendering And Native Surface Capabilities](structured-channel-rendering-and-native-surface-capabilities.md)
 - [Loop Slash Command](loop-slash-command.md)
 - [Recent Conversation Replay](recent-conversation-replay.md)
+- [Zalo Bot, Zalo OA, And Zalo Personal Channel Strategy](../../tasks/features/channels/2026-04-18-zalo-bot-oa-and-personal-channel-strategy.md)
+- [Official Zalo Bot Platform Channel MVP](../../tasks/features/channels/2026-04-18-zalo-bot-platform-channel-mvp.md)
 
 ## Dependencies
 
@@ -119,3 +126,8 @@ Keep the Slack MVP truthful on `SLACK_TEST_CHANNEL`.
 - Telegram polling should dispatch updates without global in-order blocking, so one busy topic or DM does not stall later updates for other topics or chats on the same bot
 - Slack and Telegram now share a first-class `ChannelPlugin` seam for runtime bootstrap, operator `message` commands, runtime health summaries, and shared route-policy composition
 - provider event loops, payload parsing, and transport semantics still stay provider-owned, so a future channel can plug into the same control seam without flattening provider behavior
+- the next Vietnam channel expansion is now explicitly shaped as three separate provider families:
+  - `zalo-bot` first
+  - `zalo-oa` second
+  - `zalo-personal` optional last
+- `zalo-bot` should reuse Telegram-like architecture patterns where they fit, but keep Zalo-specific transport, policy, and limit semantics truthful

@@ -1,8 +1,8 @@
-# Codex Backend Profile
+# Codex CLI Profile
 
 ## Summary
 
-Codex is the current default-oriented backend shape in `clisbot`.
+Codex is the current default-oriented CLI shape in `clisbot`.
 
 Its continuity model is strong, but its startup readiness model is still more generic than Gemini.
 
@@ -27,7 +27,7 @@ Support: `Partial`
 
 Current basis:
 
-- no backend-specific `startupReadyPattern` is configured
+- no CLI-specific `startupReadyPattern` is configured
 - startup succeeds once the tmux bootstrap sees a non-empty post-trust snapshot and no configured blocker
 - `probe`-level readiness is therefore more heuristic than explicit
 
@@ -96,7 +96,7 @@ Current normalized running clues include:
 - `Working (...)`
 - duration footer with interrupt hint
 
-These are strong enough for running snapshots, but should still be treated as backend-specific observation signals rather than contract truth by themselves.
+These are strong enough for running snapshots, but should still be treated as CLI-specific observation signals rather than contract truth by themselves.
 
 ## Main Drift Risks
 

@@ -12,21 +12,21 @@ The design target is:
 
 ## Primary Commands
 
-### Single backend, single scenario
+### Single CLI, single scenario
 
 ```text
-clisbot runner smoke --backend <codex|claude|gemini> --scenario <name> --json
+clisbot runner smoke --cli <codex|claude|gemini> --scenario <name> --json
 ```
 
 ### Launch-trio suite
 
 ```text
-clisbot runner smoke --backend all --suite launch-trio --json
+clisbot runner smoke --cli all --suite launch-trio --json
 ```
 
 ## Required Flags
 
-### `--backend`
+### `--cli`
 
 Allowed values:
 
@@ -38,7 +38,7 @@ Allowed values:
 Rules:
 
 - `all` is only valid with `--suite`
-- a concrete backend is required for `--scenario`
+- a concrete CLI is required for `--scenario`
 
 ### `--scenario`
 
@@ -53,7 +53,7 @@ Allowed values in the first batch:
 Rules:
 
 - mutually exclusive with `--suite`
-- required when `--backend` is one concrete backend
+- required when `--cli` is one concrete CLI
 
 ### `--suite`
 
@@ -77,7 +77,7 @@ Override the workspace used for the smoke run.
 
 ### `--agent <id>`
 
-Pick which configured agent profile to use when backend-specific options come from agent config.
+Pick which configured agent profile to use when CLI-specific options come from agent config.
 
 ### `--artifact-dir <path>`
 
@@ -116,13 +116,18 @@ Each single-scenario run should emit one JSON object like:
 {
   "kind": "runner-smoke-result",
   "version": "v0",
-  "backendId": "codex",
+  "cli": "codex",
   "scenario": "startup_ready",
   "ok": true,
   "grade": "strong",
   "startedAt": "2026-04-17T13:30:00.000Z",
   "finishedAt": "2026-04-17T13:30:09.000Z",
   "durationMs": 9000,
+  "retryCount": 2,
+  "detectionLatencyMs": 3100,
+  "versionBefore": "0.30.2",
+  "versionAfter": "0.30.2",
+  "workspaceMode": "fresh-copy",
   "session": {
     "sessionKey": "smoke:codex:startup_ready",
     "sessionId": "sess_abc123",
@@ -159,7 +164,7 @@ The launch-trio suite should emit one roll-up object:
   "durationMs": 240000,
   "results": [
     {
-      "backendId": "codex",
+      "cli": "codex",
       "scenario": "startup_ready",
       "ok": true,
       "grade": "strong",
@@ -167,7 +172,7 @@ The launch-trio suite should emit one roll-up object:
       "artifactDir": "~/.clisbot/artifacts/runner-smoke/2026-04-17T13-30-00Z-codex-startup_ready"
     },
     {
-      "backendId": "gemini",
+      "cli": "gemini",
       "scenario": "startup_ready",
       "ok": false,
       "grade": "blocked",

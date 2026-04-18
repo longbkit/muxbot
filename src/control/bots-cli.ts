@@ -375,11 +375,11 @@ async function addOrSetBotCredentials(
 
     let persisted = token.kind === "env" ? "env" : "mem";
     if (token.kind === "mem") {
-      setTelegramRuntimeCredential({ accountId: botId, botToken: token.secret });
+      setTelegramRuntimeCredential({ botId, botToken: token.secret });
     }
     if (persist && token.kind === "mem") {
-      persistTelegramCredential({ accountId: botId, botToken: token.secret });
-      clearTelegramRuntimeCredential({ accountId: botId });
+      persistTelegramCredential({ botId, botToken: token.secret });
+      clearTelegramRuntimeCredential({ botId });
       persisted = "tokenFile";
     }
 
@@ -439,18 +439,18 @@ async function addOrSetBotCredentials(
   let persisted = appToken.kind === "env" ? "env" : "mem";
   if (appToken.kind === "mem" && botToken.kind === "mem") {
     setSlackRuntimeCredential({
-      accountId: botId,
+      botId,
       appToken: appToken.secret,
       botToken: botToken.secret,
     });
   }
   if (persist && appToken.kind === "mem" && botToken.kind === "mem") {
     persistSlackCredential({
-      accountId: botId,
+      botId,
       appToken: appToken.secret,
       botToken: botToken.secret,
     });
-    clearSlackRuntimeCredential({ accountId: botId });
+    clearSlackRuntimeCredential({ botId });
     persisted = "tokenFile";
   }
 
@@ -674,8 +674,8 @@ async function getCredentialSource(args: string[]) {
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   ensureProviderBot(config, provider, botId);
   const source = provider === "slack"
-    ? describeSlackCredentialSource({ config: config.bots.slack, accountId: botId })
-    : describeTelegramCredentialSource({ config: config.bots.telegram, accountId: botId });
+    ? describeSlackCredentialSource({ config: config.bots.slack, botId })
+    : describeTelegramCredentialSource({ config: config.bots.telegram, botId });
   console.log(`${provider}/${botId} credentials: ${source.detail}`);
   console.log(`config: ${configPath}`);
 }

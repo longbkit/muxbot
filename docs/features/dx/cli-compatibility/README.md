@@ -20,15 +20,33 @@ That is not enough for long-term stability because upstream CLIs keep changing:
 - running indicators drift
 - interrupt semantics drift
 
-The system needs one front door that says what `clisbot` expects from a CLI backend and how that expectation is exposed to operators and automation.
+The system needs one front door that says what `clisbot` expects from a CLI and how that expectation is exposed to operators and automation.
 
 ## Scope
 
 - normalized capability definitions
 - input and output contracts for compatibility operations
 - shared state vocabulary such as `ready`, `running`, `waiting_input`, `blocked`, and `lost`
-- backend-specific capability profiles
+- CLI-specific capability profiles
 - compatibility harness strategy for fake and real CLIs
+
+## Naming Rules
+
+Use these names consistently in this feature area:
+
+- `CLI`: the upstream interactive tool such as Codex, Claude, or Gemini
+- `CLI profile`: the per-CLI capability and drift summary
+- `workspace mode`: the environment mode used to reproduce or validate behavior, such as `current` or `fresh-copy`
+- `risk slice`: one operator painpoint or instability boundary that should be reproduced and measured directly
+- `test`: the operator-facing validation unit built on top of lower-level probe, watch, and send surfaces
+- `suite`: a grouped set of tests
+- `session id`: prose form in narrative text
+- `sessionId`: schema field form in JSON examples
+
+Current exception:
+
+- early docs still use `runner smoke`, `smoke command`, and `scenario` in some places because that was the first documented shape
+- if a later batch renames the surface, prefer `runner test` and treat the older `smoke` wording as transitional
 
 ## Non-Goals
 
@@ -40,8 +58,10 @@ The system needs one front door that says what `clisbot` expects from a CLI back
 ## Related Docs
 
 - [DX](../README.md)
+- [Human Checklist](./human-checklist.md)
+- [Operator Validation Map](./operator-validation-map.md)
 - [Capability Contract](./capability-contract.md)
-- [Backend Profiles](./backend-profiles.md)
+- [CLI Profiles](./backend-profiles.md)
 - [Real-CLI Smoke Surface](./real-cli-smoke-surface.md)
 - [Smoke Command Contract](./smoke-command-contract.md)
 - [Runners](../../runners/README.md)
@@ -49,7 +69,11 @@ The system needs one front door that says what `clisbot` expects from a CLI back
 
 ## Current Focus
 
-The v0 contract and launch-trio backend profiles are now in place.
+The v0 contract and launch-trio CLI profiles are now in place.
+
+The human input checklist is now captured separately so operator painpoints stay visible even while machine-readable contracts are being normalized.
+
+The operator validation map now turns those painpoints into reproducible risk slices with explicit workspace modes, metrics, artifacts, and operator surfaces.
 
 The next batch should use that published contract to drive:
 
@@ -58,4 +82,4 @@ The next batch should use that published contract to drive:
 - `runner attach --json`
 - `runner smoke`
 
-without letting those operator surfaces drift back into backend-specific pane heuristics.
+without letting those operator surfaces drift back into CLI-specific pane heuristics.

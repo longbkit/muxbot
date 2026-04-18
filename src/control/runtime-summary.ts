@@ -18,7 +18,7 @@ import {
   resolveSlackDirectMessageConfig,
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageConfig,
-} from "../config/channel-accounts.ts";
+} from "../config/channel-bots.ts";
 import { ActivityStore } from "./activity-store.ts";
 import {
   collapseHomePath,

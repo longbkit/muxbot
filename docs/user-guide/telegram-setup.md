@@ -110,7 +110,7 @@ clisbot logs
 
 What you want to see in `clisbot status`:
 
-- `Telegram account default: ...`
+- `Telegram bot default: ...`
 - `telegram enabled=yes`
 - `connection=active`
 

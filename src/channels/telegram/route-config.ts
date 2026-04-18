@@ -2,7 +2,7 @@ import { type LoadedConfig } from "../../config/load-config.ts";
 import {
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageConfig,
-} from "../../config/channel-accounts.ts";
+} from "../../config/channel-bots.ts";
 import {
   buildSharedChannelRoute,
   type SharedChannelRoute,
@@ -28,12 +28,13 @@ function buildRoute(
   params: {
     route?: TelegramRouteOverride | null;
     requireMention: boolean;
+    botId?: string;
     accountId?: string;
   },
 ): TelegramRoute {
   const telegramConfig = resolveTelegramBotConfig(
     loadedConfig.raw.bots.telegram,
-    params.accountId,
+    params.botId ?? params.accountId,
   );
   return buildSharedChannelRoute({
     loadedConfig,
@@ -41,7 +42,6 @@ function buildRoute(
     channelConfig: telegramConfig,
     route: params.route,
     requireMention: params.requireMention,
-    accountId: params.accountId,
   });
 }
 
@@ -49,9 +49,11 @@ function resolveGroupRoute(
   loadedConfig: LoadedConfig,
   chatId: number,
   topicId?: number,
+  botId?: string,
   accountId?: string,
 ): TelegramRoute | null {
-  const telegramConfig = resolveTelegramBotConfig(loadedConfig.raw.bots.telegram, accountId);
+  const resolvedBotId = botId ?? accountId;
+  const telegramConfig = resolveTelegramBotConfig(loadedConfig.raw.bots.telegram, resolvedBotId);
   const groupRoute = telegramConfig.groups[String(chatId)] ?? telegramConfig.groups["*"];
   const topicRoute =
     topicId != null ? groupRoute?.topics?.[String(topicId)] : undefined;
@@ -63,14 +65,14 @@ function resolveGroupRoute(
         ...topicRoute,
       },
       requireMention: groupRoute?.requireMention ?? true,
-      accountId,
+      botId: resolvedBotId,
     });
   }
 
   if (telegramConfig.groupPolicy === "open") {
     return buildRoute(loadedConfig, {
       requireMention: true,
-      accountId,
+      botId: resolvedBotId,
     });
   }
 
@@ -80,9 +82,11 @@ function resolveGroupRoute(
 function resolveDirectMessageRoute(
   loadedConfig: LoadedConfig,
   senderId?: number,
+  botId?: string,
   accountId?: string,
 ) {
-  const telegramConfig = resolveTelegramBotConfig(loadedConfig.raw.bots.telegram, accountId);
+  const resolvedBotId = botId ?? accountId;
+  const telegramConfig = resolveTelegramBotConfig(loadedConfig.raw.bots.telegram, resolvedBotId);
   const route = resolveTelegramDirectMessageConfig(telegramConfig, senderId);
   if (!isAdmittedRoute(route)) {
     return null;
@@ -91,7 +95,7 @@ function resolveDirectMessageRoute(
   return buildRoute(loadedConfig, {
     route,
     requireMention: false,
-    accountId,
+    botId: resolvedBotId,
   });
 }
 
@@ -101,12 +105,18 @@ export function resolveTelegramConversationRoute(params: {
   chatId: number;
   topicId?: number;
   isForum?: boolean;
+  botId?: string;
   accountId?: string;
 }) {
   if (params.chatType === "private") {
     return {
       conversationKind: "dm" as const,
-      route: resolveDirectMessageRoute(params.loadedConfig, params.chatId, params.accountId),
+      route: resolveDirectMessageRoute(
+        params.loadedConfig,
+        params.chatId,
+        params.botId,
+        params.accountId,
+      ),
     };
   }
 
@@ -126,6 +136,7 @@ export function resolveTelegramConversationRoute(params: {
       params.loadedConfig,
       params.chatId,
       params.topicId,
+      params.botId,
       params.accountId,
     ),
   };

@@ -4,14 +4,14 @@ import type {
 } from "../config/agent-tool-presets.ts";
 import { parseTokenInput, type ParsedTokenInput } from "../config/channel-credentials.ts";
 
-export type ParsedSlackAccountFlags = {
-  accountId: string;
+export type ParsedSlackBotFlags = {
+  botId: string;
   appToken?: ParsedTokenInput;
   botToken?: ParsedTokenInput;
 };
 
-export type ParsedTelegramAccountFlags = {
-  accountId: string;
+export type ParsedTelegramBotFlags = {
+  botId: string;
   botToken?: ParsedTokenInput;
 };
 
@@ -19,8 +19,8 @@ export type ParsedBootstrapFlags = {
   cliTool?: AgentCliToolId;
   bootstrap?: AgentBootstrapMode;
   persist: boolean;
-  slackAccounts: ParsedSlackAccountFlags[];
-  telegramAccounts: ParsedTelegramAccountFlags[];
+  slackBots: ParsedSlackBotFlags[];
+  telegramBots: ParsedTelegramBotFlags[];
   sawCredentialFlags: boolean;
   sawSlackFlags: boolean;
   sawTelegramFlags: boolean;
@@ -50,58 +50,58 @@ function parseOptionValue(args: string[], name: string, index: number) {
   return value;
 }
 
-function getOrCreateSlackAccount(
-  accounts: ParsedSlackAccountFlags[],
-  accountId: string,
+function getOrCreateSlackBot(
+  bots: ParsedSlackBotFlags[],
+  botId: string,
 ) {
-  let account = accounts.find((entry) => entry.accountId === accountId);
-  if (!account) {
-    account = { accountId };
-    accounts.push(account);
+  let bot = bots.find((entry) => entry.botId === botId);
+  if (!bot) {
+    bot = { botId };
+    bots.push(bot);
   }
-  return account;
+  return bot;
 }
 
-function getOrCreateTelegramAccount(
-  accounts: ParsedTelegramAccountFlags[],
-  accountId: string,
+function getOrCreateTelegramBot(
+  bots: ParsedTelegramBotFlags[],
+  botId: string,
 ) {
-  let account = accounts.find((entry) => entry.accountId === accountId);
-  if (!account) {
-    account = { accountId };
-    accounts.push(account);
+  let bot = bots.find((entry) => entry.botId === botId);
+  if (!bot) {
+    bot = { botId };
+    bots.push(bot);
   }
-  return account;
+  return bot;
 }
 
-function ensureUniqueAccount(accounts: Array<{ accountId: string }>, accountId: string, flagName: string) {
-  if (accounts.some((entry) => entry.accountId === accountId)) {
-    throw new Error(`Duplicate ${flagName} ${accountId}`);
+function ensureUniqueBot(bots: Array<{ botId: string }>, botId: string, flagName: string) {
+  if (bots.some((entry) => entry.botId === botId)) {
+    throw new Error(`Duplicate ${flagName} ${botId}`);
   }
 }
 
-function validateSlackAccount(account: ParsedSlackAccountFlags) {
-  if (!account.appToken || !account.botToken) {
-    throw new Error(`Slack account ${account.accountId} requires both app token and bot token`);
+function validateSlackBot(bot: ParsedSlackBotFlags) {
+  if (!bot.appToken || !bot.botToken) {
+    throw new Error(`Slack bot ${bot.botId} requires both app token and bot token`);
   }
-  if (account.appToken.kind !== account.botToken.kind) {
+  if (bot.appToken.kind !== bot.botToken.kind) {
     throw new Error(
-      `Slack account ${account.accountId} must use one credential source kind for both app and bot tokens`,
+      `Slack bot ${bot.botId} must use one credential source kind for both app and bot tokens`,
     );
   }
 }
 
-function validateTelegramAccount(account: ParsedTelegramAccountFlags) {
-  if (!account.botToken) {
-    throw new Error(`Telegram account ${account.accountId} requires a bot token`);
+function validateTelegramBot(bot: ParsedTelegramBotFlags) {
+  if (!bot.botToken) {
+    throw new Error(`Telegram bot ${bot.botId} requires a bot token`);
   }
 }
 
 export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
-  const slackAccounts: ParsedSlackAccountFlags[] = [];
-  const telegramAccounts: ParsedTelegramAccountFlags[] = [];
-  let currentSlackAccountId: string | undefined;
-  let currentTelegramAccountId: string | undefined;
+  const slackBots: ParsedSlackBotFlags[] = [];
+  const telegramBots: ParsedTelegramBotFlags[] = [];
+  let currentSlackBotId: string | undefined;
+  let currentTelegramBotId: string | undefined;
   let cliTool: AgentCliToolId | undefined;
   let bootstrap: AgentBootstrapMode | undefined;
   let persist = false;
@@ -126,27 +126,27 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
       continue;
     }
     if (arg === "--slack-account") {
-      const accountId = parseOptionValue(args, arg, index);
-      ensureUniqueAccount(slackAccounts, accountId, "--slack-account");
-      currentSlackAccountId = accountId;
-      getOrCreateSlackAccount(slackAccounts, accountId);
+      const botId = parseOptionValue(args, arg, index);
+      ensureUniqueBot(slackBots, botId, "--slack-account");
+      currentSlackBotId = botId;
+      getOrCreateSlackBot(slackBots, botId);
       sawSlackFlags = true;
       index += 1;
       continue;
     }
     if (arg === "--telegram-account") {
-      const accountId = parseOptionValue(args, arg, index);
-      ensureUniqueAccount(telegramAccounts, accountId, "--telegram-account");
-      currentTelegramAccountId = accountId;
-      getOrCreateTelegramAccount(telegramAccounts, accountId);
+      const botId = parseOptionValue(args, arg, index);
+      ensureUniqueBot(telegramBots, botId, "--telegram-account");
+      currentTelegramBotId = botId;
+      getOrCreateTelegramBot(telegramBots, botId);
       sawTelegramFlags = true;
       index += 1;
       continue;
     }
     if (arg === "--slack-app-token") {
       const token = parseTokenInput(parseOptionValue(args, arg, index));
-      const account = getOrCreateSlackAccount(slackAccounts, currentSlackAccountId ?? "default");
-      account.appToken = token;
+      const bot = getOrCreateSlackBot(slackBots, currentSlackBotId ?? "default");
+      bot.appToken = token;
       sawCredentialFlags = true;
       sawSlackFlags = true;
       index += 1;
@@ -154,8 +154,8 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
     }
     if (arg === "--slack-bot-token") {
       const token = parseTokenInput(parseOptionValue(args, arg, index));
-      const account = getOrCreateSlackAccount(slackAccounts, currentSlackAccountId ?? "default");
-      account.botToken = token;
+      const bot = getOrCreateSlackBot(slackBots, currentSlackBotId ?? "default");
+      bot.botToken = token;
       sawCredentialFlags = true;
       sawSlackFlags = true;
       index += 1;
@@ -163,11 +163,11 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
     }
     if (arg === "--telegram-bot-token") {
       const token = parseTokenInput(parseOptionValue(args, arg, index));
-      const account = getOrCreateTelegramAccount(
-        telegramAccounts,
-        currentTelegramAccountId ?? "default",
+      const bot = getOrCreateTelegramBot(
+        telegramBots,
+        currentTelegramBotId ?? "default",
       );
-      account.botToken = token;
+      bot.botToken = token;
       sawCredentialFlags = true;
       sawTelegramFlags = true;
       index += 1;
@@ -177,19 +177,19 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
     throw new Error(`Unknown option for start/init: ${arg}`);
   }
 
-  for (const account of slackAccounts) {
-    validateSlackAccount(account);
+  for (const bot of slackBots) {
+    validateSlackBot(bot);
   }
-  for (const account of telegramAccounts) {
-    validateTelegramAccount(account);
+  for (const bot of telegramBots) {
+    validateTelegramBot(bot);
   }
 
   return {
     cliTool,
     bootstrap,
     persist,
-    slackAccounts,
-    telegramAccounts,
+    slackBots,
+    telegramBots,
     sawCredentialFlags,
     sawSlackFlags,
     sawTelegramFlags,
@@ -199,9 +199,9 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
 
 export function hasLiteralBootstrapCredentials(flags: ParsedBootstrapFlags) {
   return (
-    flags.slackAccounts.some(
-      (account) => isLiteralToken(account.appToken) || isLiteralToken(account.botToken),
+    flags.slackBots.some(
+      (bot) => isLiteralToken(bot.appToken) || isLiteralToken(bot.botToken),
     ) ||
-    flags.telegramAccounts.some((account) => isLiteralToken(account.botToken))
+    flags.telegramBots.some((bot) => isLiteralToken(bot.botToken))
   );
 }

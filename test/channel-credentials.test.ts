@@ -11,9 +11,9 @@ import {
   validatePersistentChannelCredentials,
 } from "../src/config/channel-credentials.ts";
 import {
-  applyBootstrapAccountsToConfig,
-  deactivateExpiredMemAccounts,
-} from "../src/config/channel-account-management.ts";
+  applyBootstrapBotsToConfig,
+  deactivateExpiredMemBots,
+} from "../src/config/channel-bot-management.ts";
 import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
@@ -66,7 +66,7 @@ describe("channel credentials", () => {
     config.bots.telegram.default.credentialType = "mem";
     config.bots.telegram.default.botToken = "";
     setTelegramRuntimeCredential({
-      accountId: "default",
+      botId: "default",
       botToken: "telegram-mem-token",
     });
 
@@ -89,7 +89,7 @@ describe("channel credentials", () => {
     expect(resolved.bots.telegram.default.botToken).toBe("telegram-mem-env-token");
   });
 
-  test("skips missing mem accounts instead of throwing during materialization", () => {
+  test("skips missing mem bots instead of throwing during materialization", () => {
     const config = createConfig();
     config.bots.telegram.default.credentialType = "mem";
     config.bots.telegram.default.botToken = "";
@@ -99,13 +99,13 @@ describe("channel credentials", () => {
     expect(resolved.bots.telegram.default.credentialType).toBe("mem");
   });
 
-  test("deactivates expired mem accounts and disables the channel when none remain", () => {
+  test("deactivates expired mem bots and disables the channel when none remain", () => {
     const config = createConfig();
     config.bots.telegram.default.enabled = true;
     config.bots.telegram.default.credentialType = "mem";
     config.bots.telegram.default.botToken = "";
 
-    const lines = deactivateExpiredMemAccounts(config);
+    const lines = deactivateExpiredMemBots(config);
 
     expect(lines).toEqual([
       "Disabled expired telegram/default (credentialType=mem).",
@@ -115,15 +115,15 @@ describe("channel credentials", () => {
     expect(config.bots.telegram.default.botToken).toBe("");
   });
 
-  test("bootstrap account application keeps channel root tokens empty", () => {
+  test("bootstrap bot application keeps channel root tokens empty", () => {
     const config = createConfig();
 
-    applyBootstrapAccountsToConfig(
+    applyBootstrapBotsToConfig(
       config,
       {
-        slackAccounts: [
+        slackBots: [
           {
-            accountId: "default",
+            botId: "default",
             appToken: {
               kind: "env",
               envName: "SLACK_APP_TOKEN",
@@ -136,9 +136,9 @@ describe("channel credentials", () => {
             },
           },
         ],
-        telegramAccounts: [
+        telegramBots: [
           {
-            accountId: "default",
+            botId: "default",
             botToken: {
               kind: "env",
               envName: "TELEGRAM_BOT_TOKEN",

@@ -70,11 +70,11 @@ import {
   reconcileSlackText,
   type SlackPostedMessageChunk,
 } from "./transport.ts";
-import type { SlackAccountConfig } from "../../config/channel-accounts.ts";
+import type { SlackBotCredentialConfig } from "../../config/channel-bots.ts";
 import {
   resolveSlackBotConfig,
   resolveSlackDirectMessageConfig,
-} from "../../config/channel-accounts.ts";
+} from "../../config/channel-bots.ts";
 import { logLatencyDebug } from "../../control/latency-debug.ts";
 import { buildTokenHint } from "../runtime-identity.ts";
 
@@ -117,18 +117,18 @@ export class SlackSocketService {
     private readonly agentService: AgentService,
     private readonly processedEventsStore: ProcessedEventsStore,
     private readonly activityStore: ActivityStore,
-    private readonly accountId = "default",
-    private readonly accountConfig: SlackAccountConfig,
+    private readonly botId = "default",
+    private readonly botCredentials: SlackBotCredentialConfig,
   ) {
     this.app = new App({
-      token: this.accountConfig.botToken,
-      appToken: this.accountConfig.appToken,
+      token: this.botCredentials.botToken,
+      appToken: this.botCredentials.appToken,
       socketMode: true,
     });
 
     this.agentService.registerSurfaceNotificationHandler({
       platform: "slack",
-      accountId: this.accountId,
+      botId: this.botId,
       handler: async ({ binding, text }) => {
         if (!binding.channelId) {
           return;
@@ -144,7 +144,7 @@ export class SlackSocketService {
   }
 
   private getBotConfig() {
-    return resolveSlackBotConfig(this.loadedConfig.raw.bots.slack, this.accountId);
+    return resolveSlackBotConfig(this.loadedConfig.raw.bots.slack, this.botId);
   }
 
   private getDirectMessageConfig(userId?: string) {
@@ -406,7 +406,7 @@ export class SlackSocketService {
     const sessionTarget = resolveSlackConversationTarget({
       loadedConfig: this.loadedConfig,
       agentId: params.route.agentId,
-      accountId: this.accountId,
+      botId: this.botId,
       channelId,
       userId: typeof event.user === "string" ? event.user : undefined,
       messageTs,
@@ -510,7 +510,7 @@ export class SlackSocketService {
       channelId,
       messageTs,
       threadTs,
-      botToken: this.accountConfig.botToken,
+      botToken: this.botCredentials.botToken,
       workspacePath: this.agentService.getWorkspacePath(sessionTarget),
       sessionKey: sessionTarget.sessionKey,
       messageId: messageTs ?? threadTs ?? `${Date.now()}`,
@@ -560,7 +560,7 @@ export class SlackSocketService {
       this.loadedConfig.raw.agents.defaults.cli;
     const identity = {
       platform: "slack" as const,
-      accountId: this.accountId,
+      botId: this.botId,
       conversationKind: params.conversationKind,
       senderId:
         typeof event.user === "string" ? event.user.trim().toUpperCase() : undefined,
@@ -595,7 +595,7 @@ export class SlackSocketService {
     logLatencyDebug("slack-event-accepted", timingContext, {
       conversationKind: params.conversationKind,
       responseMode: params.route.responseMode,
-      accountId: this.accountId,
+      botId: this.botId,
     });
     const ackReactionTask = waitForBackgroundSlackTask(
       addConfiguredReaction(
@@ -605,7 +605,7 @@ export class SlackSocketService {
       ),
     );
     const processingLease = await this.processingIndicators.acquire({
-      key: `slack:${this.accountId}:${channelId}:${threadTs}`,
+      key: `slack:${this.botId}:${channelId}:${threadTs}`,
       activate: async () =>
         activateSlackProcessingDecoration({
           addReaction: () =>
@@ -742,7 +742,7 @@ export class SlackSocketService {
       const resolvedRoute = resolveSlackConversationRoute(
         this.loadedConfig,
         normalizedEvent,
-        { accountId: this.accountId },
+        { botId: this.botId },
       );
       const route = resolvedRoute.route;
       if (!route) {
@@ -798,7 +798,7 @@ export class SlackSocketService {
       const resolvedRoute = resolveSlackConversationRoute(
         this.loadedConfig,
         normalizedEvent,
-        { accountId: this.accountId },
+        { botId: this.botId },
       );
       const route = resolvedRoute.route;
 
@@ -852,13 +852,13 @@ export class SlackSocketService {
 
   async start() {
     const auth = await this.app.client.auth.test({
-      token: this.accountConfig.botToken,
+      token: this.botCredentials.botToken,
     });
     this.botUserId = auth.user_id ?? "";
     this.botLabel = (auth as { user?: string }).user?.trim() ?? "";
     this.teamId = auth.team_id ?? "";
     this.apiAppId = (auth as { api_app_id?: string }).api_app_id ?? "";
-    console.log(`slack bot user ${this.botLabel || this.botUserId} (${this.accountId})`);
+    console.log(`slack bot user ${this.botLabel || this.botUserId} (${this.botId})`);
     this.app.error(async (error) => {
       console.error("slack app error", error);
     });
@@ -872,7 +872,7 @@ export class SlackSocketService {
   async stop() {
     this.agentService.unregisterSurfaceNotificationHandler({
       platform: "slack",
-      accountId: this.accountId,
+      botId: this.botId,
     });
     await this.app.stop();
   }
@@ -883,10 +883,10 @@ export class SlackSocketService {
 
   getRuntimeIdentity() {
     return {
-      accountId: this.accountId,
+      botId: this.botId,
       label: this.botLabel ? `bot=${this.botLabel}` : `botUser=${this.botUserId || "unknown"}`,
       appLabel: this.apiAppId ? `app=${this.apiAppId}` : undefined,
-      tokenHint: buildTokenHint(this.accountConfig.botToken),
+      tokenHint: buildTokenHint(this.botCredentials.botToken),
     };
   }
 }

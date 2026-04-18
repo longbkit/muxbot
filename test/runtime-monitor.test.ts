@@ -90,7 +90,7 @@ describe("serveMonitor", () => {
     const plugin: ChannelPlugin = {
       id: "telegram",
       isEnabled: () => true,
-      listAccounts: () => [{ accountId: "alerts", config: {} }],
+      listBots: () => [{ botId: "alerts", config: {} }],
       createRuntimeService: () => {
         throw new Error("not used");
       },
@@ -99,7 +99,7 @@ describe("serveMonitor", () => {
       markStartupFailure: async () => undefined,
       runMessageCommand: async (_loadedConfig, command) => {
         sentMessages.push(command.message ?? "");
-        return { accountId: command.account ?? "alerts", result: { ok: true } };
+        return { botId: command.account ?? "alerts", result: { ok: true } };
       },
       resolveMessageReplyTarget: () => null,
     };

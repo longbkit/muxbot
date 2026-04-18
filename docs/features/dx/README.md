@@ -12,7 +12,7 @@ Planned
 
 Some important product truths are not end-user chat features:
 
-- what a backend CLI actually supports
+- what a CLI actually supports
 - how operators and automation inspect that support
 - which machine-readable contracts are safe to build on
 - how compatibility drift is detected before it becomes production confusion
@@ -23,9 +23,9 @@ Those concerns should not be scattered across `agents`, `runners`, `stability`, 
 
 - operator and developer-facing machine-readable control surfaces
 - compatibility contracts for upstream interactive CLIs
-- capability normalization and backend profile docs
-- fake-backend regression harness design
-- real-backend canary strategy and artifact conventions
+- capability normalization and CLI profile docs
+- fake CLI regression harness design
+- real CLI canary strategy and artifact conventions
 - capability matrices and drift classification docs
 
 ## Non-Goals
@@ -42,6 +42,8 @@ Those concerns should not be scattered across `agents`, `runners`, `stability`, 
 ## Related Feature Docs
 
 - [CLI Compatibility](./cli-compatibility/README.md)
+- [CLI Compatibility Human Checklist](./cli-compatibility/human-checklist.md)
+- [CLI Compatibility Operator Validation Map](./cli-compatibility/operator-validation-map.md)
 
 ## Dependencies
 

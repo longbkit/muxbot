@@ -2,10 +2,10 @@ import type { AgentSessionTarget } from "../../agents/agent-service.ts";
 import type { ChannelPlugin } from "../channel-plugin.ts";
 import type { ParsedMessageCommand } from "../message-command.ts";
 import {
-  listTelegramAccounts,
-  resolveTelegramAccountConfig,
-  type TelegramAccountConfig,
-} from "../../config/channel-accounts.ts";
+  listTelegramBots,
+  resolveTelegramBotCredentials,
+  type TelegramBotCredentialConfig,
+} from "../../config/channel-bots.ts";
 import { TelegramPollingService } from "./service.ts";
 import { deleteTelegramMessageAction, editTelegramMessage, listTelegramPins, pinTelegramMessage, reactTelegramMessage, sendTelegramMessage, sendTelegramPoll, unpinTelegramMessage, unsupportedTelegramHistoryAction } from "./message-actions.ts";
 import { resolveTelegramConversationRoute } from "./route-config.ts";
@@ -14,7 +14,7 @@ import { resolveTelegramConversationTarget } from "./session-routing.ts";
 function resolveTelegramReplyTarget(params: {
   loadedConfig: Parameters<ChannelPlugin["resolveMessageReplyTarget"]>[0]["loadedConfig"];
   command: ParsedMessageCommand;
-  accountId: string;
+  botId: string;
 }): AgentSessionTarget | null {
   if (!params.command.target) {
     return null;
@@ -32,7 +32,7 @@ function resolveTelegramReplyTarget(params: {
     chatId,
     topicId: Number.isFinite(topicId) ? topicId : undefined,
     isForum: Number.isFinite(topicId),
-    accountId: params.accountId,
+    botId: params.botId,
   });
   if (!resolved.route) {
     return null;
@@ -41,7 +41,7 @@ function resolveTelegramReplyTarget(params: {
   return resolveTelegramConversationTarget({
     loadedConfig: params.loadedConfig,
     agentId: resolved.route.agentId,
-    accountId: params.accountId,
+    botId: params.botId,
     chatId,
     userId: chatId > 0 ? chatId : undefined,
     conversationKind:
@@ -57,19 +57,19 @@ function resolveTelegramReplyTarget(params: {
 export const telegramChannelPlugin: ChannelPlugin = {
   id: "telegram",
   isEnabled: (loadedConfig) => loadedConfig.raw.bots.telegram.defaults.enabled,
-  listAccounts: (loadedConfig) =>
-    listTelegramAccounts(loadedConfig.raw.bots.telegram).map(({ accountId, config }) => ({
-      accountId,
+  listBots: (loadedConfig) =>
+    listTelegramBots(loadedConfig.raw.bots.telegram).map(({ botId, config }) => ({
+      botId,
       config,
     })),
-  createRuntimeService: (context, account) =>
+  createRuntimeService: (context, bot) =>
     new TelegramPollingService(
       context.loadedConfig,
       context.agentService,
       context.processedEventsStore,
       context.activityStore,
-      account.accountId,
-      account.config as TelegramAccountConfig,
+      bot.botId,
+      bot.config as TelegramBotCredentialConfig,
       context.reportLifecycle,
     ),
   renderHealthSummary: (state) => {
@@ -83,15 +83,15 @@ export const telegramChannelPlugin: ChannelPlugin = {
     }
   },
   renderActiveHealthSummary: (serviceCount) =>
-    `Telegram polling connected for ${serviceCount} account(s).`,
+    `Telegram polling connected for ${serviceCount} bot(s).`,
   markStartupFailure: (store, error) => store.markTelegramFailure(error),
   runMessageCommand: async (loadedConfig, command) => {
-    const account = resolveTelegramAccountConfig(
+    const bot = resolveTelegramBotCredentials(
       loadedConfig.raw.bots.telegram,
       command.account,
     );
     const shared = {
-      botToken: account.config.botToken,
+      botToken: bot.config.botToken,
       target: command.target!,
       threadId: command.threadId,
       replyTo: command.replyTo,
@@ -112,37 +112,37 @@ export const telegramChannelPlugin: ChannelPlugin = {
 
     switch (command.action) {
       case "send":
-        return { accountId: account.accountId, result: await sendTelegramMessage(shared) };
+        return { botId: bot.botId, result: await sendTelegramMessage(shared) };
       case "poll":
-        return { accountId: account.accountId, result: await sendTelegramPoll(shared) };
+        return { botId: bot.botId, result: await sendTelegramPoll(shared) };
       case "react":
-        return { accountId: account.accountId, result: await reactTelegramMessage(shared) };
+        return { botId: bot.botId, result: await reactTelegramMessage(shared) };
       case "reactions":
         return {
-          accountId: account.accountId,
+          botId: bot.botId,
           result: await unsupportedTelegramHistoryAction("reactions"),
         };
       case "read":
         return {
-          accountId: account.accountId,
+          botId: bot.botId,
           result: await unsupportedTelegramHistoryAction("read"),
         };
       case "edit":
-        return { accountId: account.accountId, result: await editTelegramMessage(shared) };
+        return { botId: bot.botId, result: await editTelegramMessage(shared) };
       case "delete":
         return {
-          accountId: account.accountId,
+          botId: bot.botId,
           result: await deleteTelegramMessageAction(shared),
         };
       case "pin":
-        return { accountId: account.accountId, result: await pinTelegramMessage(shared) };
+        return { botId: bot.botId, result: await pinTelegramMessage(shared) };
       case "unpin":
-        return { accountId: account.accountId, result: await unpinTelegramMessage(shared) };
+        return { botId: bot.botId, result: await unpinTelegramMessage(shared) };
       case "pins":
-        return { accountId: account.accountId, result: await listTelegramPins(shared) };
+        return { botId: bot.botId, result: await listTelegramPins(shared) };
       case "search":
         return {
-          accountId: account.accountId,
+          botId: bot.botId,
           result: await unsupportedTelegramHistoryAction("search"),
         };
     }

@@ -198,31 +198,31 @@ export function renderConfiguredChannelTokenStatusLines(
   const lines: string[] = [];
 
   if (config.bots.slack.defaults.enabled) {
-    const accountId = config.bots.slack.defaults.defaultBotId || "default";
+    const botId = config.bots.slack.defaults.defaultBotId || "default";
     try {
       const source = describeSlackCredentialSource({
         config: config.bots.slack,
         env,
       });
-      lines.push(`Slack account ${accountId}: ${source.detail}`);
+      lines.push(`Slack bot ${botId}: ${source.detail}`);
     } catch (error) {
       lines.push(
-        `Slack account ${accountId}: unavailable (${error instanceof Error ? error.message : String(error)})`,
+        `Slack bot ${botId}: unavailable (${error instanceof Error ? error.message : String(error)})`,
       );
     }
   }
 
   if (config.bots.telegram.defaults.enabled) {
-    const accountId = config.bots.telegram.defaults.defaultBotId || "default";
+    const botId = config.bots.telegram.defaults.defaultBotId || "default";
     try {
       const source = describeTelegramCredentialSource({
         config: config.bots.telegram,
         env,
       });
-      lines.push(`Telegram account ${accountId}: ${source.detail}`);
+      lines.push(`Telegram bot ${botId}: ${source.detail}`);
     } catch (error) {
       lines.push(
-        `Telegram account ${accountId}: unavailable (${error instanceof Error ? error.message : String(error)})`,
+        `Telegram bot ${botId}: unavailable (${error instanceof Error ? error.message : String(error)})`,
       );
     }
   }

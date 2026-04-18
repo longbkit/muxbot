@@ -16,7 +16,7 @@ export type ChannelRuntimeService = {
 };
 
 export type ChannelRuntimeIdentity = {
-  accountId: string;
+  botId: string;
   label?: string;
   appLabel?: string;
   tokenHint?: string;
@@ -37,24 +37,24 @@ export type ChannelRuntimeLifecycleEvent = {
   actions?: string[];
 };
 
-export type ChannelRuntimeAccount = {
-  accountId: string;
+export type ChannelRuntimeBot = {
+  botId: string;
   config: unknown;
 };
 
 export type ChannelRuntimeEntry = {
   channel: RuntimeChannel;
-  accountId: string;
+  botId: string;
   service: ChannelRuntimeService;
 };
 
 export type ChannelPlugin = {
   id: RuntimeChannel;
   isEnabled(loadedConfig: LoadedConfig): boolean;
-  listAccounts(loadedConfig: LoadedConfig): ChannelRuntimeAccount[];
+  listBots(loadedConfig: LoadedConfig): ChannelRuntimeBot[];
   createRuntimeService(
     context: ChannelRuntimeContext,
-    account: ChannelRuntimeAccount,
+    bot: ChannelRuntimeBot,
   ): ChannelRuntimeService;
   renderHealthSummary(state: "starting" | "disabled" | "stopped"): string;
   renderActiveHealthSummary(serviceCount: number): string;
@@ -63,12 +63,12 @@ export type ChannelPlugin = {
     loadedConfig: LoadedConfig,
     command: ParsedMessageCommand,
   ): Promise<{
-    accountId: string;
+    botId: string;
     result: unknown;
   }>;
   resolveMessageReplyTarget(params: {
     loadedConfig: LoadedConfig;
     command: ParsedMessageCommand;
-    accountId: string;
+    botId: string;
   }): AgentSessionTarget | null;
 };

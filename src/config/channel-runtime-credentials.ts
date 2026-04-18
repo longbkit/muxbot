@@ -22,6 +22,14 @@ import {
 
 const CREDENTIALS_GITIGNORE_CONTENT = ["*", "!*/", "!.gitignore", ""].join("\n");
 
+function resolveRuntimeBotId(params: { botId?: string; accountId?: string }) {
+  const botId = params.botId?.trim() || params.accountId?.trim();
+  if (!botId) {
+    throw new Error("Missing bot id for runtime credentials.");
+  }
+  return botId;
+}
+
 function readTrimmedFile(pathname: string) {
   return readFileSync(pathname, "utf8").trim();
 }
@@ -112,27 +120,31 @@ export function removeRuntimeCredentials(
 }
 
 export function setTelegramRuntimeCredential(params: {
-  accountId: string;
+  botId?: string;
+  accountId?: string;
   botToken: string;
   runtimeCredentialsPath?: string;
 }) {
+  const botId = resolveRuntimeBotId(params);
   const document = getRuntimeCredentialDocument(params.runtimeCredentialsPath);
   document.telegram ??= {};
-  document.telegram[params.accountId] = {
+  document.telegram[botId] = {
     botToken: params.botToken.trim(),
   };
   writeRuntimeCredentialDocument(document, params.runtimeCredentialsPath);
 }
 
 export function setSlackRuntimeCredential(params: {
-  accountId: string;
+  botId?: string;
+  accountId?: string;
   appToken: string;
   botToken: string;
   runtimeCredentialsPath?: string;
 }) {
+  const botId = resolveRuntimeBotId(params);
   const document = getRuntimeCredentialDocument(params.runtimeCredentialsPath);
   document.slack ??= {};
-  document.slack[params.accountId] = {
+  document.slack[botId] = {
     appToken: params.appToken.trim(),
     botToken: params.botToken.trim(),
   };
@@ -140,47 +152,55 @@ export function setSlackRuntimeCredential(params: {
 }
 
 export function clearTelegramRuntimeCredential(params: {
-  accountId: string;
+  botId?: string;
+  accountId?: string;
   runtimeCredentialsPath?: string;
 }) {
+  const botId = resolveRuntimeBotId(params);
   const document = getRuntimeCredentialDocument(params.runtimeCredentialsPath);
   if (document.telegram) {
-    delete document.telegram[params.accountId];
+    delete document.telegram[botId];
   }
   writeRuntimeCredentialDocument(document, params.runtimeCredentialsPath);
 }
 
 export function clearSlackRuntimeCredential(params: {
-  accountId: string;
+  botId?: string;
+  accountId?: string;
   runtimeCredentialsPath?: string;
 }) {
+  const botId = resolveRuntimeBotId(params);
   const document = getRuntimeCredentialDocument(params.runtimeCredentialsPath);
   if (document.slack) {
-    delete document.slack[params.accountId];
+    delete document.slack[botId];
   }
   writeRuntimeCredentialDocument(document, params.runtimeCredentialsPath);
 }
 
 export function persistTelegramCredential(params: {
-  accountId: string;
+  botId?: string;
+  accountId?: string;
   botToken: string;
   env?: NodeJS.ProcessEnv;
 }) {
+  const botId = resolveRuntimeBotId(params);
   ensureCanonicalCredentialArtifacts(params.env);
-  const path = getCanonicalTelegramBotTokenPath(params.accountId, params.env);
+  const path = getCanonicalTelegramBotTokenPath(botId, params.env);
   writeSecretFile(path, params.botToken);
   return path;
 }
 
 export function persistSlackCredential(params: {
-  accountId: string;
+  botId?: string;
+  accountId?: string;
   appToken: string;
   botToken: string;
   env?: NodeJS.ProcessEnv;
 }) {
+  const botId = resolveRuntimeBotId(params);
   ensureCanonicalCredentialArtifacts(params.env);
-  const appPath = getCanonicalSlackAppTokenPath(params.accountId, params.env);
-  const botPath = getCanonicalSlackBotTokenPath(params.accountId, params.env);
+  const appPath = getCanonicalSlackAppTokenPath(botId, params.env);
+  const botPath = getCanonicalSlackBotTokenPath(botId, params.env);
   writeSecretFile(appPath, params.appToken);
   writeSecretFile(botPath, params.botToken);
   return {

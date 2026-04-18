@@ -3,8 +3,10 @@ import type { ChannelIdentity } from "../channels/channel-identity.ts";
 
 export type StoredLoopSurfaceBinding = Pick<
   ChannelIdentity,
-  "platform" | "accountId" | "conversationKind" | "channelId" | "chatId" | "threadTs" | "topicId"
->;
+  "platform" | "botId" | "conversationKind" | "channelId" | "chatId" | "threadTs" | "topicId"
+> & {
+  accountId?: string;
+};
 
 type StoredLoopBase = {
   id: string;

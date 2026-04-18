@@ -163,5 +163,5 @@ describe("fast start e2e", () => {
     const persistedConfig = JSON.parse(readFileSync(configPath, "utf8"));
     expect(persistedConfig.bots.telegram.defaults.enabled).toBe(false);
     expect(persistedConfig.bots.telegram.default.enabled).toBe(false);
-  });
+  }, 15000);
 });

@@ -10,14 +10,19 @@ import type {
   TelegramProviderDefaultsConfig,
 } from "./schema.ts";
 
-export type SlackAccountConfig = {
+// Canonical bot-oriented config helpers live here.
+
+export type SlackBotCredentialConfig = {
   appToken: string;
   botToken: string;
 };
 
-export type TelegramAccountConfig = {
+export type TelegramBotCredentialConfig = {
   botToken: string;
 };
+
+export type SlackAccountConfig = SlackBotCredentialConfig;
+export type TelegramAccountConfig = TelegramBotCredentialConfig;
 
 export type ResolvedSlackBotConfig = Omit<SlackBotConfig, "directMessages" | "groups"> &
   SlackProviderDefaultsConfig & {
@@ -53,8 +58,8 @@ function resolveDirectMessageRoute(
   return routes["dm:*"] ?? routes["*"];
 }
 
-function normalizeAccountId(accountId?: string | null) {
-  const normalized = accountId?.trim();
+function normalizeBotId(botId?: string | null) {
+  const normalized = botId?.trim();
   return normalized ? normalized : undefined;
 }
 
@@ -155,7 +160,7 @@ function getConfiguredDefaultBotId(params: {
   defaultBotId?: string;
   bots: Record<string, unknown>;
 }) {
-  const explicit = normalizeAccountId(params.defaultBotId);
+  const explicit = normalizeBotId(params.defaultBotId);
   if (explicit) {
     return explicit;
   }
@@ -165,58 +170,86 @@ function getConfiguredDefaultBotId(params: {
   }
 
   const firstBotId = Object.keys(params.bots)[0];
-  return normalizeAccountId(firstBotId) ?? "default";
+  return normalizeBotId(firstBotId) ?? "default";
+}
+
+export function resolveSlackBotId(
+  config: ClisbotConfig["bots"]["slack"],
+  botId?: string | null,
+) {
+  return normalizeBotId(botId) ?? getConfiguredDefaultBotId({
+    defaultBotId: config.defaults.defaultBotId,
+    bots: getSlackBotsRecord(config),
+  });
+}
+
+export function resolveTelegramBotId(
+  config: ClisbotConfig["bots"]["telegram"],
+  botId?: string | null,
+) {
+  return normalizeBotId(botId) ?? getConfiguredDefaultBotId({
+    defaultBotId: config.defaults.defaultBotId,
+    bots: getTelegramBotsRecord(config),
+  });
 }
 
 export function resolveSlackAccountId(
   config: ClisbotConfig["bots"]["slack"],
   accountId?: string | null,
 ) {
-  return normalizeAccountId(accountId) ?? getConfiguredDefaultBotId({
-    defaultBotId: config.defaults.defaultBotId,
-    bots: getSlackBotsRecord(config),
-  });
+  return resolveSlackBotId(config, accountId);
 }
 
 export function resolveTelegramAccountId(
   config: ClisbotConfig["bots"]["telegram"],
   accountId?: string | null,
 ) {
-  return normalizeAccountId(accountId) ?? getConfiguredDefaultBotId({
-    defaultBotId: config.defaults.defaultBotId,
-    bots: getTelegramBotsRecord(config),
-  });
+  return resolveTelegramBotId(config, accountId);
+}
+
+export function getSlackBotRecord(
+  config: ClisbotConfig["bots"]["slack"],
+  botId: string,
+) {
+  return getSlackBotsRecord(config)[botId] as SlackBotConfig | undefined;
+}
+
+export function getTelegramBotRecord(
+  config: ClisbotConfig["bots"]["telegram"],
+  botId: string,
+) {
+  return getTelegramBotsRecord(config)[botId] as TelegramBotConfig | undefined;
 }
 
 export function getSlackBotConfig(
   config: ClisbotConfig["bots"]["slack"],
   accountId: string,
 ) {
-  return getSlackBotsRecord(config)[accountId] as SlackBotConfig | undefined;
+  return getSlackBotRecord(config, accountId);
 }
 
 export function getTelegramBotConfig(
   config: ClisbotConfig["bots"]["telegram"],
   accountId: string,
 ) {
-  return getTelegramBotsRecord(config)[accountId] as TelegramBotConfig | undefined;
+  return getTelegramBotRecord(config, accountId);
 }
 
 export function resolveSlackBotConfig(
   config: ClisbotConfig["bots"]["slack"],
-  accountId?: string | null,
+  botId?: string | null,
 ): ResolvedSlackBotConfig {
-  const resolvedAccountId = resolveSlackAccountId(config, accountId);
+  const resolvedBotId = resolveSlackBotId(config, botId);
   const providerDefaults = config.defaults;
-  const botConfig = getSlackBotConfig(config, resolvedAccountId);
+  const botConfig = getSlackBotRecord(config, resolvedBotId);
   if (!botConfig) {
-    throw new Error(`Unknown Slack bot: ${resolvedAccountId}`);
+    throw new Error(`Unknown Slack bot: ${resolvedBotId}`);
   }
 
   return {
     ...providerDefaults,
     ...botConfig,
-    id: resolvedAccountId,
+    id: resolvedBotId,
     commandPrefixes: {
       slash:
         botConfig.commandPrefixes?.slash ??
@@ -256,19 +289,19 @@ export function resolveSlackBotConfig(
 
 export function resolveTelegramBotConfig(
   config: ClisbotConfig["bots"]["telegram"],
-  accountId?: string | null,
+  botId?: string | null,
 ): ResolvedTelegramBotConfig {
-  const resolvedAccountId = resolveTelegramAccountId(config, accountId);
+  const resolvedBotId = resolveTelegramBotId(config, botId);
   const providerDefaults = config.defaults;
-  const botConfig = getTelegramBotConfig(config, resolvedAccountId);
+  const botConfig = getTelegramBotRecord(config, resolvedBotId);
   if (!botConfig) {
-    throw new Error(`Unknown Telegram bot: ${resolvedAccountId}`);
+    throw new Error(`Unknown Telegram bot: ${resolvedBotId}`);
   }
 
   return {
     ...providerDefaults,
     ...botConfig,
-    id: resolvedAccountId,
+    id: resolvedBotId,
     commandPrefixes: {
       slash:
         botConfig.commandPrefixes?.slash ??
@@ -319,14 +352,14 @@ export function resolveTelegramDirectMessageConfig(
   return resolveDirectMessageRoute(config.directMessages, senderId);
 }
 
-export function resolveSlackAccountConfig(
+export function resolveSlackBotCredentials(
   config: ClisbotConfig["bots"]["slack"],
-  accountId?: string | null,
-): { accountId: string; config: SlackAccountConfig } {
-  const resolved = resolveSlackBotConfig(config, accountId);
+  botId?: string | null,
+): { botId: string; config: SlackBotCredentialConfig } {
+  const resolved = resolveSlackBotConfig(config, botId);
   if (resolved.appToken && resolved.botToken) {
     return {
-      accountId: resolved.id,
+      botId: resolved.id,
       config: {
         appToken: resolved.appToken,
         botToken: resolved.botToken,
@@ -337,14 +370,14 @@ export function resolveSlackAccountConfig(
   throw new Error(`Unknown Slack bot: ${resolved.id}`);
 }
 
-export function resolveTelegramAccountConfig(
+export function resolveTelegramBotCredentials(
   config: ClisbotConfig["bots"]["telegram"],
-  accountId?: string | null,
-): { accountId: string; config: TelegramAccountConfig } {
-  const resolved = resolveTelegramBotConfig(config, accountId);
+  botId?: string | null,
+): { botId: string; config: TelegramBotCredentialConfig } {
+  const resolved = resolveTelegramBotConfig(config, botId);
   if (resolved.botToken) {
     return {
-      accountId: resolved.id,
+      botId: resolved.id,
       config: {
         botToken: resolved.botToken,
       },
@@ -354,15 +387,37 @@ export function resolveTelegramAccountConfig(
   throw new Error(`Unknown Telegram bot: ${resolved.id}`);
 }
 
-export function listSlackAccounts(
+export function resolveSlackAccountConfig(
   config: ClisbotConfig["bots"]["slack"],
-): Array<{ accountId: string; config: SlackAccountConfig }> {
+  accountId?: string | null,
+): { accountId: string; config: SlackBotCredentialConfig } {
+  const resolved = resolveSlackBotCredentials(config, accountId);
+  return {
+    accountId: resolved.botId,
+    config: resolved.config,
+  };
+}
+
+export function resolveTelegramAccountConfig(
+  config: ClisbotConfig["bots"]["telegram"],
+  accountId?: string | null,
+): { accountId: string; config: TelegramBotCredentialConfig } {
+  const resolved = resolveTelegramBotCredentials(config, accountId);
+  return {
+    accountId: resolved.botId,
+    config: resolved.config,
+  };
+}
+
+export function listSlackBots(
+  config: ClisbotConfig["bots"]["slack"],
+): Array<{ botId: string; config: SlackBotCredentialConfig }> {
   return Object.entries(getSlackBotsRecord(config))
     .filter(([, bot]) => bot.enabled !== false)
-    .map(([accountId]) => {
-      const resolved = resolveSlackBotConfig(config, accountId);
+    .map(([botId]) => {
+      const resolved = resolveSlackBotConfig(config, botId);
       return {
-        accountId,
+        botId,
         config: {
           appToken: resolved.appToken,
           botToken: resolved.botToken,
@@ -372,19 +427,37 @@ export function listSlackAccounts(
     .filter(({ config }) => config.appToken.trim() && config.botToken.trim());
 }
 
-export function listTelegramAccounts(
+export function listTelegramBots(
   config: ClisbotConfig["bots"]["telegram"],
-): Array<{ accountId: string; config: TelegramAccountConfig }> {
+): Array<{ botId: string; config: TelegramBotCredentialConfig }> {
   return Object.entries(getTelegramBotsRecord(config))
     .filter(([, bot]) => bot.enabled !== false)
-    .map(([accountId]) => {
-      const resolved = resolveTelegramBotConfig(config, accountId);
+    .map(([botId]) => {
+      const resolved = resolveTelegramBotConfig(config, botId);
       return {
-        accountId,
+        botId,
         config: {
           botToken: resolved.botToken,
         },
       };
     })
     .filter(({ config }) => config.botToken.trim());
+}
+
+export function listSlackAccounts(
+  config: ClisbotConfig["bots"]["slack"],
+): Array<{ accountId: string; config: SlackBotCredentialConfig }> {
+  return listSlackBots(config).map((entry) => ({
+    accountId: entry.botId,
+    config: entry.config,
+  }));
+}
+
+export function listTelegramAccounts(
+  config: ClisbotConfig["bots"]["telegram"],
+): Array<{ accountId: string; config: TelegramBotCredentialConfig }> {
+  return listTelegramBots(config).map((entry) => ({
+    accountId: entry.botId,
+    config: entry.config,
+  }));
 }

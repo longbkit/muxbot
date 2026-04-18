@@ -1,4 +1,5 @@
 import type { ChannelIdentity } from "./channel-identity.ts";
+import { resolveChannelIdentityBotId } from "./channel-identity.ts";
 import { getClisbotPromptCommand } from "../control/clisbot-wrapper.ts";
 
 export type ChannelAgentPromptConfig = {
@@ -322,12 +323,13 @@ function buildReplyCommandBase(params: {
   command: string;
   identity: ChannelIdentity;
 }) {
+  const botId = resolveChannelIdentityBotId(params.identity);
   if (params.identity.platform === "slack") {
     return renderTemplate(SLACK_REPLY_COMMAND_BASE, {
       command: params.command,
-      account_clause: params.identity.accountId
+      account_clause: botId
         ? renderTemplate(ACCOUNT_CLAUSE, {
-          account_id: params.identity.accountId,
+          account_id: botId,
         })
         : EMPTY_ACCOUNT_CLAUSE,
       channel_id: params.identity.channelId ?? "",
@@ -341,9 +343,9 @@ function buildReplyCommandBase(params: {
 
   return renderTemplate(TELEGRAM_REPLY_COMMAND_BASE, {
     command: params.command,
-    account_clause: params.identity.accountId
+    account_clause: botId
       ? renderTemplate(ACCOUNT_CLAUSE, {
-        account_id: params.identity.accountId,
+        account_id: botId,
       })
       : EMPTY_ACCOUNT_CLAUSE,
     chat_id: params.identity.chatId ?? "",

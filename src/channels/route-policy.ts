@@ -64,7 +64,6 @@ type BuildSharedChannelRouteParams = {
   channelConfig: SharedChannelConfig;
   route?: SharedChannelRouteOverride | null;
   requireMention: boolean;
-  accountId?: string;
 };
 
 export function buildSharedChannelRoute(params: BuildSharedChannelRouteParams): SharedChannelRoute {

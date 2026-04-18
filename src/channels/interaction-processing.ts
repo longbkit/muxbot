@@ -62,6 +62,7 @@ import { sleep } from "../shared/process.ts";
 import { join } from "node:path";
 import type { ProcessingIndicatorLifecycle } from "./processing-indicator.ts";
 import type { ChannelIdentity } from "./channel-identity.ts";
+import { resolveChannelIdentityBotId } from "./channel-identity.ts";
 
 export type ChannelInteractionRoute = {
   agentId: string;
@@ -623,7 +624,7 @@ async function resolveLoopPromptText(params: {
 function buildLoopSurfaceBinding(identity: ChannelInteractionIdentity) {
   return {
     platform: identity.platform,
-    accountId: identity.accountId,
+    botId: resolveChannelIdentityBotId(identity),
     conversationKind: identity.conversationKind,
     channelId: identity.channelId,
     chatId: identity.chatId,

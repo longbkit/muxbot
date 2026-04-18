@@ -9,8 +9,10 @@ import { getDefaultCredentialsDir } from "../shared/paths.ts";
 
 const TOKEN_ENV_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
 
-export type SlackPersistentAccountConfig = SlackBotConfig;
-export type TelegramPersistentAccountConfig = TelegramBotConfig;
+export type SlackPersistentBotConfig = SlackBotConfig;
+export type TelegramPersistentBotConfig = TelegramBotConfig;
+export type SlackPersistentAccountConfig = SlackPersistentBotConfig;
+export type TelegramPersistentAccountConfig = TelegramPersistentBotConfig;
 
 export type RuntimeCredentialDocument = {
   slack?: Record<string, { appToken?: string; botToken?: string }>;
@@ -49,14 +51,14 @@ export type ResolvedCredentialSource =
     };
 
 export type ResolvedSlackCredential = {
-  accountId: string;
+  botId: string;
   appToken: string;
   botToken: string;
   source: ResolvedCredentialSource;
 };
 
 export type ResolvedTelegramCredential = {
-  accountId: string;
+  botId: string;
   botToken: string;
   source: ResolvedCredentialSource;
 };
@@ -65,9 +67,13 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function normalizeAccountId(accountId?: string | null) {
-  const trimmed = accountId?.trim();
+export function normalizeBotId(botId?: string | null) {
+  const trimmed = botId?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+export function normalizeAccountId(accountId?: string | null) {
+  return normalizeBotId(accountId);
 }
 
 export function getSlackBotsRecord(
@@ -84,8 +90,8 @@ export function getTelegramBotsRecord(
   return bots;
 }
 
-function normalizeAccountEnvSegment(accountId: string) {
-  return accountId
+function normalizeBotEnvSegment(botId: string) {
+  return botId
     .trim()
     .replaceAll(/[^a-zA-Z0-9]+/g, "_")
     .replaceAll(/_+/g, "_")
@@ -93,15 +99,15 @@ function normalizeAccountEnvSegment(accountId: string) {
     .toUpperCase() || "DEFAULT";
 }
 
-export function getConfiguredDefaultAccountId(params: {
+export function getConfiguredDefaultBotId(params: {
   defaultAccount?: string;
   defaultBotId?: string;
   accounts?: unknown;
   bots?: Record<string, unknown>;
 }) {
   const explicit =
-    normalizeAccountId(params.defaultBotId) ??
-    normalizeAccountId(params.defaultAccount);
+    normalizeBotId(params.defaultBotId) ??
+    normalizeBotId(params.defaultAccount);
   if (explicit) {
     return explicit;
   }
@@ -113,56 +119,79 @@ export function getConfiguredDefaultAccountId(params: {
     return "default";
   }
 
-  const firstAccountId = Object.keys(bots)[0];
-  return normalizeAccountId(firstAccountId) ?? "default";
+  const firstBotId = Object.keys(bots)[0];
+  return normalizeBotId(firstBotId) ?? "default";
 }
 
-export function getTelegramMemEnvName(accountId: string) {
-  return `CLISBOT_MEM_TELEGRAM__${normalizeAccountEnvSegment(accountId)}__BOT_TOKEN`;
+export function getConfiguredDefaultAccountId(params: {
+  defaultAccount?: string;
+  defaultBotId?: string;
+  accounts?: unknown;
+  bots?: Record<string, unknown>;
+}) {
+  return getConfiguredDefaultBotId(params);
 }
 
-export function getSlackMemAppEnvName(accountId: string) {
-  return `CLISBOT_MEM_SLACK__${normalizeAccountEnvSegment(accountId)}__APP_TOKEN`;
+export function getTelegramMemEnvName(botId: string) {
+  return `CLISBOT_MEM_TELEGRAM__${normalizeBotEnvSegment(botId)}__BOT_TOKEN`;
 }
 
-export function getSlackMemBotEnvName(accountId: string) {
-  return `CLISBOT_MEM_SLACK__${normalizeAccountEnvSegment(accountId)}__BOT_TOKEN`;
+export function getSlackMemAppEnvName(botId: string) {
+  return `CLISBOT_MEM_SLACK__${normalizeBotEnvSegment(botId)}__APP_TOKEN`;
+}
+
+export function getSlackMemBotEnvName(botId: string) {
+  return `CLISBOT_MEM_SLACK__${normalizeBotEnvSegment(botId)}__BOT_TOKEN`;
 }
 
 export function trimString(value?: string) {
   return value?.trim() ?? "";
 }
 
+export function getTelegramBotConfig(
+  config: ClisbotConfig["bots"]["telegram"],
+  botId: string,
+) {
+  return getTelegramBotsRecord(config)[botId] as TelegramPersistentBotConfig | undefined;
+}
+
+export function getSlackBotConfig(
+  config: ClisbotConfig["bots"]["slack"],
+  botId: string,
+) {
+  return getSlackBotsRecord(config)[botId] as SlackPersistentBotConfig | undefined;
+}
+
 export function getTelegramAccountConfig(
   config: ClisbotConfig["bots"]["telegram"],
   accountId: string,
 ) {
-  return getTelegramBotsRecord(config)[accountId] as TelegramPersistentAccountConfig | undefined;
+  return getTelegramBotConfig(config, accountId);
 }
 
 export function getSlackAccountConfig(
   config: ClisbotConfig["bots"]["slack"],
   accountId: string,
 ) {
-  return getSlackBotsRecord(config)[accountId] as SlackPersistentAccountConfig | undefined;
+  return getSlackBotConfig(config, accountId);
 }
 
 export function getTelegramEnvReference(
   config: ClisbotConfig["bots"]["telegram"],
-  accountId: string,
+  botId: string,
 ) {
-  const account = getTelegramAccountConfig(config, accountId);
-  return trimString(account?.botToken);
+  const bot = getTelegramBotConfig(config, botId);
+  return trimString(bot?.botToken);
 }
 
 export function getSlackEnvReference(
   config: ClisbotConfig["bots"]["slack"],
-  accountId: string,
+  botId: string,
 ) {
-  const account = getSlackAccountConfig(config, accountId);
+  const bot = getSlackBotConfig(config, botId);
   return {
-    appToken: trimString(account?.appToken),
-    botToken: trimString(account?.botToken),
+    appToken: trimString(bot?.appToken),
+    botToken: trimString(bot?.botToken),
   };
 }
 
@@ -231,22 +260,22 @@ export function parseTokenInput(value: string): ParsedTokenInput {
 }
 
 export function getCanonicalTelegramBotTokenPath(
-  accountId: string,
+  botId: string,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  return join(getDefaultCredentialsDir(env), "telegram", accountId, "bot-token");
+  return join(getDefaultCredentialsDir(env), "telegram", botId, "bot-token");
 }
 
 export function getCanonicalSlackAppTokenPath(
-  accountId: string,
+  botId: string,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  return join(getDefaultCredentialsDir(env), "slack", accountId, "app-token");
+  return join(getDefaultCredentialsDir(env), "slack", botId, "app-token");
 }
 
 export function getCanonicalSlackBotTokenPath(
-  accountId: string,
+  botId: string,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  return join(getDefaultCredentialsDir(env), "slack", accountId, "bot-token");
+  return join(getDefaultCredentialsDir(env), "slack", botId, "bot-token");
 }

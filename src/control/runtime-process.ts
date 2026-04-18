@@ -5,7 +5,7 @@ import { kill } from "node:process";
 import { loadConfig } from "../config/load-config.ts";
 import { renderDefaultConfigTemplate } from "../config/template.ts";
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
-import { deactivateExpiredMemAccounts } from "../config/channel-account-management.ts";
+import { deactivateExpiredMemBots } from "../config/channel-bot-management.ts";
 import { ensureClisbotWrapper } from "./clisbot-wrapper.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
 import { readTextFile, readTextFileSlice, writeTextFile } from "../shared/fs.ts";
@@ -531,7 +531,7 @@ async function disableExpiredMemAccountsInConfig(configPath?: string) {
   }
 
   const { config } = await readEditableConfig(resolvedConfigPath);
-  const lifecycleLines = deactivateExpiredMemAccounts(config);
+  const lifecycleLines = deactivateExpiredMemBots(config);
   if (lifecycleLines.length === 0) {
     return;
   }

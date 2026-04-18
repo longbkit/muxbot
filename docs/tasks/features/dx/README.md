@@ -8,7 +8,7 @@ Examples:
 
 - machine-readable control surfaces
 - CLI compatibility contracts
-- fake-backend regression harness work
+- fake CLI regression harness work
 - upstream-canary validation work
 - capability matrices and drift classification
 

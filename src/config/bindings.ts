@@ -1,19 +1,21 @@
 import type { LoadedConfig } from "./load-config.ts";
 import type { ClisbotConfig } from "./schema.ts";
 import {
-  getSlackBotConfig,
-  getTelegramBotConfig,
-  resolveSlackAccountId,
-  resolveTelegramAccountId,
-} from "./channel-accounts.ts";
+  getSlackBotRecord,
+  getTelegramBotRecord,
+  resolveSlackBotId,
+  resolveTelegramBotId,
+} from "./channel-bots.ts";
 
 export type BindingMatch = {
   channel: "slack" | "telegram";
+  botId?: string;
   accountId?: string;
 };
 
 export function formatBinding(match: BindingMatch) {
-  return match.accountId ? `${match.channel}:${match.accountId}` : match.channel;
+  const botId = match.botId ?? match.accountId;
+  return botId ? `${match.channel}:${botId}` : match.channel;
 }
 
 function getRawConfig(config: LoadedConfig | ClisbotConfig) {
@@ -25,14 +27,15 @@ export function resolveBoundAgentId(
   match: BindingMatch,
 ): string | null {
   const raw = getRawConfig(config);
+  const requestedBotId = match.botId ?? match.accountId;
 
   if (match.channel === "slack") {
-    const accountId = resolveSlackAccountId(raw.bots.slack, match.accountId);
-    return getSlackBotConfig(raw.bots.slack, accountId)?.agentId ?? null;
+    const botId = resolveSlackBotId(raw.bots.slack, requestedBotId);
+    return getSlackBotRecord(raw.bots.slack, botId)?.agentId ?? null;
   }
 
-  const accountId = resolveTelegramAccountId(raw.bots.telegram, match.accountId);
-  return getTelegramBotConfig(raw.bots.telegram, accountId)?.agentId ?? null;
+  const botId = resolveTelegramBotId(raw.bots.telegram, requestedBotId);
+  return getTelegramBotRecord(raw.bots.telegram, botId)?.agentId ?? null;
 }
 
 export function resolveTopLevelBoundAgentId(

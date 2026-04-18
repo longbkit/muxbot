@@ -139,7 +139,7 @@ Important distinction:
 - `--slack-app-token`, `--slack-bot-token`, and `--telegram-bot-token` accept either bare env names like `CUSTOM_SLACK_APP_TOKEN` or placeholder form like `${CUSTOM_SLACK_APP_TOKEN}`
 - `clisbot start` prints which token refs or credential sources it is using for the channels you requested
 - existing enabled channel token refs are validated before the detached runtime is spawned
-- fresh bootstrap enables only the channels and accounts you named explicitly with flags
+- fresh bootstrap enables only the channels and bots you named explicitly with flags
 - `--persist` writes canonical credential files for any literal channel tokens from that invocation, so later plain `clisbot start` can reuse them
 - Gemini-first setups also need Gemini itself to already be authenticated for routed use, either by a prior direct `gemini` login or by headless auth such as `GEMINI_API_KEY` or Vertex AI credentials
 - the generated default config does not preseed Slack channel routes, Slack groups, Telegram groups, or Telegram topics

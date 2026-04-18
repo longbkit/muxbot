@@ -11,7 +11,7 @@ export type RuntimeChannelConnection =
   | "failed";
 
 export type ChannelHealthInstance = {
-  accountId: string;
+  botId: string;
   label?: string;
   appLabel?: string;
   tokenHint?: string;
@@ -137,7 +137,22 @@ export class RuntimeHealthStore {
         channel,
         {
           ...record,
-          instances: record?.instances ?? [],
+          instances: (record?.instances ?? []).map((instance) => {
+            const legacyAccountId = (instance as unknown as { accountId?: unknown })?.accountId;
+            const { accountId: _legacyAccountId, ...rest } = instance as unknown as {
+              accountId?: string;
+              [key: string]: unknown;
+            };
+            return {
+              ...rest,
+              botId:
+                typeof instance?.botId === "string" && instance.botId.trim()
+                  ? instance.botId
+                  : typeof legacyAccountId === "string" && legacyAccountId.trim()
+                    ? legacyAccountId
+                    : "unknown",
+            };
+          }),
         },
       ]),
     ) as RuntimeHealthDocument["channels"];

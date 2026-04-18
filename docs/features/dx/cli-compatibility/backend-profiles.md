@@ -1,8 +1,8 @@
-# CLI Compatibility Backend Profiles
+# CLI Compatibility CLI Profiles
 
 ## Summary
 
-This page maps the current launch-trio backends to the v0 CLI compatibility contract:
+This page maps the current launch-trio CLIs to the v0 CLI compatibility contract:
 
 - Codex
 - Claude
@@ -22,21 +22,21 @@ Use these support levels:
 
 ## Comparison Matrix
 
-| Backend | Start | Probe Ready / Waiting Input | Session Id Strategy | Resume | Recover After Pane Loss | Attach Observe | Interrupt | Main Drift Risk |
+| CLI | Start | Probe Ready / Waiting Input | Session Id Strategy | Resume | Recover After Pane Loss | Attach Observe | Interrupt | Main Drift Risk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Codex | Strong | Partial | runner-created + `/status` capture | Strong | Strong | Strong | Partial | no explicit ready pattern |
 | Claude | Strong | Partial | explicit `--session-id` | Strong | Strong | Strong | Partial | no explicit ready pattern |
 | Gemini | Strong | Strong | runner-created + `/stats session` capture | Strong | Strong | Strong | Partial | auth/setup blockers and upstream screen drift |
 
-## Current Cross-Backend Truth
+## Current Cross-CLI Truth
 
-All three current backends share these runtime truths:
+All three current CLIs share these runtime truths:
 
 - execution is hosted by the tmux runner today
 - trust prompts are runner-owned
 - observation and transcript capture already exist through the runner
 - interrupt is currently a generic `Escape` send, so contract support should be treated as best-effort until confirmation becomes first-class
-- pane-loss recovery depends on restoring a runner instance while preserving logical `sessionKey`, then reusing backend-native `sessionId` when available
+- pane-loss recovery depends on restoring a runner instance while preserving logical `sessionKey`, then reusing CLI-native `sessionId` when available
 
 ## Highest-Value Difference
 
@@ -47,7 +47,7 @@ The most important current difference is startup truth:
 
 That means Gemini currently has the clearest machine-readable readiness contract, while Codex and Claude still rely more on generic startup heuristics after trust-prompt handling.
 
-## Backend Profiles
+## CLI Profiles
 
 - [Codex](./profiles/codex.md)
 - [Claude](./profiles/claude.md)

@@ -35,7 +35,7 @@ Those belong to auth, because control is a surface that consumes auth decisions 
 ## Non-Goals
 
 - end-user message rendering
-- backend-specific runner details
+- CLI-specific runner details
 - channel routing
 - owning the auth model itself
 
