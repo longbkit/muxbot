@@ -130,7 +130,8 @@ const TELEGRAM_FULL_COMMANDS: TelegramRegisteredCommand[] = [
 const TELEGRAM_STARTUP_CONFLICT_MAX_WAIT_MS = 6_000;
 const TELEGRAM_POLLING_CONFLICT_BACKOFF_MAX_DELAY_MS = 30_000;
 const TELEGRAM_POLLING_CONFLICT_SLEEP_SLICE_MS = 250;
-const TELEGRAM_POLLING_CONFLICT_OWNER_ALERT_DELAY_MS = 5 * 60_000;
+const TELEGRAM_POLLING_CONFLICT_OWNER_ALERT_DELAY_MS = 60_000;
+const TELEGRAM_POLLING_CONFLICT_OWNER_ALERT_REPEAT_MS = 15 * 60_000;
 
 function computeTelegramPollingConflictBackoffDelayMs(baseDelayMs: number, attempt: number) {
   const safeBaseDelayMs = Math.max(1, baseDelayMs);
@@ -406,6 +407,7 @@ export class TelegramPollingService {
           "clisbot will keep retrying automatically with backoff until Telegram polling can recover",
         ],
         ownerAlertAfterMs: TELEGRAM_POLLING_CONFLICT_OWNER_ALERT_DELAY_MS,
+        ownerAlertRepeatMs: TELEGRAM_POLLING_CONFLICT_OWNER_ALERT_REPEAT_MS,
       });
       console.error(
         "telegram polling blocked: another bot instance is already calling getUpdates for this token; retrying with backoff",

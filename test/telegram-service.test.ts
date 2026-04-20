@@ -352,6 +352,7 @@ describe("TelegramPollingService", () => {
       detail?: string;
       actions?: string[];
       ownerAlertAfterMs?: number;
+      ownerAlertRepeatMs?: number;
     }> = [];
     let getUpdatesCalls = 0;
     let service: TelegramPollingService | undefined;
@@ -443,7 +444,8 @@ describe("TelegramPollingService", () => {
       expect(lifecycleEvents[0]?.actions).toContain(
         "clisbot will keep retrying automatically with backoff until Telegram polling can recover",
       );
-      expect(lifecycleEvents[0]?.ownerAlertAfterMs).toBe(5 * 60_000);
+      expect(lifecycleEvents[0]?.ownerAlertAfterMs).toBe(60_000);
+      expect(lifecycleEvents[0]?.ownerAlertRepeatMs).toBe(15 * 60_000);
       expect(lifecycleEvents[1]?.detail).toBe(
         "Telegram polling recovered after a polling-conflict retry.",
       );

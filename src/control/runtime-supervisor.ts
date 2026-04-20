@@ -44,8 +44,14 @@ type RuntimeSupervisorDependencies = {
 
 type ChannelOwnerAlertIncident = {
   runtimeId: number;
+  channel: ChannelPlugin["id"];
+  botId: string;
   timer?: ReturnType<typeof setTimeout>;
-  attemptUsed: boolean;
+  repeatAlertEveryMs: number;
+  startedAtMs: number;
+  summary?: string;
+  detail?: string;
+  deliveredAlerts: number;
 };
 
 function buildChannelOwnerAlertKey(params: {
@@ -56,35 +62,51 @@ function buildChannelOwnerAlertKey(params: {
   return `${params.runtimeId}:${params.channel}:${params.botId}`;
 }
 
-function formatOwnerAlertDelay(delayMs: number) {
-  if (delayMs % 60_000 === 0) {
-    const minutes = delayMs / 60_000;
-    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+function formatElapsedDuration(elapsedMs: number) {
+  const totalMinutes = Math.max(1, Math.floor(elapsedMs / 60_000));
+  if (totalMinutes < 60) {
+    return `${totalMinutes} minute${totalMinutes === 1 ? "" : "s"}`;
   }
 
-  if (delayMs % 1_000 === 0) {
-    const seconds = delayMs / 1_000;
-    return `${seconds} second${seconds === 1 ? "" : "s"}`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
   }
 
-  return `${delayMs}ms`;
+  return `${hours} hour${hours === 1 ? "" : "s"} ${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
 
 function renderChannelOwnerAlertMessage(params: {
   channel: ChannelPlugin["id"];
   botId: string;
-  delayMs: number;
-  event: ChannelRuntimeLifecycleEvent;
+  incidentState: "failed" | "still-failed" | "resolved";
+  elapsedMs: number;
+  summary?: string;
+  detail?: string;
 }) {
+  const elapsed = formatElapsedDuration(params.elapsedMs);
+  const statusLine =
+    params.incidentState === "failed"
+      ? `status: ${params.channel} channel has remained failed for ${elapsed}`
+      : params.incidentState === "still-failed"
+        ? `status: ${params.channel} channel is still failing after ${elapsed}`
+        : `status: ${params.channel} channel recovered after ${elapsed}`;
   return [
     "clisbot channel alert",
     "",
-    `status: ${params.channel} channel has remained failed for ${formatOwnerAlertDelay(params.delayMs)}`,
+    statusLine,
     `channel: ${params.channel}/${params.botId}`,
-    ...(params.event.summary ? [`summary: ${params.event.summary}`] : []),
-    ...(params.event.detail ? [`detail: ${params.event.detail}`] : []),
-    "note: the runtime process is still alive; clisbot is continuing automatic channel-level recovery attempts",
-    `action: inspect ${renderCliCommand("logs", { inline: true })} and fix the channel-level fault or conflicting poller`,
+    ...(params.summary ? [`summary: ${params.summary}`] : []),
+    ...(params.detail ? [`detail: ${params.detail}`] : []),
+    ...(params.incidentState === "resolved"
+      ? [
+          "note: the channel recovered without requiring a runtime restart",
+        ]
+      : [
+          "note: the runtime process is still alive; clisbot is continuing automatic channel-level recovery attempts",
+          `action: inspect ${renderCliCommand("logs", { inline: true })} and fix the channel-level fault or conflicting poller`,
+        ]),
   ].join("\n");
 }
 
@@ -416,7 +438,7 @@ export class RuntimeSupervisor {
       botId: params.botId,
     });
     if (params.event.connection === "active") {
-      this.clearChannelOwnerAlert(incidentKey);
+      await this.clearChannelOwnerAlert(incidentKey, params.event);
       await this.dependencies.runtimeHealthStore.setChannel({
         channel: params.plugin.id,
         connection: "active",
@@ -530,29 +552,58 @@ export class RuntimeSupervisor {
       return;
     }
 
+    const repeatAlertEveryMs =
+      params.event.ownerAlertRepeatMs ??
+      params.loadedConfig.raw.control.runtimeMonitor.ownerAlerts.minIntervalMinutes * 60_000;
     const existingIncident = this.channelOwnerAlertIncidents.get(params.key);
-    if (existingIncident?.timer || existingIncident?.attemptUsed) {
+    const incident = existingIncident ?? {
+      runtimeId: params.runtimeId,
+      channel: params.pluginId,
+      botId: params.botId,
+      repeatAlertEveryMs: Math.max(1, repeatAlertEveryMs),
+      startedAtMs: Date.now(),
+      deliveredAlerts: 0,
+    };
+    incident.channel = params.pluginId;
+    incident.botId = params.botId;
+    incident.summary = params.event.summary;
+    incident.detail = params.event.detail;
+    incident.repeatAlertEveryMs = Math.max(1, repeatAlertEveryMs);
+    this.channelOwnerAlertIncidents.set(params.key, incident);
+
+    if (incident.timer) {
       return;
     }
 
-    const incident = existingIncident ?? {
+    this.scheduleNextChannelOwnerAlert({
+      key: params.key,
       runtimeId: params.runtimeId,
-      attemptUsed: false,
-    };
-    const message = renderChannelOwnerAlertMessage({
       channel: params.pluginId,
       botId: params.botId,
-      delayMs,
-      event: params.event,
+      delayMs: existingIncident ? incident.repeatAlertEveryMs : delayMs,
     });
+  }
+
+  private scheduleNextChannelOwnerAlert(params: {
+    key: string;
+    runtimeId: number;
+    channel: ChannelPlugin["id"];
+    botId: string;
+    delayMs: number;
+  }) {
+    const incident = this.channelOwnerAlertIncidents.get(params.key);
+    if (!incident || incident.runtimeId !== params.runtimeId) {
+      return;
+    }
 
     incident.timer = setTimeout(() => {
       void this.fireChannelOwnerAlert({
         key: params.key,
         runtimeId: params.runtimeId,
-        message,
+        channel: params.channel,
+        botId: params.botId,
       });
-    }, delayMs);
+    }, params.delayMs);
     incident.timer.unref?.();
     this.channelOwnerAlertIncidents.set(params.key, incident);
   }
@@ -560,28 +611,38 @@ export class RuntimeSupervisor {
   private async fireChannelOwnerAlert(params: {
     key: string;
     runtimeId: number;
-    message: string;
+    channel: ChannelPlugin["id"];
+    botId: string;
   }) {
     const incident = this.channelOwnerAlertIncidents.get(params.key);
-    if (!incident || incident.runtimeId !== params.runtimeId || incident.attemptUsed) {
+    if (!incident || incident.runtimeId !== params.runtimeId) {
       return;
     }
 
     incident.timer = undefined;
-    incident.attemptUsed = true;
-    this.channelOwnerAlertIncidents.set(params.key, incident);
-
     const activeRuntime = this.activeRuntime;
     if (activeRuntime?.id !== params.runtimeId) {
       return;
     }
 
     try {
+      const message = renderChannelOwnerAlertMessage({
+        channel: params.channel,
+        botId: params.botId,
+        incidentState: incident.deliveredAlerts === 0 ? "failed" : "still-failed",
+        elapsedMs: Date.now() - incident.startedAtMs,
+        summary: incident.summary,
+        detail: incident.detail,
+      });
       const result = await sendOwnerAlert({
         loadedConfig: activeRuntime.loadedConfig,
-        message: params.message,
+        message,
         listChannelPlugins: this.dependencies.listChannelPlugins,
       });
+      if (result.delivered.length > 0) {
+        incident.deliveredAlerts += 1;
+      }
+      this.channelOwnerAlertIncidents.set(params.key, incident);
       if (result.delivered.length === 0 && result.failed.length > 0) {
         console.error(
           "clisbot channel alert delivery failed",
@@ -591,9 +652,26 @@ export class RuntimeSupervisor {
     } catch (error) {
       console.error("clisbot channel alert dispatch failed", error);
     }
+
+    const nextIncident = this.channelOwnerAlertIncidents.get(params.key);
+    if (
+      !nextIncident ||
+      nextIncident.runtimeId !== params.runtimeId ||
+      nextIncident.timer ||
+      nextIncident.deliveredAlerts >= 2
+    ) {
+      return;
+    }
+    this.scheduleNextChannelOwnerAlert({
+      key: params.key,
+      runtimeId: params.runtimeId,
+      channel: params.channel,
+      botId: params.botId,
+      delayMs: nextIncident.repeatAlertEveryMs,
+    });
   }
 
-  private clearChannelOwnerAlert(key: string) {
+  private async clearChannelOwnerAlert(key: string, activeEvent?: ChannelRuntimeLifecycleEvent) {
     const incident = this.channelOwnerAlertIncidents.get(key);
     if (!incident) {
       return;
@@ -603,6 +681,32 @@ export class RuntimeSupervisor {
       clearTimeout(incident.timer);
     }
     this.channelOwnerAlertIncidents.delete(key);
+
+    if (incident.deliveredAlerts === 0) {
+      return;
+    }
+
+    const activeRuntime = this.activeRuntime;
+    if (!activeRuntime || activeRuntime.id !== incident.runtimeId) {
+      return;
+    }
+
+    try {
+      await sendOwnerAlert({
+        loadedConfig: activeRuntime.loadedConfig,
+        message: renderChannelOwnerAlertMessage({
+          channel: incident.channel,
+          botId: incident.botId,
+          incidentState: "resolved",
+          elapsedMs: Date.now() - incident.startedAtMs,
+          summary: activeEvent?.summary ?? "Channel recovered.",
+          detail: activeEvent?.detail,
+        }),
+        listChannelPlugins: this.dependencies.listChannelPlugins,
+      });
+    } catch (error) {
+      console.error("clisbot channel recovery alert dispatch failed", error);
+    }
   }
 
   private clearChannelOwnerAlertsForRuntime(runtimeId: number) {

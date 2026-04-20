@@ -432,6 +432,7 @@ Important behavior:
 Important behavior:
 
 - main help promotes `clisbot runner list` and `clisbot runner watch --latest` as the fastest tmux debug entry points
+- `runner list` shows mapped `sessionId` plus a simple persisted state when available; tmux-only sessions are labeled `unmanaged`
 - `clisbot status` includes the newest five runner sessions by default; if there are more, it prints `(n) sessions more`
 - `watch --latest` means the session with the newest admitted prompt, not the newest tmux spawn
 - `watch --next` waits for the first newly admitted prompt after the command starts, then sticks to that session
