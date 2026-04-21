@@ -830,9 +830,6 @@ async function executePromptDelivery<TChunk>(params: {
         observerId: params.observerId,
         timingContext: params.timingContext,
         onUpdate: async (update) => {
-          if (!update.forceVisible && !paneManagedDelivery && !messageToolPreview) {
-            return;
-          }
           if (update.status === "running" && !loggedFirstRunningUpdate) {
             loggedFirstRunningUpdate = true;
             logLatencyDebug("channel-first-running-update", params.timingContext, {
@@ -848,6 +845,9 @@ async function executePromptDelivery<TChunk>(params: {
             let renderedQueueStart = false;
             if (update.status === "running") {
               renderedQueueStart = await maybeRenderQueueStartNotification();
+            }
+            if (!update.forceVisible && !paneManagedDelivery && !messageToolPreview) {
+              return;
             }
             if (
               params.route.streaming === "off" &&

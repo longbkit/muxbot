@@ -198,6 +198,8 @@ describe("channel credentials", () => {
   });
 
   test("can materialize only the requested channel credentials", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-channel-credentials-"));
+    process.env.CLISBOT_HOME = tempDir;
     const config = createConfig();
     config.bots.slack.defaults.enabled = true;
     config.bots.slack.default.appToken = "${SLACK_APP_TOKEN}";

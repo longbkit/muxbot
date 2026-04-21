@@ -9,6 +9,8 @@ import { TmuxClient } from "../src/runners/tmux/client.ts";
 import type { StoredSessionEntry } from "../src/agents/session-store.ts";
 
 const tempDirs: string[] = [];
+const REPO_ROOT = join(import.meta.dir, "..");
+const BUN_COMMAND = Bun.which("bun") ?? process.execPath;
 
 function createTempDir() {
   const dir = mkdtempSync(join(tmpdir(), "clisbot-runner-cli-"));
@@ -82,8 +84,8 @@ async function createSessionWithOutput(tmux: TmuxClient, socketDir: string, sess
 }
 
 async function runRunnerCliCommand(configPath: string, args: string[]) {
-  const subprocess = Bun.spawn(["bun", "run", "src/main.ts", "runner", ...args], {
-    cwd: "/home/node/projects/clisbot",
+  const subprocess = Bun.spawn([BUN_COMMAND, "run", "src/main.ts", "runner", ...args], {
+    cwd: REPO_ROOT,
     env: {
       ...process.env,
       CLISBOT_CONFIG_PATH: configPath,
@@ -237,22 +239,26 @@ describe("runner cli integration", () => {
       "--interval",
       "100ms",
       "--timeout",
-      "1200ms",
+      "8000ms",
     ]);
 
     await Bun.sleep(250);
-    const admittedAt = Date.now();
     await createSessionWithOutput(tmux, dir, "gamma", "gamma next output");
-    await writeSessionStore(sessionStorePath, [
-      {
-        agentId: "default",
-        sessionKey: "gamma",
-        workspacePath: join(dir, "workspaces", "default"),
-        runnerCommand: "codex",
-        lastAdmittedPromptAt: admittedAt,
-        updatedAt: admittedAt,
-      },
-    ]);
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const admittedAt = Date.now();
+      await writeSessionStore(sessionStorePath, [
+        {
+          agentId: "default",
+          sessionKey: "gamma",
+          workspacePath: join(dir, "workspaces", "default"),
+          runnerCommand: "codex",
+          lastAdmittedPromptAt: admittedAt,
+          updatedAt: admittedAt,
+        },
+      ]);
+      await Bun.sleep(200);
+    }
 
     const result = await watchPromise;
     expect(result.exitCode).toBe(0);

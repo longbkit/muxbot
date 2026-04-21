@@ -14,6 +14,7 @@ import {
   submitTmuxSessionInput,
   TmuxBootstrapSessionLostError,
   TmuxPasteUnconfirmedError,
+  TmuxSubmitUnconfirmedError,
   tmuxPaneHasTrustPrompt,
   waitForTmuxSessionBootstrap,
 } from "../runners/tmux/session-handshake.ts";
@@ -96,7 +97,7 @@ function isRecoverableStartupSessionLoss(error: unknown) {
 }
 
 function isFreshStartRetryablePromptDeliveryError(error: unknown) {
-  return error instanceof TmuxPasteUnconfirmedError;
+  return error instanceof TmuxPasteUnconfirmedError || error instanceof TmuxSubmitUnconfirmedError;
 }
 
 export class RunnerService {
@@ -186,7 +187,18 @@ export class RunnerService {
       });
     }
 
-    const sessionId = await this.captureSessionIdentity(resolved);
+    let sessionId: string | null;
+    try {
+      sessionId = await this.captureSessionIdentity(resolved);
+    } catch (error) {
+      if (isFreshStartRetryablePromptDeliveryError(error)) {
+        this.sessionIdentityCaptureRetryAt.set(
+          resolved.sessionKey,
+          Date.now() + SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS,
+        );
+      }
+      throw error;
+    }
     if (sessionId) {
       this.sessionIdentityCaptureRetryAt.delete(resolved.sessionKey);
     } else {
@@ -442,7 +454,6 @@ export class RunnerService {
       sessionName: resolved.sessionName,
       stateDir: this.loadedConfig.stateDir,
     });
-    this.sessionIdentityCaptureRetryAt.delete(resolved.sessionKey);
 
     try {
       await this.tmux.newSession({

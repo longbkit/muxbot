@@ -98,6 +98,9 @@ export async function submitTmuxSessionInput(params: {
     throw new TmuxPasteUnconfirmedError(pasteDelivery.attempts);
   }
   const preSubmitState = pasteDelivery.state;
+  const preSubmitSnapshot = normalizePaneText(
+    await params.tmux.capturePane(params.sessionName, captureLines),
+  );
 
   await params.tmux.sendKey(params.sessionName, "Enter");
   if (
@@ -105,7 +108,7 @@ export async function submitTmuxSessionInput(params: {
       tmux: params.tmux,
       sessionName: params.sessionName,
       baseline: preSubmitState,
-      baselineSnapshot: prePasteSnapshot,
+      baselineSnapshot: preSubmitSnapshot,
       captureLines,
     })
   ) {
@@ -121,7 +124,7 @@ export async function submitTmuxSessionInput(params: {
       tmux: params.tmux,
       sessionName: params.sessionName,
       baseline: preSubmitState,
-      baselineSnapshot: prePasteSnapshot,
+      baselineSnapshot: preSubmitSnapshot,
       captureLines,
     })
   ) {

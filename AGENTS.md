@@ -66,6 +66,8 @@ Prefer these repo-standard commands:
 - local dev logs: `bun run logs`
 - package build: `bun run build`
 - publish: run `npm login`, then run exactly `npm publish --access public`
+- when `npm login`, `npm publish --access public`, or another external auth command returns a browser link, keep the process open, send the link to the user, wait for them to finish auth, then continue the same flow
+- do not switch publish auth into a manual `--otp` handoff; keep the normal interactive publish flow and hand off only the exact link or prompt the tool returns from that same live process
 
 Do not invent ad hoc verification flows when one of these commands already fits.
 

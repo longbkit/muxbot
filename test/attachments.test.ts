@@ -128,4 +128,70 @@ describe("slack attachment hydration", () => {
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  test("does not hydrate files from the root thread message for a text-only reply", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-slack-attachments-"));
+    const originalFetch = globalThis.fetch;
+    let historyCalls = 0;
+    globalThis.fetch = ((async () =>
+      new Response(Buffer.from("hello from slack"), {
+        status: 200,
+        headers: {
+          "content-type": "text/plain",
+        },
+      })) as unknown) as typeof fetch;
+
+    try {
+      const paths = await resolveSlackAttachmentPaths({
+        client: {
+          conversations: {
+            history: async ({ latest }) => {
+              historyCalls += 1;
+              if (latest === "1771.2") {
+                return {
+                  messages: [
+                    {
+                      ts: "1771.2",
+                      files: [],
+                    },
+                  ],
+                };
+              }
+
+              return {
+                messages: [
+                  {
+                    ts: "1771.1",
+                    files: [
+                      {
+                        name: "root-thread-image.png",
+                        mimetype: "image/png",
+                        url_private_download: "https://files.slack.com/root.png",
+                      },
+                    ],
+                  },
+                ],
+              };
+            },
+          },
+        },
+        event: {
+          text: "text only reply",
+        },
+        channelId: "C123",
+        messageTs: "1771.2",
+        threadTs: "1771.1",
+        botToken: "xoxb-test",
+        workspacePath: tempDir,
+        sessionKey: "agent-default-main",
+        messageId: "1771.2",
+      });
+
+      expect(paths).toEqual([]);
+      expect(historyCalls).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });

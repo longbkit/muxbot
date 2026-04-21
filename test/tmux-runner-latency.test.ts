@@ -1034,6 +1034,7 @@ describe("tmux runner latency behavior", () => {
       cursorY: 0,
       historySize: 0,
     };
+    let snapshot = "READY";
     const fakeTmux = {
       async sendLiteral() {
         sendLiteralCount += 1;
@@ -1042,6 +1043,7 @@ describe("tmux runner latency behavior", () => {
           cursorY: 0,
           historySize: 0,
         };
+        snapshot = "READY\nping";
       },
       async sendKey() {
         return;
@@ -1050,7 +1052,7 @@ describe("tmux runner latency behavior", () => {
         return state;
       },
       async capturePane() {
-        return "";
+        return snapshot;
       },
     } as unknown as TmuxClient;
 

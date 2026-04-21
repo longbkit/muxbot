@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import { runRunnerCli } from "../src/control/runner-cli.ts";
 import { CliCommandError } from "../src/control/runtime-cli-shared.ts";
+
+const REPO_ROOT = join(import.meta.dir, "..");
+const BUN_COMMAND = Bun.which("bun") ?? process.execPath;
 
 describe("runner cli", () => {
   const originalLog = console.log;
@@ -33,9 +37,20 @@ describe("runner cli", () => {
 
   test("smoke --json returns a machine-readable not-implemented result and exit code 3", async () => {
     const subprocess = Bun.spawn(
-      ["bun", "run", "src/main.ts", "runner", "smoke", "--backend", "codex", "--scenario", "startup_ready", "--json"],
+      [
+        BUN_COMMAND,
+        "run",
+        "src/main.ts",
+        "runner",
+        "smoke",
+        "--backend",
+        "codex",
+        "--scenario",
+        "startup_ready",
+        "--json",
+      ],
       {
-        cwd: "/home/node/projects/clisbot",
+        cwd: REPO_ROOT,
         stdout: "pipe",
         stderr: "pipe",
       },

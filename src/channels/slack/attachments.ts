@@ -110,18 +110,6 @@ async function resolveSlackFiles(params: {
     return currentFiles;
   }
 
-  if (
-    params.threadTs &&
-    params.messageTs &&
-    params.threadTs !== params.messageTs
-  ) {
-    return fetchSlackMessageFiles(
-      params.client,
-      params.channelId,
-      params.threadTs,
-    );
-  }
-
   return [];
 }
 

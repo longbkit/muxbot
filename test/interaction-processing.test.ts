@@ -2591,6 +2591,66 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(reconciled).toEqual([]);
   });
 
+  test("queue start notification is posted on running updates even when message-tool streaming is off", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => true,
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 1,
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "",
+              fullSnapshot: "",
+              initialSnapshot: "",
+            });
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "queued final after running",
+              fullSnapshot: "queued final after running",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue send the short summary after the current run",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(posted).toHaveLength(2);
+    expect(posted[0]).toContain("Queued message is now running");
+    expect(posted[1]).toContain("queued final after running");
+    expect(reconciled).toEqual([]);
+  });
+
   test("queue start notifications can be disabled per route", async () => {
     const posted: string[] = [];
 

@@ -26,12 +26,16 @@ function shellQuote(value: string) {
   return `'${value.replaceAll("'", `'\"'\"'`)}'`;
 }
 
-function getClisbotMainScriptPath() {
-  return fileURLToPath(new URL(isPackagedRuntime() ? "../main.js" : "../main.ts", import.meta.url));
+function getClisbotMainScriptPath(moduleUrl = import.meta.url) {
+  if (isPackagedRuntime(moduleUrl)) {
+    return fileURLToPath(moduleUrl);
+  }
+
+  return fileURLToPath(new URL("../main.ts", moduleUrl));
 }
 
-function isPackagedRuntime() {
-  const currentModulePath = fileURLToPath(import.meta.url);
+function isPackagedRuntime(moduleUrl = import.meta.url) {
+  const currentModulePath = fileURLToPath(moduleUrl);
   return currentModulePath.includes(`${sep}dist${sep}`);
 }
 
@@ -51,9 +55,11 @@ export function getClisbotWrapperDir() {
   return dirname(getClisbotWrapperPath());
 }
 
-export function renderClisbotWrapperScript() {
+export function renderClisbotWrapperScript(options: {
+  moduleUrl?: string;
+} = {}) {
   const execPath = process.execPath;
-  const mainScriptPath = getClisbotMainScriptPath();
+  const mainScriptPath = getClisbotMainScriptPath(options.moduleUrl);
   const cliName = getRenderedCliName();
 
   return [

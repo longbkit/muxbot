@@ -29,7 +29,7 @@ type FakeSession = {
   longRunningStep: number;
   trustPromptOnCapture?: number;
   trustPromptVariant?: "codex" | "claude" | "gemini";
-  ignoreNextEnter?: boolean;
+  ignoreEnterCount?: number;
   noServerAfterTrustDismiss?: boolean;
   failWithNoServerOnNextCapture?: boolean;
   scriptedCaptureOutputs?: string[];
@@ -51,7 +51,7 @@ class FakeTmuxClient {
   private nextTrustPromptCaptureCount: number | null = null;
   private nextTrustPromptVariant: "codex" | "claude" | "gemini" = "codex";
   private nextNoServerAfterTrustDismiss = false;
-  private ignoreNextEnterSessionNames = new Set<string>();
+  private readonly ignoreEnterCounts = new Map<string, number>();
   private nextStatusResponseMode: "session-id" | "no-session-id" = "session-id";
   private nextDropPromptLiteralCount = 0;
 
@@ -92,7 +92,11 @@ class FakeTmuxClient {
   }
 
   ignoreNextEnter(sessionName: string) {
-    this.ignoreNextEnterSessionNames.add(sessionName);
+    this.ignoreNextEnters(sessionName, 1);
+  }
+
+  ignoreNextEnters(sessionName: string, count: number) {
+    this.ignoreEnterCounts.set(sessionName, Math.max(0, count));
   }
 
   setStatusResponseModeOnNextSession(mode: "session-id" | "no-session-id") {
@@ -148,7 +152,7 @@ class FakeTmuxClient {
         longRunningStep: 0,
         trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
         trustPromptVariant: this.nextTrustPromptVariant,
-        ignoreNextEnter: this.ignoreNextEnterSessionNames.delete(params.sessionName),
+        ignoreEnterCount: this.ignoreEnterCounts.get(params.sessionName) ?? 0,
         noServerAfterTrustDismiss: this.nextNoServerAfterTrustDismiss,
         failWithNoServerOnNextCapture: false,
         scriptedCaptureOutputs,
@@ -182,7 +186,7 @@ class FakeTmuxClient {
       longRunningStep: 0,
       trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
       trustPromptVariant: this.nextTrustPromptVariant,
-      ignoreNextEnter: this.ignoreNextEnterSessionNames.delete(params.sessionName),
+      ignoreEnterCount: this.ignoreEnterCounts.get(params.sessionName) ?? 0,
       noServerAfterTrustDismiss: this.nextNoServerAfterTrustDismiss,
       failWithNoServerOnNextCapture: false,
       scriptedCaptureOutputs,
@@ -195,6 +199,7 @@ class FakeTmuxClient {
     this.nextNoServerAfterTrustDismiss = false;
     this.nextStatusResponseMode = "session-id";
     this.nextDropPromptLiteralCount = 0;
+    this.ignoreEnterCounts.delete(params.sessionName);
     this.serverRunning = true;
   }
 
@@ -230,8 +235,8 @@ class FakeTmuxClient {
       }
       return;
     }
-    if (session.ignoreNextEnter) {
-      session.ignoreNextEnter = false;
+    if ((session.ignoreEnterCount ?? 0) > 0) {
+      session.ignoreEnterCount = Math.max(0, (session.ignoreEnterCount ?? 0) - 1);
       return;
     }
     session.snapshot = this.stripPendingPrompt(session.snapshot, session.pendingInput);
@@ -1563,6 +1568,74 @@ describe("AgentService session identity", () => {
       const transcript = await runnerSessions.captureTranscript(target);
 
       expect(transcript.snapshot.match(/STATUS pending/g)?.length ?? 0).toBe(1);
+      expect(readSessionId(storePath, target.sessionKey)).toBeNull();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("retries in one fresh session when startup status-command submit is not confirmed", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              noOutputTimeoutMs: 10_000,
+            },
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const loaded = await loadConfig(configPath);
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c1:thread:startup-submit-retry",
+      };
+      const resolved = resolveAgentTarget(loaded, target);
+      const fakeTmux = new FakeTmuxClient();
+      fakeTmux.ignoreNextEnters(resolved.sessionName, 2);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+
+      const run = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+
+      expect(run.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
+      expect(run.snapshot).not.toContain("STATUS");
+      expect(fakeTmux.sessionCommands).toHaveLength(2);
       expect(readSessionId(storePath, target.sessionKey)).toBeNull();
     } finally {
       rmSync(tempDir, { recursive: true, force: true });

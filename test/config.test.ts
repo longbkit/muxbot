@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentService } from "../src/agents/agent-service.ts";
@@ -96,6 +97,7 @@ describe("loadConfig", () => {
 
     await Bun.write(configPath, JSON.stringify(config));
 
+    process.env.CLISBOT_HOME = tempDir;
     process.env.SLACK_APP_TOKEN = "app-token";
     process.env.SLACK_BOT_TOKEN = "bot-token";
     process.env.TELEGRAM_BOT_TOKEN = "telegram-token";
@@ -226,10 +228,14 @@ describe("loadConfig", () => {
 
     const loaded = await loadConfig(configPath);
 
-    expect(loaded.raw.session.storePath).toBe("/home/node/.clisbot-dev/state/sessions.json");
-    expect(loaded.raw.tmux.socketPath).toBe("/home/node/.clisbot-dev/state/clisbot.sock");
+    expect(loaded.raw.session.storePath).toBe(
+      join(homedir(), ".clisbot-dev", "state", "sessions.json"),
+    );
+    expect(loaded.raw.tmux.socketPath).toBe(
+      join(homedir(), ".clisbot-dev", "state", "clisbot.sock"),
+    );
     expect(loaded.raw.agents.defaults.workspace).toBe(
-      "/home/node/.clisbot-dev/workspaces/{agentId}",
+      join(homedir(), ".clisbot-dev", "workspaces", "{agentId}"),
     );
   });
 

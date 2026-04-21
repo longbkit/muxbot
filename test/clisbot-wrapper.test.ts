@@ -84,4 +84,13 @@ describe("clisbot wrapper", () => {
     expect(renderClisbotWrapperScript()).toContain("--internal-cli-name clisbot");
     expect(renderClisbotWrapperScript()).not.toContain("--internal-cli-name clisbot-dev");
   });
+
+  test("keeps the packaged wrapper on dist/main.js instead of package-root main.js", () => {
+    const script = renderClisbotWrapperScript({
+      moduleUrl: "file:///tmp/clisbot/dist/main.js",
+    });
+
+    expect(script).toContain("/tmp/clisbot/dist/main.js");
+    expect(script).not.toContain("/tmp/clisbot/main.js");
+  });
 });
