@@ -590,6 +590,8 @@ async function executePromptDelivery<TChunk>(params: {
   let messageToolPreviewMonitor: Promise<void> | undefined;
   let queueStartPending = false;
   let deferredQueueStartPreview = false;
+  let queueAckPending = false;
+  let queueStartDeferredForAck = false;
   const paneManagedDelivery =
     params.route.responseMode === "capture-pane" || params.forceQueuedDelivery === true;
   const messageToolPreview =
@@ -767,6 +769,11 @@ async function executePromptDelivery<TChunk>(params: {
       return true;
     }
 
+    if (queueAckPending && responseChunks.length === 0) {
+      queueStartDeferredForAck = true;
+      return true;
+    }
+
     queueStartPending = false;
     if (responseChunks.length > 0) {
       const postedNew = await renderResponseText(text);
@@ -781,14 +788,44 @@ async function executePromptDelivery<TChunk>(params: {
       return true;
     }
 
-    const posted = await params.postText(text);
-    if (posted.length > 0) {
+    const postedNew = await renderResponseText(text);
+    if (postedNew) {
       await recordVisibleReply("reply", "channel");
+      activePreviewStartedAt = Date.now();
     }
-    return posted.length > 0;
+    renderedState = {
+      text,
+      body: "",
+    };
+    return postedNew;
   }
 
   function buildInitialPlaceholderText(positionAhead: number) {
+    if (
+      queueStartPending &&
+      params.forceQueuedDelivery === true &&
+      positionAhead === 0
+    ) {
+      queueStartPending = false;
+      return (
+        renderQueueStartNotification({
+          mode: params.queueStartMode ?? "none",
+          agentId: params.route.agentId,
+          promptSummary:
+            params.notificationPromptSummary ??
+            summarizeSurfaceNotificationText(params.promptText),
+        }) ??
+        renderPlatformInteraction({
+          platform: params.identity.platform,
+          status: "running",
+          content: "",
+          queuePosition: positionAhead,
+          maxChars: Number.POSITIVE_INFINITY,
+          note: "Working...",
+        })
+      );
+    }
+
     if (deferredQueueStartPreview && queueStartPending) {
       deferredQueueStartPreview = false;
       queueStartPending = false;
@@ -892,7 +929,7 @@ async function executePromptDelivery<TChunk>(params: {
       },
     );
     queueStartPending =
-      positionAhead > 0 &&
+      (positionAhead > 0 || params.forceQueuedDelivery === true) &&
       (params.queueStartMode ?? "none") !== "none";
     if (params.onPromptAccepted) {
       await params.onPromptAccepted();
@@ -910,7 +947,17 @@ async function executePromptDelivery<TChunk>(params: {
         text: placeholderText,
         body: "",
       };
-    } else if (paneManagedDelivery && positionAhead > 0 && params.route.streaming !== "off") {
+    } else if (
+      paneManagedDelivery &&
+      positionAhead === 0 &&
+      params.forceQueuedDelivery === true
+    ) {
+      await maybeRenderQueueStartNotification();
+    } else if (
+      paneManagedDelivery &&
+      positionAhead > 0 &&
+      (params.route.streaming !== "off" || params.forceQueuedDelivery === true)
+    ) {
       const queuedText = renderPlatformInteraction({
         platform: params.identity.platform,
         status: "queued",
@@ -919,7 +966,13 @@ async function executePromptDelivery<TChunk>(params: {
         maxChars: Number.POSITIVE_INFINITY,
         note: "Waiting for the agent queue to clear.",
       });
-      const postedNew = await renderResponseText(queuedText);
+      queueAckPending = true;
+      let postedNew = false;
+      try {
+        postedNew = await renderResponseText(queuedText);
+      } finally {
+        queueAckPending = false;
+      }
       if (postedNew) {
         await recordVisibleReply("reply", "channel");
       }
@@ -927,6 +980,10 @@ async function executePromptDelivery<TChunk>(params: {
         text: queuedText,
         body: "",
       };
+      if (queueStartDeferredForAck) {
+        queueStartDeferredForAck = false;
+        await maybeRenderQueueStartNotification();
+      }
     }
 
     const returnOnToolFinal =
@@ -965,7 +1022,6 @@ async function executePromptDelivery<TChunk>(params: {
 
     const finalResult = await result;
     await renderChain;
-    await maybeRenderQueueStartNotification();
 
     if (params.suppressDetachedSettlement && finalResult.status === "detached") {
       return;

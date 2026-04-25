@@ -2532,13 +2532,13 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(observedPrompt).toBe("follow up after the active run");
-    expect(posted).toHaveLength(2);
-    expect(posted[0]).toContain("Queued message is now running");
-    expect(posted[1]).toContain("queued mode final");
-    expect(reconciled).toEqual([]);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toContain("queued mode final");
   });
 
-  test("explicit queue command stays silent until final settlement when streaming is off", async () => {
+  test("explicit queue command acknowledges queue acceptance while streaming is off", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
     let observedPrompt = "";
@@ -2585,13 +2585,114 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(observedPrompt).toBe("send the short summary after the current run");
-    expect(posted).toHaveLength(2);
-    expect(posted[0]).toContain("Queued message is now running");
-    expect(posted[1]).toContain("queued final only");
-    expect(reconciled).toEqual([]);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toContain("queued final only");
   });
 
-  test("queue start notification is posted on running updates even when message-tool streaming is off", async () => {
+  test("explicit queue command renders queue start immediately when the queue is empty and streaming is off", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    let observedPrompt = "";
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => false,
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = prompt;
+          return {
+            positionAhead: 0,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "empty queue final",
+              fullSnapshot: "empty queue final",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue send the short summary now",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(observedPrompt).toBe("send the short summary now");
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued message is now running");
+    expect(posted[0]).not.toContain("Queued: 0 ahead.");
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toContain("empty queue final");
+  });
+
+  test("explicit queue command uses queue start as the initial preview when the queue is empty", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => false,
+        enqueuePrompt: () => ({
+          positionAhead: 0,
+          result: Promise.resolve({
+            status: "completed",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            snapshot: "empty queue streaming final",
+            fullSnapshot: "empty queue streaming final",
+            initialSnapshot: "",
+          }),
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue send the short summary now",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued message is now running");
+    expect(posted[0]).not.toContain("Working");
+    expect(reconciled.at(-1)).toContain("empty queue streaming final");
+  });
+
+  test("queue start notification is rendered on running updates even when message-tool streaming is off", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
 
@@ -2645,14 +2746,16 @@ describe("processChannelInteraction agent prompt text", () => {
       },
     });
 
-    expect(posted).toHaveLength(2);
-    expect(posted[0]).toContain("Queued message is now running");
-    expect(posted[1]).toContain("queued final after running");
-    expect(reconciled).toEqual([]);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled).toHaveLength(2);
+    expect(reconciled[0]).toContain("Queued message is now running");
+    expect(reconciled[1]).toContain("queued final after running");
   });
 
   test("queue start notifications can be disabled per route", async () => {
     const posted: string[] = [];
+    const reconciled: string[] = [];
 
     await processChannelInteraction({
       agentService: {
@@ -2690,11 +2793,17 @@ describe("processChannelInteraction agent prompt text", () => {
         posted.push(text);
         return [text];
       },
-      reconcileText: async (_chunks, text) => [text],
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
     });
 
     expect(posted).toHaveLength(1);
-    expect(posted[0]).toContain("queued final only");
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toContain("queued final only");
+    expect(reconciled[0]).not.toContain("Queued message is now running");
   });
 
   test("explicit steer command injects a steering message into the active run", async () => {
