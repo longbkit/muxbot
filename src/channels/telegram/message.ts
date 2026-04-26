@@ -25,6 +25,22 @@ export type TelegramPhotoSize = {
   file_size?: number;
 };
 
+export type TelegramVoice = {
+  file_id: string;
+  mime_type?: string;
+  file_size?: number;
+  duration?: number;
+};
+
+export type TelegramAudio = {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+  duration?: number;
+  title?: string;
+};
+
 export type TelegramMessage = {
   message_id: number;
   message_thread_id?: number;
@@ -34,6 +50,8 @@ export type TelegramMessage = {
   chat: TelegramChat;
   document?: TelegramFileDocument;
   photo?: TelegramPhotoSize[];
+  voice?: TelegramVoice;
+  audio?: TelegramAudio;
   reply_to_message?: {
     from?: TelegramUser;
   };
