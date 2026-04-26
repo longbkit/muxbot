@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { downloadRemoteBuffer } from "../../agents/attachments/download.ts";
 import { saveWorkspaceAttachment } from "../../agents/attachments/storage.ts";
 import { callTelegramApi } from "./api.ts";
-import type { TelegramFileDocument, TelegramMessage, TelegramPhotoSize } from "./message.ts";
+import type { TelegramAudio, TelegramFileDocument, TelegramMessage, TelegramPhotoSize, TelegramVoice } from "./message.ts";
 
 type TelegramGetFileResult = {
   file_path?: string;
@@ -97,6 +97,47 @@ export async function resolveTelegramAttachmentPaths(params: {
       }
     } catch (error) {
       console.error("telegram photo download failed", error);
+    }
+  }
+
+  const voice = params.message.voice;
+  if (voice?.file_id) {
+    try {
+      const filePath = await downloadTelegramAttachment({
+        botToken: params.botToken,
+        fileId: voice.file_id,
+        workspacePath: params.workspacePath,
+        sessionKey: params.sessionKey,
+        messageId: params.messageId,
+        contentType: voice.mime_type ?? "audio/ogg",
+        defaultBaseName: "telegram-voice",
+      });
+      if (filePath) {
+        attachmentPaths.push(filePath);
+      }
+    } catch (error) {
+      console.error("telegram voice download failed", error);
+    }
+  }
+
+  const audio = params.message.audio;
+  if (audio?.file_id) {
+    try {
+      const filePath = await downloadTelegramAttachment({
+        botToken: params.botToken,
+        fileId: audio.file_id,
+        workspacePath: params.workspacePath,
+        sessionKey: params.sessionKey,
+        messageId: params.messageId,
+        originalFilename: audio.file_name,
+        contentType: audio.mime_type,
+        defaultBaseName: "telegram-audio",
+      });
+      if (filePath) {
+        attachmentPaths.push(filePath);
+      }
+    } catch (error) {
+      console.error("telegram audio download failed", error);
     }
   }
 
