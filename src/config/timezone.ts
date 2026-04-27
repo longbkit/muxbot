@@ -39,6 +39,19 @@ export function getHostTimezone() {
   return normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) ?? "UTC";
 }
 
+export function formatTimezoneLocalTime(timezone: string, date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${formatter.format(date).replace(",", "")} ${timezone}`;
+}
+
 export function resolveTimezone(candidates: TimezoneCandidate[]): ResolvedTimezone {
   for (const candidate of candidates) {
     const timezone = normalizeTimezone(candidate.timezone);

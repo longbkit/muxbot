@@ -63,6 +63,7 @@ export function renderRoutesHelp() {
     "  - If a sender is not in `allowUsers` on a multi-user route, the bot replies: `You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to `allowUsers` for this surface.`",
     "  - Use `bots set-agent ...` when the whole bot should change fallback agent; use `routes set-agent ...` only when one route needs a different agent.",
     "  - Use route timezone only when one Slack/Telegram surface needs different wall-clock time from the app or agent default.",
+    "  - `routes get-timezone` prints the route override, effective timezone, and current local time for that surface.",
     "",
     "Examples:",
     `  ${renderCliCommand("routes add --channel telegram group:-1001234567890 --bot alerts --require-mention false --allow-bots true --policy allowlist")}`,

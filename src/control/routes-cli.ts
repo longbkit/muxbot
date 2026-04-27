@@ -1,5 +1,9 @@
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
-import { parseTimezone } from "../config/timezone.ts";
+import {
+  formatTimezoneLocalTime,
+  parseTimezone,
+  resolveConfigTimezone,
+} from "../config/timezone.ts";
 import type {
   BotRouteConfig,
   ClisbotConfig,
@@ -670,7 +674,17 @@ async function getSetClearRouteField(args: string[], action: string) {
     await writeEditableConfig(configPath, config);
     console.log(`cleared additionalMessageMode for ${provider}/${botId}/${parsed.routeId}`);
   } else if (action === "get-timezone") {
+    const bot = provider === "slack" ? ensureSlackBot(config, botId) : ensureTelegramBot(config, botId);
+    const agentId = route.agentId ?? bot.agentId ?? config.agents.defaults.defaultAgentId;
+    const resolved = resolveConfigTimezone({
+      config,
+      agentId,
+      routeTimezone: route.timezone,
+      botTimezone: bot.timezone,
+    });
     console.log(`${provider}/${botId}/${parsed.routeId} timezone: ${route.timezone ?? "(inherit)"}`);
+    console.log(`effective: ${resolved.timezone} (${resolved.source})`);
+    console.log(`localTime: ${formatTimezoneLocalTime(resolved.timezone)}`);
   } else if (action === "set-timezone") {
     route.timezone = parseTimezone(parseOptionValue(args, "--timezone") ?? findPositionalArgs(args)[1]);
     await writeEditableConfig(configPath, config);

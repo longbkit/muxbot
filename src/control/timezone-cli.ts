@@ -1,5 +1,10 @@
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
-import { getHostTimezone, parseTimezone, resolveConfigTimezone } from "../config/timezone.ts";
+import {
+  formatTimezoneLocalTime,
+  getHostTimezone,
+  parseTimezone,
+  resolveConfigTimezone,
+} from "../config/timezone.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 
 function getEditableConfigPath() {
@@ -41,6 +46,7 @@ export async function runTimezoneCli(args: string[]) {
     const resolved = resolveConfigTimezone({ config });
     console.log(`app.timezone: ${config.app.timezone ?? "(unset)"}`);
     console.log(`effective: ${resolved.timezone} (${resolved.source})`);
+    console.log(`localTime: ${formatTimezoneLocalTime(resolved.timezone)}`);
     console.log(`host: ${getHostTimezone()}`);
     console.log(`config: ${configPath}`);
     return;
@@ -68,6 +74,7 @@ export async function runTimezoneCli(args: string[]) {
   if (action === "doctor") {
     const resolved = resolveConfigTimezone({ config });
     console.log(`effective: ${resolved.timezone} (${resolved.source})`);
+    console.log(`localTime: ${formatTimezoneLocalTime(resolved.timezone)}`);
     console.log(`app.timezone: ${config.app.timezone ?? "(unset)"}`);
     console.log(`host: ${getHostTimezone()}`);
     console.log(`config: ${configPath}`);

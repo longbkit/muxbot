@@ -217,6 +217,51 @@ describe("routes cli", () => {
     expect(rawConfig.bots.slack.default.groups.C1234567890?.agentId).toBe("support");
   });
 
+  test("shows effective timezone and current local time for a route", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    const output: string[] = [];
+    console.log = ((line?: unknown) => {
+      output.push(String(line ?? ""));
+    }) as typeof console.log;
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "telegram",
+      "group:-1001234567890",
+      "--bot",
+      "default",
+    ]);
+    await runRoutesCli([
+      "set-timezone",
+      "--channel",
+      "telegram",
+      "group:-1001234567890",
+      "--bot",
+      "default",
+      "Asia/Ho_Chi_Minh",
+    ]);
+    output.length = 0;
+
+    await runRoutesCli([
+      "get-timezone",
+      "--channel",
+      "telegram",
+      "group:-1001234567890",
+      "--bot",
+      "default",
+    ]);
+
+    const text = output.join("\n");
+    expect(text).toContain("telegram/default/group:-1001234567890 timezone: Asia/Ho_Chi_Minh");
+    expect(text).toContain("effective: Asia/Ho_Chi_Minh (route)");
+    expect(text).toContain("localTime:");
+    expect(text).toContain("Asia/Ho_Chi_Minh");
+  });
+
   test("mutates allow and block users on canonical wildcard ids", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;

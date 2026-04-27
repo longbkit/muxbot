@@ -28,6 +28,8 @@ Update these files with what you learned:
 - `IDENTITY.md` — your name, creature, vibe, emoji
 - `USER.md` — their name, how to address them, timezone, notes
 
+Before writing timezone notes, use `clisbot routes get-timezone` for this chat surface, show the resolved timezone plus current local time, and ask if it is right.
+
 Then open `SOUL.md` together and talk about:
 
 - What matters to them
