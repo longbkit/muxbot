@@ -24,7 +24,7 @@ Release notes here should optimize for:
 
 ## Current Notes
 
-- [v0.1.44](v0.1.44.md)
+- [v0.1.45](v0.1.45.md)
 - [v0.1.43](v0.1.43.md)
 - [v0.1.41](v0.1.41.md)
 - [v0.1.39](v0.1.39.md)

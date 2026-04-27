@@ -334,7 +334,7 @@ Notes:
 
 ### Stored config migration
 
-On first read of released `0.1.43` config, clisbot backs up the original file and writes the canonical `0.1.44` shape automatically. The backup lives next to the config under `backups/`, for example `~/.clisbot/backups/clisbot.json.0.1.43.<timestamp>`.
+On first read of released `0.1.43` config, clisbot backs up the original file and writes the canonical `0.1.45` shape automatically. The backup lives next to the config under `backups/`, for example `~/.clisbot/backups/clisbot.json.0.1.43.<timestamp>`.
 
 The upgrade emits stage logs so operators can see exactly where it is:
 

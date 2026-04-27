@@ -118,7 +118,7 @@ If you want to try first without persisting the token yet, just remove `--persis
 Next steps:
 
 - For security, DMs default to pairing.
-- Existing `0.1.44` or older config is upgraded automatically on first run. clisbot writes a backup first under `~/.clisbot/backups/`, then rewrites the config to the current shape.
+- Existing `0.1.43` configs upgrade directly to `0.1.45` automatically on first run. clisbot writes a backup first under `~/.clisbot/backups/`, then rewrites the config to the current shape.
 - Shared Slack channels, Slack groups, Telegram groups, and Telegram topics are a separate gate: normal users need an explicit route such as `group:<id>` or `topic:<chatId>:<topicId>` before the bot will talk there. Legacy Slack `channel:<id>` input still works for compatibility.
 - After a shared surface is admitted, per-surface sender control comes from the bot's default shared rule `groups["*"]` plus any route-local `allowUsers` or `blockUsers`.
 - If the effective shared policy is `disabled`, the bot stays silent there for everyone, including owner/admin.

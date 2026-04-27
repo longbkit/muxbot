@@ -9,7 +9,7 @@ related:
   - docs/user-guide/channels.md
   - docs/user-guide/cli-commands.md
   - docs/user-guide/auth-and-roles.md
-  - docs/releases/v0.1.44.md
+  - docs/releases/v0.1.45.md
   - docs/tasks/features/configuration/2026-04-25-config-downgrade-and-restore-ux.md
   - docs/workflow/ai-agent-operating-preferences.md
   - docs/workflow/decision-and-struggle-patterns.md
