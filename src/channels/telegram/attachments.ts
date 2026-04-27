@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { downloadRemoteBuffer } from "../../agents/attachments/download.ts";
 import { saveWorkspaceAttachment } from "../../agents/attachments/storage.ts";
 import { callTelegramApi } from "./api.ts";
-import type { TelegramAudio, TelegramFileDocument, TelegramMessage, TelegramPhotoSize, TelegramVoice } from "./message.ts";
+import type { TelegramFileDocument, TelegramMessage, TelegramPhotoSize } from "./message.ts";
 
 type TelegramGetFileResult = {
   file_path?: string;
@@ -46,9 +46,23 @@ async function downloadTelegramAttachment(params: {
     buffer: downloaded.buffer,
     originalFilename:
       params.originalFilename || basename(fileInfo.file_path),
-    contentType: downloaded.contentType ?? params.contentType,
+    contentType: resolveTelegramAttachmentContentType({
+      downloadedContentType: downloaded.contentType,
+      fallbackContentType: params.contentType,
+    }),
     defaultBaseName: params.defaultBaseName,
   });
+}
+
+function resolveTelegramAttachmentContentType(params: {
+  downloadedContentType?: string;
+  fallbackContentType?: string;
+}) {
+  const downloaded = params.downloadedContentType?.split(";")[0]?.trim().toLowerCase();
+  if (!downloaded || downloaded === "application/octet-stream") {
+    return params.fallbackContentType ?? params.downloadedContentType;
+  }
+  return params.downloadedContentType;
 }
 
 export async function resolveTelegramAttachmentPaths(params: {
