@@ -219,13 +219,19 @@ function renderErrorInteractionBody(body: string, footer: string) {
 }
 
 function renderSlackRunningInteraction(body: string, note?: string) {
-  const statusNote = note ? `_${note}_` : "_Working..._";
-  return body ? `${body}\n\n${statusNote}` : statusNote;
+  if (note) {
+    return body ? `${body}\n\n_${note}_` : `_${note}_`;
+  }
+
+  return body || "_Working..._";
 }
 
 function renderTelegramRunningInteraction(body: string, note?: string) {
-  const statusNote = note || "Working...";
-  return body ? `${body}\n\n${statusNote}` : statusNote;
+  if (note) {
+    return body ? `${body}\n\n${note}` : note;
+  }
+
+  return body || "Working...";
 }
 
 export function renderSlackInteraction(params: {

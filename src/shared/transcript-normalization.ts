@@ -40,9 +40,7 @@ export function collapseBlankLines(lines: string[]) {
 
 const DURATION_STATUS_PATTERN = String.raw`(?:\d+(?:h|m|s))(?:\s+\d+(?:h|m|s)){0,2}`;
 const CODEX_WORKING_STATUS_PATTERN = new RegExp(
-  String.raw`^(?:[•◦·]\s*)?Working(?:\s*\()?${
-    DURATION_STATUS_PATTERN
-  }\b.*(?:esc to interrupt|interrupt)\)?$`,
+  String.raw`^(?=.*\b${DURATION_STATUS_PATTERN}\b)(?=.*(?:esc\s+to\s+(?:interrupt|cancel)|interrupt|cancel|ctrl\+c))(?:[•◦·✻✽*]\s*)?Working(?:\.{3}|…)?\s*.*\)?$`,
   "i",
 );
 const CODEX_INTERRUPT_FOOTER_PATTERN = new RegExp(

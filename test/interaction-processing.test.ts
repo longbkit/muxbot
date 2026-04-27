@@ -1863,7 +1863,7 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Working");
     expect(reconciled.at(-1)).toContain("working draft");
-    expect(reconciled.at(-1)).toContain("Working");
+    expect(reconciled.at(-1)).not.toContain("Working...");
   });
 
   test("hands off the live draft after a message-tool reply boundary", async () => {

@@ -387,6 +387,19 @@ This project maps channel messages into tmux-backed agents.
     expect(cleaned).toContain("Working (3m 12s • esc to interrupt)");
   });
 
+  test("keeps codex ellipsis timer lines in running snapshots", () => {
+    const cleaned = cleanRunningInteractionSnapshot(`
+› explain this codebase
+
+• Exploring the workspace
+
+• Working... (2m 4s • esc to interrupt)
+    `);
+
+    expect(cleaned).toContain("• Exploring the workspace");
+    expect(cleaned).toContain("Working... (2m 4s • esc to interrupt)");
+  });
+
   test("strips gemini chrome while keeping meaningful content", () => {
     const cleaned = cleanInteractionSnapshot(`
  ▝▜▄     Gemini CLI v0.37.1
@@ -707,7 +720,7 @@ Finagling
         content: "Thinking...\nFound the issue.",
         maxChars: 200,
       }),
-    ).toBe("Thinking...\nFound the issue.\n\n_Working..._");
+    ).toBe("Thinking...\nFound the issue.");
 
     expect(
       renderTelegramInteraction({
@@ -715,7 +728,15 @@ Finagling
         content: "Thinking...\nFound the issue.",
         maxChars: 200,
       }),
-    ).toBe("Thinking...\nFound the issue.\n\nWorking...");
+    ).toBe("Thinking...\nFound the issue.");
+
+    expect(
+      renderTelegramInteraction({
+        status: "running",
+        content: "Thinking...\nWorking... (2m 4s • esc to interrupt)",
+        maxChars: 200,
+      }),
+    ).toBe("Thinking...\nWorking... (2m 4s • esc to interrupt)");
 
     expect(
       renderSlackInteraction({
