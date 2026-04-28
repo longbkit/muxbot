@@ -1,29 +1,27 @@
-# Migrations
+# Manual Migrations
 
 ## Purpose
 
-Use `docs/migrations/` for concrete upgrade runbooks.
+Use `docs/migrations/` only when an update requires manual operator action.
 
-Release notes say what changed. Migration notes say exactly how to move safely from one version to another when config, schema, runtime state, credentials, or operational behavior may need attention.
+Agents should read [`index.md`](index.md) first during updates. It is the short machine-readable decision file. This README is for maintainers writing future migration docs.
 
 ## File Layout
 
-- `vA.B.C-to-vX.Y.Z.md`: one runbook per meaningful upgrade path.
+- `index.md`: short update path index for agents.
+- `vA.B.C-to-vX.Y.Z.md`: one runbook per required manual migration path.
 - `templates/migration.md`: template for future migration notes.
 
 ## Writing Rule
 
-Migration notes should be procedural and verifiable:
+Create a migration runbook only when at least one field below is not safe/automatic:
 
-- who needs the migration
-- preflight checks
-- backup or rollback location
-- upgrade steps
-- post-upgrade verification
-- downgrade or rollback caveats
+- `Manual action`
+- `Update path`
+- `Breaking change`
+- `Rollback`
+- `Intermediate version`
 
-Do not create a migration note for every release. Create one only when the operator may need a concrete procedure.
+## Current Manual Migrations
 
-## Current Migrations
-
-- [v0.1.43 to v0.1.45](v0.1.43-to-v0.1.45.md)
+No current stable update requires a manual migration runbook.

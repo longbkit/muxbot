@@ -60,7 +60,7 @@ No upcoming changes yet.
 
 - None yet.
 
-## Upgrade Notes
+## Update Notes
 
 - None yet.
 

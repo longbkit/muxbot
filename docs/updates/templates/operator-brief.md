@@ -18,7 +18,7 @@ Date: YYYY-MM-DD
 
 - ...
 
-## Upgrade / Rollout
+## Update / Rollout
 
 - ...
 

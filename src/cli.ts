@@ -15,6 +15,7 @@ export type ParsedCliCommand =
   | { name: "stop"; hard: boolean }
   | { name: "status" }
   | { name: "logs"; lines: number }
+  | { name: "update"; args: string[] }
   | { name: "timezone"; args: string[] }
   | { name: "bots"; args: string[] }
   | { name: "routes"; args: string[] }
@@ -68,6 +69,13 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
     return {
       name: "logs",
       lines: parseLineCount(args.slice(1)),
+    };
+  }
+
+  if (command === "update") {
+    return {
+      name: "update",
+      args: args.slice(1),
     };
   }
 
@@ -209,6 +217,7 @@ export function renderCliHelp() {
     `  ${renderCliCommand("status")}`,
     `  ${renderCliCommand("version")}`,
     `  ${renderCliCommand("logs [--lines N]")}`,
+    `  ${renderCliCommand("update --help")}`,
     `  ${renderCliCommand("timezone <get|set|clear|doctor>")}`,
     `  ${renderCliCommand("bots <subcommand>")}`,
     `  ${renderCliCommand("routes <subcommand>")}`,
@@ -233,6 +242,8 @@ export function renderCliHelp() {
     "  status             Show runtime process, config, log, tmux socket status, and recent runner sessions.",
     "  version            Show the installed clisbot version.",
     "  logs               Print the most recent clisbot log lines.",
+    "  update             Print the AI-readable package update guide and release/migration doc links.",
+    `                     See ${renderCliCommand("update --help", { inline: true })} before asking an agent to update clisbot.`,
     "  timezone           Manage the app-wide wall-clock timezone used by schedules and loops.",
     `                     See ${renderCliCommand("timezone --help", { inline: true })} for override guidance.`,
     "  bots               Manage provider bot identities, credentials, and bot-level fallback settings.",

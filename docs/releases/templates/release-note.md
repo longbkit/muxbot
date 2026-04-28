@@ -93,9 +93,14 @@ One short paragraph explaining the release in user/operator terms.
 
 - ...
 
-## Migration Notes
+## Update Notes
 
-- Link to `../migrations/...` when an upgrade runbook exists.
+- Update path:
+- Manual action:
+- Risk level:
+- Automatic config update:
+- Breaking change:
+- Link to `../migrations/...` only when a manual migration runbook exists.
 
 ## Pre-Release History
 
@@ -112,5 +117,6 @@ One short paragraph explaining the release in user/operator terms.
 
 - Feature docs:
 - Task docs:
+- Update guide:
 - Migration:
 - Operator brief:

@@ -118,7 +118,7 @@ If you want to try first without persisting the token yet, just remove `--persis
 Next steps:
 
 - For security, DMs default to pairing.
-- Existing `0.1.43` configs upgrade directly to `0.1.45` automatically on first run. clisbot writes a backup first under `~/.clisbot/backups/`, then rewrites the config to the current shape.
+- Existing `0.1.43` configs update directly to `0.1.45` automatically on first run. clisbot writes a backup first under `~/.clisbot/backups/`, then rewrites the config to the current shape.
 - Shared Slack channels, Slack groups, Telegram groups, and Telegram topics are a separate gate: normal users need an explicit route such as `group:<id>` or `topic:<chatId>:<topicId>` before the bot will talk there. Legacy Slack `channel:<id>` input still works for compatibility.
 - After a shared surface is admitted, per-surface sender control comes from the bot's default shared rule `groups["*"]` plus any route-local `allowUsers` or `blockUsers`.
 - If the effective shared policy is `disabled`, the bot stays silent there for everyone, including owner/admin.
@@ -139,7 +139,7 @@ Need the step-by-step setup docs instead of the shortest path?
 
 - Telegram: [Telegram Bot Setup](docs/user-guide/telegram-setup.md)
 - Slack: [Slack App Setup](docs/user-guide/slack-setup.md)
-- Release history: [CHANGELOG.md](CHANGELOG.md), [release notes](docs/releases/README.md), [operator updates](docs/updates/README.md), and [migration runbooks](docs/migrations/README.md)
+- Release history: [CHANGELOG.md](CHANGELOG.md), [release notes](docs/releases/README.md), [update guide](docs/update/README.md), [operator updates](docs/updates/README.md), and [migration index](docs/migrations/index.md)
 - Slack app manifest template: [app-manifest.json](templates/slack/default/app-manifest.json)
 - Slack app manifest guide: [app-manifest-guide.md](templates/slack/default/app-manifest-guide.md)
 
@@ -191,11 +191,11 @@ bun run start --cli codex --bot-type personal --telegram-bot-token <your-telegra
 
 Repo-local `bun run start|stop|restart|status|logs|init|pairing` is pinned by `.env` to `CLISBOT_HOME=~/.clisbot-dev`, so local testing does not accidentally reuse your main `~/.clisbot` runtime.
 
-Upgrade note for existing installs:
+Update note for existing installs:
 
 - `v0.1.39` includes breaking changes in config shape and in the main CLI command surface.
-- If you already run an older install, ask Codex or Claude in this repo to update your current config before upgrading.
-- The upgrade itself is still simple:
+- If you already run an older install, ask Codex or Claude in this repo to update your current config before updating the package.
+- The package update itself is still simple:
 
 ```bash
 clisbot stop
@@ -337,7 +337,7 @@ Most users only need a small set of commands at first:
 
 - `clisbot start`: start the bot runtime and create the default first-run setup when needed.
 - `clisbot restart`: restart the runtime cleanly; use this first when the bot stops responding.
-- `clisbot stop`: stop the runtime cleanly before upgrades, config changes, or maintenance.
+- `clisbot stop`: stop the runtime cleanly before updates, config changes, or maintenance.
 - `clisbot stop --hard`: stop the runtime and kill all tmux runner sessions on the configured clisbot socket; use this when stale runner panes, old environment variables, or stuck sessions survive a normal restart.
 - `clisbot status`: check whether the runtime, channels, and active sessions look healthy.
 - `clisbot logs`: inspect recent runtime logs when startup, routing, or replies look wrong.

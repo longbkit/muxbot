@@ -10,6 +10,7 @@ import { runMessageCli } from "./control/message-cli.ts";
 import { runRoutesCli } from "./control/routes-cli.ts";
 import { runRunnerCli } from "./control/runner-cli.ts";
 import { runTimezoneCli } from "./control/timezone-cli.ts";
+import { runUpdateCli } from "./control/update-cli.ts";
 import { initConfig, start } from "./control/runtime-bootstrap-cli.ts";
 import {
   logs,
@@ -96,6 +97,11 @@ async function runBuiltinCommand(command: ReturnType<typeof parseCliArgs>) {
 
   if (command.name === "logs") {
     await logs(command.lines);
+    return true;
+  }
+
+  if (command.name === "update") {
+    await runUpdateCli(command.args);
     return true;
   }
 

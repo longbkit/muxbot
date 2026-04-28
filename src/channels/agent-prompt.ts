@@ -282,7 +282,7 @@ function buildReplyStyleHint(identity: ChannelIdentity) {
 function renderConfigurationGuidance() {
   const cliName = getRenderedCliName();
   return [
-    `When the user asks to change ${cliName} configuration, use ${cliName} CLI commands; see ${renderCliCommand("--help", { inline: true })}, ${renderCliCommand("bots --help", { inline: true })}, ${renderCliCommand("routes --help", { inline: true })}, or ${renderCliCommand("auth --help", { inline: true })} for details.`,
+    `When the user asks to change ${cliName} configuration, use ${cliName} CLI commands; see ${renderCliCommand("--help", { inline: true })}, ${renderCliCommand("bots --help", { inline: true })}, ${renderCliCommand("routes --help", { inline: true })}, ${renderCliCommand("auth --help", { inline: true })}, or ${renderCliCommand("update --help", { inline: true })} for details.`,
     `For schedule/loop/reminder requests, inspect ${renderCliCommand("loops --help", { inline: true })} and use the loops CLI.`,
   ].join("\n");
 }

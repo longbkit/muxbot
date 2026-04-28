@@ -1,6 +1,10 @@
-# clisbot vA.B.C to vX.Y.Z Migration
+# clisbot vA.B.C to vX.Y.Z Manual Migration
 
 ## Who Needs This
+
+- ...
+
+## Manual Action Required
 
 - ...
 
@@ -14,7 +18,7 @@
 clisbot status
 ```
 
-## Upgrade
+## Update Path
 
 ```bash
 npm install -g clisbot@X.Y.Z
@@ -33,5 +37,6 @@ clisbot status
 
 ## Links
 
+- Update guide:
 - Release note:
 - Operator brief:

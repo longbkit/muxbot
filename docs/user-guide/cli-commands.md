@@ -80,6 +80,7 @@ Bot id rules:
 - `clisbot status`
 - `clisbot version`
 - `clisbot logs`
+- `clisbot update`
 - `clisbot bots ...`
 - `clisbot routes ...`
 - `clisbot agents ...`
@@ -97,12 +98,14 @@ Bot id rules:
 - `clisbot stop [--hard]`: stop runtime, optionally clean all tmux sessions on the clisbot socket
 - `clisbot status`: inspect runtime, config, log, tmux state, and the five most recent runner sessions
 - `clisbot logs [--lines N]`: print recent logs
+- `clisbot update --help`: print the AI-readable package update guide, including stable/beta defaults, release notes, and migration index links
 - `clisbot init [first-run flags...]`: bootstrap config and optional first agent without starting runtime
 
 Focused help:
 
 - `clisbot start --help`: first-run help for tokens, bot bootstrap, and examples
 - `clisbot init --help`: same bootstrap help without starting the runtime
+- `clisbot update --help`: package update checklist for humans and agents
 
 ## Bots
 
@@ -345,7 +348,7 @@ Important behavior:
 - `agents remove` fails while any bot or route still references that agent
 - `agents set-default` defines the global fallback agent when a more specific bot or route choice is absent
 - `--workspace` is optional; a sensible default workspace path exists
-- `agents bootstrap` is the template refresh or upgrade path
+- `agents bootstrap` is the template refresh or update path
 - without `--force`, `agents bootstrap` shows what files would change before overwriting them
 - when practical, `agents bootstrap` shows a diff or at least a file-by-file overwrite plan
 

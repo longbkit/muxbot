@@ -26,6 +26,15 @@ Use this file before introducing a new concept name. If an existing term fits, r
 | `loop` | Scheduled or repeated message tied to a session/surface. | Agents own schedule state; channels supply surface context for delivery. |
 | `steering` | A new user message injected while a run is still active. | Channels detect it; agents/runners submit it to the active run. |
 
+## Update Terms
+
+| Term | Meaning | Owner / Boundary |
+| --- | --- | --- |
+| `update` | Preferred public term for installing a newer `clisbot` package and restarting the runtime. | Control CLI and release docs. |
+| `manual migration` | Operator action required during an update beyond install, restart, status, and release-note review. | Migration docs only. |
+
+Use `update` in public CLI help, folder names, release docs, and operator-facing wording. Avoid `upgrade` for this product concept unless quoting old history or external tooling.
+
 ## Identity Terms
 
 | Term | Meaning | Example | Do Not Use For |

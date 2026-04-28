@@ -4,7 +4,7 @@
 
 Use `docs/updates/` for narrative catch-up notes that help operators and users understand what to try, watch, or change.
 
-Updates are not the canonical release ledger. Version-bound truth lives in [`docs/releases/`](../releases/README.md), and concrete upgrade procedures live in [`docs/migrations/`](../migrations/README.md).
+Updates are not the canonical release ledger. Version-bound truth lives in [`docs/releases/`](../releases/README.md), package update procedure lives in [`docs/update/`](../update/README.md), and manual migration decisions start in [`docs/migrations/index.md`](../migrations/index.md).
 
 ## File Layout
 
