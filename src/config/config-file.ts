@@ -8,6 +8,7 @@ import { normalizeConfigDocumentShape } from "./config-migration.ts";
 import { upgradeEditableConfigFileIfNeeded } from "./config-upgrade.ts";
 import { normalizeConfigDirectMessageRoutes } from "./direct-message-routes.ts";
 import { normalizeConfigGroupRoutes } from "./group-routes.ts";
+import { pruneConfigForPersistence } from "./persisted-config.ts";
 import { renderDefaultConfigTemplate } from "./template.ts";
 
 export async function ensureEditableConfigFile(configPath = getDefaultConfigPath()) {
@@ -60,7 +61,7 @@ export async function writeEditableConfig(configPath: string, config: ClisbotCon
     }),
   );
   const nextConfig = {
-    ...normalizedConfig,
+    ...pruneConfigForPersistence(normalizedConfig),
     meta: {
       ...normalizedConfig.meta,
       lastTouchedAt: new Date().toISOString(),

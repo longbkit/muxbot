@@ -152,8 +152,8 @@ class FakeTmuxClient {
       ? [...(this.resumeCaptureScripts.get(sessionId) ?? [])]
       : undefined;
     const initialSnapshot = resumedWithScript
-      ? `READY ${sessionId}\nRECOVER ${sessionId}`
-      : `READY ${sessionId}`;
+      ? `READY ${sessionId}\nRECOVER ${sessionId}\n› ready`
+      : `READY ${sessionId}\n› ready`;
     this.sessionCommands.push(params.command);
     if (this.duplicateOnNewSession.has(params.sessionName)) {
       this.duplicateOnNewSession.delete(params.sessionName);
@@ -243,7 +243,7 @@ class FakeTmuxClient {
       session.snapshot.includes("Do you trust the files in this folder?") ||
       session.snapshot.includes("Trust folder (default)")
     ) {
-      session.snapshot = `READY ${session.sessionId}`;
+      session.snapshot = `READY ${session.sessionId}\n› ready`;
       session.cursorX = session.snapshot.length;
       session.cursorY = 0;
       if (session.noServerAfterTrustDismiss) {
@@ -515,9 +515,7 @@ function buildConfig(params: {
     ...config.agents.defaults.runner[cli],
     command: params.runnerCommand,
     args: params.runnerArgs,
-    ...(params.startupReadyPattern
-      ? { startupReadyPattern: params.startupReadyPattern }
-      : {}),
+    startupReadyPattern: params.startupReadyPattern,
     ...(params.sessionId ? { sessionId: params.sessionId } : {}),
   };
   config.agents.list = [{ id: "default", cli }];

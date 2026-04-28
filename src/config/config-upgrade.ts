@@ -9,6 +9,7 @@ import {
 } from "./config-migration.ts";
 import { normalizeConfigDirectMessageRoutes } from "./direct-message-routes.ts";
 import { normalizeConfigGroupRoutes } from "./group-routes.ts";
+import { pruneConfigForPersistence } from "./persisted-config.ts";
 import { clisbotConfigSchema } from "./schema.ts";
 
 function readSchemaVersion(value: unknown) {
@@ -75,10 +76,13 @@ export async function upgradeEditableConfigFileIfNeeded(configPath: string) {
     ),
   );
   logUpgradeStage(`applying ${CURRENT_SCHEMA_VERSION} config to ${collapseHomePath(expandedConfigPath)}`);
+  const persistedConfig = pruneConfigForPersistence(normalizedConfig, {
+    forceRunnerStartupDefaults: true,
+  });
   await writeTextFile(
     expandedConfigPath,
     `${JSON.stringify({
-      ...normalizedConfig,
+      ...persistedConfig,
       meta: {
         ...normalizedConfig.meta,
         lastTouchedAt: new Date().toISOString(),

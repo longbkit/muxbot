@@ -11,7 +11,6 @@ import {
   getDefaultWorkspaceTemplate,
 } from "../shared/paths.ts";
 import { CURRENT_SCHEMA_VERSION } from "./config-migration.ts";
-import { getDefaultRuntimeMonitorRestartBackoff } from "./runtime-monitor-backoff.ts";
 
 type DefaultChannelBootstrapOptions = {
   slackEnabled?: boolean;
@@ -32,7 +31,6 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
   const sessionStorePath = collapseHomePath(getDefaultSessionStorePath());
   const workspaceTemplate = collapseHomePath(getDefaultWorkspaceTemplate());
   const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  const defaultRuntimeMonitorRestartBackoff = getDefaultRuntimeMonitorRestartBackoff();
 
   return JSON.stringify(
     {
@@ -79,7 +77,6 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             maxActiveLoops: 10,
           },
           runtimeMonitor: {
-            restartBackoff: defaultRuntimeMonitorRestartBackoff,
             ownerAlerts: {
               enabled: true,
               minIntervalMinutes: 30,
@@ -353,25 +350,6 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             gemini: {
               command: "gemini",
               args: ["--approval-mode=yolo", "--sandbox=false"],
-              startupDelayMs: 15000,
-              startupRetryCount: 2,
-              startupRetryDelayMs: 1000,
-              startupReadyPattern: "Type your message or @path/to/file",
-              startupBlockers: [
-                {
-                  pattern:
-                    "Please visit the following URL to authorize the application|Enter the authorization code:",
-                  message:
-                    "Gemini CLI is waiting for manual OAuth authorization. Authenticate Gemini once in a direct interactive terminal, or configure headless auth such as GEMINI_API_KEY or Vertex AI before routing Gemini through clisbot.",
-                },
-                {
-                  pattern:
-                    "How would you like to authenticate for this project\\?|Failed to sign in\\.|Manual authorization is required but the current session is non-interactive",
-                  message:
-                    "Gemini CLI is blocked in its authentication setup flow or sign-in recovery. Complete Gemini authentication directly first, or switch clisbot to a headless auth path such as GEMINI_API_KEY or Vertex AI before routing prompts.",
-                },
-              ],
-              promptSubmitDelayMs: 200,
               sessionId: {
                 create: {
                   mode: "runner",

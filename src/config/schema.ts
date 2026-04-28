@@ -16,6 +16,7 @@ import { getDefaultRuntimeMonitorRestartBackoff } from "./runtime-monitor-backof
 
 const defaultSessionIdPattern =
   "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b";
+const codexStartupReadyPattern = "(?:^|\\s)›\\s";
 
 const runnerSessionIdCreateSchema = z.object({
   mode: z.enum(["runner", "explicit"]).default("runner"),
@@ -636,6 +637,7 @@ const agentsDefaultsSchema = z.object({
         "-C",
         "{workspace}",
       ],
+      startupReadyPattern: codexStartupReadyPattern,
       sessionId: {
         create: {
           mode: "runner",
@@ -1090,6 +1092,7 @@ export const clisbotConfigSchema = z.object({
             "-C",
             "{workspace}",
           ],
+          startupReadyPattern: codexStartupReadyPattern,
           sessionId: {
             create: {
               mode: "runner",
@@ -1220,6 +1223,7 @@ export const clisbotConfigSchema = z.object({
             "-C",
             "{workspace}",
           ],
+          startupReadyPattern: codexStartupReadyPattern,
           sessionId: {
             create: {
               mode: "runner",

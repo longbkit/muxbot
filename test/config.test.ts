@@ -43,6 +43,9 @@ describe("loadConfig", () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
     const configPath = join(tempDir, "clisbot.json");
     const config = buildTemplateConfig();
+    expect(config.agents.defaults.runner.codex.startupReadyPattern).toBeUndefined();
+    expect(config.agents.defaults.runner.gemini.startupReadyPattern).toBeUndefined();
+    expect(config.app.control.runtimeMonitor.restartBackoff).toBeUndefined();
 
     config.app.session.mainKey = "main";
     config.app.session.identityLinks = {
@@ -176,6 +179,7 @@ describe("loadConfig", () => {
     expect(resolvedDefaultAgent.runner.sessionId.create.mode).toBe("runner");
     expect(resolvedDefaultAgent.runner.sessionId.capture.mode).toBe("status-command");
     expect(resolvedDefaultAgent.runner.sessionId.resume.mode).toBe("command");
+    expect(resolvedDefaultAgent.runner.startupReadyPattern).toBe("(?:^|\\s)›\\s");
   });
 
   test("migrates released 0.1.43 route keys into the new canonical surface shape", async () => {
@@ -373,6 +377,58 @@ describe("loadConfig", () => {
     expect(rewrittenConfig.bots.telegram.default.timezone).toBe("Asia/Tokyo");
     expect(backups).toHaveLength(1);
     expect(backups[0]).toContain("clisbot.json.0.1.44.");
+  });
+
+  test("clears runner-owned startup defaults during 0.1.45 config upgrade", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+
+    config.meta.schemaVersion = "0.1.44";
+    config.app.control.runtimeMonitor.restartBackoff = {
+      fastRetry: {
+        delaySeconds: 10,
+        maxRestarts: 3,
+      },
+      stages: [
+        {
+          delayMinutes: 15,
+          maxRestarts: 4,
+        },
+        {
+          delayMinutes: 30,
+          maxRestarts: 4,
+        },
+      ],
+    };
+    config.agents.defaults.runner.codex.startupReadyPattern = "custom-codex-ready";
+    config.agents.defaults.runner.gemini.startupDelayMs = 12345;
+    config.agents.defaults.runner.gemini.startupRetryCount = 7;
+    config.agents.defaults.runner.gemini.startupRetryDelayMs = 4321;
+    config.agents.defaults.runner.gemini.startupReadyPattern = "custom-gemini-ready";
+    config.agents.defaults.runner.gemini.startupBlockers = [
+      {
+        pattern: "custom-blocker",
+        message: "custom blocker",
+      },
+    ];
+    config.agents.defaults.runner.gemini.promptSubmitDelayMs = 999;
+
+    await Bun.write(configPath, JSON.stringify(config));
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+    const rewrittenConfig = JSON.parse(readFileSync(configPath, "utf8"));
+    const resolvedDefaultAgent = new AgentService(loaded).getResolvedAgentConfig("default");
+
+    expect(rewrittenConfig.app.control.runtimeMonitor.restartBackoff).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.codex.startupReadyPattern).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupRetryCount).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupRetryDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupReadyPattern).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupBlockers).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.promptSubmitDelayMs).toBeUndefined();
+    expect(resolvedDefaultAgent.runner.startupReadyPattern).toBe("(?:^|\\s)›\\s");
   });
 
   test("preserves current-schema disabled wildcard sender policy", async () => {

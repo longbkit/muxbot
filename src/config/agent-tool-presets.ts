@@ -51,6 +51,7 @@ export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTempl
     startupDelayMs: 3000,
     startupRetryCount: 2,
     startupRetryDelayMs: 1000,
+    startupReadyPattern: "(?:^|\\s)›\\s",
     promptSubmitDelayMs: 150,
     sessionId: {
       create: {

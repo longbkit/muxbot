@@ -430,7 +430,10 @@ export class RunnerService {
       });
       try {
         await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
-        await this.syncSessionIdentity(resolved);
+        await this.sessionState.touchSessionEntry(resolved, {
+          sessionId: existing?.sessionId,
+          runnerCommand: resolved.runner.command,
+        });
       } catch (error) {
         throw await this.mapSessionError(error, resolved.sessionName, "during startup");
       }
