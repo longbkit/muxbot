@@ -123,7 +123,11 @@ function getPromptMarker(lines: string[]) {
   return null;
 }
 
-function sliceFromLastPromptBlock(raw: string) {
+function slicePromptBlockFrom(lines: string[], index: number) {
+  return lines.slice(index).join("\n");
+}
+
+function sliceFromLastPromptBlock(raw: string, cleanSnapshot: (snapshot: string) => string) {
   const lines = splitNormalizedLines(raw);
   const marker = getPromptMarker(lines);
   if (!marker) {
@@ -135,19 +139,22 @@ function sliceFromLastPromptBlock(raw: string) {
       continue;
     }
 
-    return lines.slice(index).join("\n");
+    const promptTail = slicePromptBlockFrom(lines, index);
+    if (cleanSnapshot(promptTail)) {
+      return promptTail;
+    }
   }
 
   return "";
 }
 
 export function deriveLatestPromptInteractionSnapshot(currentSnapshot: string) {
-  const promptTail = sliceFromLastPromptBlock(currentSnapshot);
+  const promptTail = sliceFromLastPromptBlock(currentSnapshot, cleanInteractionSnapshot);
   return promptTail ? cleanInteractionSnapshot(promptTail) : "";
 }
 
 export function deriveLatestPromptRunningInteractionSnapshot(currentSnapshot: string) {
-  const promptTail = sliceFromLastPromptBlock(currentSnapshot);
+  const promptTail = sliceFromLastPromptBlock(currentSnapshot, cleanRunningInteractionSnapshot);
   return promptTail ? cleanRunningInteractionSnapshot(promptTail) : "";
 }
 

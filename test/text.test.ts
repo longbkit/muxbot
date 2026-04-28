@@ -421,6 +421,27 @@ This project maps channel messages into tmux-backed agents.
     expect(cleaned).toContain("Working... (2m 4s • esc to interrupt)");
   });
 
+  test("latest prompt extraction ignores the idle codex input prompt below a running timer", () => {
+    const snapshot = [
+      "Previous answer.",
+      "",
+      "› current request",
+      "",
+      "• Summarizing findings...",
+      "",
+      "• Working (5m 02s • esc to interrupt)",
+      "",
+      "› Write tests for @filename",
+      "",
+      "  gpt-5.5 high · ~/.clisbot/workspaces/default",
+    ].join("\n");
+
+    expect(deriveLatestPromptRunningInteractionSnapshot(snapshot)).toBe(
+      ["• Summarizing findings...", "", "• Working (5m 02s • esc to interrupt)"].join("\n"),
+    );
+    expect(deriveLatestPromptInteractionSnapshot(snapshot)).toBe("• Summarizing findings...");
+  });
+
   test("strips gemini chrome while keeping meaningful content", () => {
     const cleaned = cleanInteractionSnapshot(`
  ▝▜▄     Gemini CLI v0.37.1

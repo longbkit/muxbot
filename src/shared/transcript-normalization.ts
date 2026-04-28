@@ -394,6 +394,18 @@ export function hasActiveTimerStatus(snapshot: string) {
   return splitNormalizedLines(snapshot).some((line) => isActiveTimerStatusLine(line));
 }
 
+export function extractLatestActiveTimerStatusLine(snapshot: string) {
+  const lines = splitNormalizedLines(snapshot);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index]?.trim() ?? "";
+    if (isActiveTimerStatusLine(line)) {
+      return line;
+    }
+  }
+
+  return "";
+}
+
 function shouldDropCodexChromeLine(line: string) {
   const trimmed = line.trim();
   if (!trimmed) {

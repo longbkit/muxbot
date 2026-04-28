@@ -716,6 +716,78 @@ describe("tmux runner latency behavior", () => {
     expect(completedSnapshots.join("\n")).not.toContain("Previous answer");
   });
 
+  test("monitorTmuxRun keeps the live timer when codex shows an idle input prompt below it", async () => {
+    const snapshots = [
+      [
+        "Previous answer from an older request.",
+        "",
+        "• Summarizing findings...",
+        "",
+        "• Working (5m 02s • esc to interrupt)",
+        "",
+        "› Write tests for @filename",
+        "",
+        "  gpt-5.5 high · ~/.clisbot/workspaces/default",
+      ].join("\n"),
+      [
+        "Previous answer from an older request.",
+        "",
+        "• Summarizing findings...",
+        "",
+        "• Working (5m 04s • esc to interrupt)",
+        "",
+        "› Write tests for @filename",
+        "",
+        "  gpt-5.5 high · ~/.clisbot/workspaces/default",
+      ].join("\n"),
+      [
+        "Previous answer from an older request.",
+        "",
+        "Final line.",
+      ].join("\n"),
+      [
+        "Previous answer from an older request.",
+        "",
+        "Final line.",
+      ].join("\n"),
+    ];
+    let captureIndex = 0;
+    const runningSnapshots: string[] = [];
+
+    const fakeTmux = {
+      async capturePane() {
+        const snapshot = snapshots[Math.min(captureIndex, snapshots.length - 1)] ?? "";
+        captureIndex += 1;
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await monitorTmuxRun({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      prompt: undefined,
+      promptSubmitDelayMs: 1,
+      captureLines: 80,
+      updateIntervalMs: 5,
+      idleTimeoutMs: 15,
+      noOutputTimeoutMs: 1_000,
+      maxRuntimeMs: 10_000,
+      startedAt: Date.now(),
+      initialSnapshot: "unrelated stale baseline",
+      detachedAlready: false,
+      onRunning: async (update) => {
+        runningSnapshots.push(update.snapshot);
+      },
+      onDetached: async () => undefined,
+      onCompleted: async () => undefined,
+    });
+
+    expect(runningSnapshots[0]).toContain("• Summarizing findings...");
+    expect(runningSnapshots[0]).toContain("• Working (5m 02s • esc to interrupt)");
+    expect(runningSnapshots[0]).not.toContain("› Write tests");
+    expect(runningSnapshots[1]).toContain("• Working (5m 04s • esc to interrupt)");
+  });
+
   test("monitorTmuxRun uses the post-submit pane as the streaming baseline", async () => {
     let literalVisible = false;
     let entered = false;
