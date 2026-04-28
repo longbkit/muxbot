@@ -152,18 +152,20 @@ What happens next:
 - fresh bootstrap only enables the channels you name explicitly
 - after the persisted first run, later restarts can use plain `clisbot start`
 
-## Big Upgrades In v0.1.39
+## Recent Release Highlights
 
-- Much better native Slack and Telegram rendering, so replies are easier to read and feel far less like pasted terminal output.
-- A much cleaner first-run path, with a clearer bot-first setup story and better setup docs.
-- Stronger pairing, auth, and safer shared-channel behavior by default.
-- More trustworthy long-running work, with better attach, detach, recovery, and operator visibility.
-- Real recurring automation with `/loop`.
+- `v0.1.45`: safer personal and team bots in real Slack and Telegram groups, automatic direct updates from `0.1.43`, more reliable scheduled loops, clearer sender and surface context, Telegram audio support, and stricter streaming/session isolation.
+- `v0.1.43`: more durable runtime recovery, clearer routed follow-up controls, more truthful tmux prompt submission checks, better queued-start notifications, and safer Slack thread attachment behavior.
+- `v0.1.39`: the first large release of the current bot-first shape, with native Slack and Telegram rendering, cleaner first-run setup, stronger pairing/auth defaults, better long-running run visibility, and recurring `/loop` automation.
+
+There are many more useful fixes and operator improvements in the full release notes, including config update safety, CLI help, setup docs, runner debugging, route policy behavior, and channel-specific polish.
 
 Read the full notes here:
 
 - [CHANGELOG.md](CHANGELOG.md)
 - [Release Notes Index](docs/releases/README.md)
+- [v0.1.45 Release Notes](docs/releases/v0.1.45.md)
+- [v0.1.43 Release Notes](docs/releases/v0.1.43.md)
 - [v0.1.39 Release Notes](docs/releases/v0.1.39.md)
 
 If you prefer Slack first:

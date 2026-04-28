@@ -3,6 +3,7 @@ import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency
 import { sleep } from "../../shared/process.ts";
 import {
   deriveInteractionText,
+  extractScrolledAppend,
   normalizePaneText,
   splitNormalizedLines,
   trimBlankLines,
@@ -193,7 +194,7 @@ export async function captureTmuxSessionIdentity(params: {
     }
 
     const sessionId = extractSessionId(
-      deriveInteractionText(statusSubmission.submittedSnapshot, snapshot),
+      deriveSessionIdentityText(statusSubmission.submittedSnapshot, snapshot),
       params.pattern,
     );
     if (sessionId) {
@@ -210,6 +211,15 @@ export async function captureTmuxSessionIdentity(params: {
   }
 
   return null;
+}
+
+function deriveSessionIdentityText(submittedSnapshot: string, snapshot: string) {
+  const rawSubmitted = normalizePaneText(submittedSnapshot);
+  const rawSnapshot = normalizePaneText(snapshot);
+  return (
+    extractScrolledAppend(rawSubmitted, rawSnapshot) ||
+    deriveInteractionText(submittedSnapshot, snapshot)
+  );
 }
 
 export async function dismissTmuxTrustPromptIfPresent(params: {

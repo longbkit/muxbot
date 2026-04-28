@@ -1526,6 +1526,30 @@ export async function processChannelInteraction<TChunk>(params: {
       return interactionResult;
     }
 
+    if (slashCommand.name === "new") {
+      if (sessionBusy) {
+        await params.postText(
+          "This session is busy. Use `/stop` first if you want to interrupt it before starting a new native CLI conversation.",
+        );
+        await params.agentService.recordConversationReply(params.sessionTarget);
+        return interactionResult;
+      }
+
+      const rotated = await params.agentService.startNewNativeSession(params.sessionTarget);
+      await params.postText(
+        [
+          `Started a new native CLI conversation for agent \`${rotated.agentId}\`.`,
+          `sessionName: \`${rotated.sessionName}\``,
+          `storedSessionId: \`${rotated.sessionId ?? "none"}\``,
+          rotated.restartedRunner
+            ? "No live runner existed, so clisbot opened a fresh runner session."
+            : `nativeCommand: \`${rotated.command}\``,
+        ].join("\n"),
+      );
+      await params.agentService.recordConversationReply(params.sessionTarget);
+      return interactionResult;
+    }
+
     if (slashCommand.name === "nudge") {
       const nudged = await params.agentService.nudgeSession(params.sessionTarget);
       await params.postText(

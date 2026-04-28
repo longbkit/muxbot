@@ -269,6 +269,10 @@ export class AgentService {
     return this.runnerSessions.nudgeSession(target);
   }
 
+  async startNewNativeSession(target: AgentSessionTarget) {
+    return this.runnerSessions.startNewNativeSession(target);
+  }
+
   async getConversationFollowUpState(target: AgentSessionTarget) {
     return this.sessionState.getConversationFollowUpState(target);
   }

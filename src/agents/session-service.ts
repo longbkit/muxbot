@@ -133,11 +133,13 @@ export class ActiveRunInProgressError extends Error {
 function createDeferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  void promise.catch(() => undefined);
   const deferred: Deferred<T> = {
-    promise: new Promise<T>((nextResolve, nextReject) => {
-      resolve = nextResolve;
-      reject = nextReject;
-    }),
+    promise,
     resolve: (value) => {
       if (deferred.settled) {
         return;
@@ -611,21 +613,24 @@ export class SessionService {
     };
 
     try {
-      const fresh = await this.runnerSessions.startFreshSession(target, params.timingContext);
+      const restarted = await this.runnerSessions.restartRunnerPreservingSessionId(
+        target,
+        params.timingContext,
+      );
       const currentRun = this.getRun(sessionKey, params.runId);
       if (!currentRun) {
         return true;
       }
       const restartedAt = Date.now();
-      currentRun.resolved = fresh.resolved;
+      currentRun.resolved = restarted.resolved;
       currentRun.steeringReady = false;
       currentRun.startedAt = restartedAt;
       currentRun.latestUpdate = this.createRunUpdate({
         resolved: currentRun.resolved,
         status: currentRun.latestUpdate.status === "detached" ? "detached" : "running",
         snapshot: "",
-        fullSnapshot: fresh.initialSnapshot,
-        initialSnapshot: fresh.initialSnapshot,
+        fullSnapshot: restarted.initialSnapshot,
+        initialSnapshot: restarted.initialSnapshot,
       });
       await this.sessionState.setSessionRuntime(currentRun.resolved, {
         state: "running",
@@ -635,16 +640,16 @@ export class SessionService {
       this.startRunMonitor(sessionKey, {
         ...params,
         promptRetryAttempt: 1,
-        initialSnapshot: fresh.initialSnapshot,
+        initialSnapshot: restarted.initialSnapshot,
         startedAt: restartedAt,
       });
       return true;
-    } catch (freshError) {
+    } catch (restartError) {
       await this.failActiveRun(
         sessionKey,
         run.runId,
         await this.runnerSessions.mapRunError(
-          freshError,
+          restartError,
           run.resolved.sessionName,
           run.latestUpdate.fullSnapshot,
         ),
@@ -731,6 +736,16 @@ export class SessionService {
       if (!currentRun) {
         return true;
       }
+      if (await this.hasStoredResumableSessionId(currentRun.resolved)) {
+        await this.notifyRecoveryStep(currentRun, buildRunRecoveryNote("resume-failed"));
+        await this.failActiveRun(
+          sessionKey,
+          currentRun.runId,
+          new Error(buildRunRecoveryNote("manual-new-required")),
+        );
+        return true;
+      }
+
       await this.notifyRecoveryStep(currentRun, buildRunRecoveryNote("fresh-attempt"));
       try {
         await this.runnerSessions.startFreshSession(target, params.timingContext);
@@ -753,6 +768,14 @@ export class SessionService {
       );
       return true;
     }
+  }
+
+  private async hasStoredResumableSessionId(resolved: ResolvedAgentTarget) {
+    if (resolved.runner.sessionId.resume.mode !== "command") {
+      return false;
+    }
+    const entry = await this.sessionState.getEntry(resolved.sessionKey);
+    return Boolean(entry?.sessionId);
   }
 
   private startRunMonitor(

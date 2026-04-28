@@ -392,6 +392,130 @@ Voice-specific code map:
 | Voice wake           | `src/infra/voicewake.ts`, `src/gateway/server-methods/voicewake.ts`, native `VoiceWake*` files              |
 | Voice Call plugin    | `extensions/voice-call/src/*`, `docs/plugins/voice-call.md`                                                 |
 
+## clisbot implementation implications
+
+The safest `clisbot` path is to split audio work into explicit phases instead of
+folding it into the chat runtime immediately.
+
+### Phase 1: standalone conversion CLI
+
+Add a local utility surface first:
+
+```bash
+clisbot audio transcribe input.oga --language vi-VN --out transcript.txt
+clisbot audio speak --text "xin chào" --out reply.aiff
+clisbot audio speak --body-file reply.txt --out reply.m4a
+clisbot audio permissions status
+clisbot audio permissions request --speech
+```
+
+This should live as a control/local utility, not a channel behavior. It can be
+implemented with a shared `src/audio` service and a `src/control/audio-cli.ts`
+entry, then later reused by attachment and message flows.
+
+Provider shape:
+
+- `macos-speech` for STT using a Swift helper around
+  `SFSpeechURLRecognitionRequest(fileURL:)`.
+- `macos-system` for TTS using either `say` initially or a Swift helper around
+  `AVSpeechSynthesizer`.
+- future fallback providers such as Whisper CLI, OpenAI, or Deepgram should use
+  the same service interface instead of special channel code.
+
+Audio normalization is required before relying on Apple Speech. Telegram voice
+notes are commonly OGG/Opus, while Apple Speech file recognition should not be
+assumed to accept every channel-native format directly. The CLI should normalize
+or reject with a clear error before invoking the provider.
+
+### Phase 2: inbound audio attachment transcription
+
+Current `clisbot` attachment behavior is intentionally small:
+
+- channels detect and download Slack or Telegram files
+- the agents layer stores them under
+  `{workspace}/.attachments/{sessionKey}/{messageId}/...`
+- prompt shaping prepends `@/absolute/path` mentions
+- runners stay channel-agnostic
+
+Auto-transcribing attachments would change the current prompt contract, so it
+should be opt-in. A conservative shape is:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "audio": {
+        "transcribeAttachments": true,
+        "provider": "macos-speech",
+        "language": "vi-VN"
+      }
+    }
+  }
+}
+```
+
+When enabled, keep the original audio file and add a sidecar transcript file
+such as `voice.txt`. The prompt can then include the transcript while preserving
+the source attachment path for agents that want to inspect or retry.
+
+### Phase 3: outbound spoken replies
+
+Text-to-audio as a standalone utility is low risk because `clisbot message send
+--file` already sends local files. Automatic final-answer TTS is higher risk
+because it touches response rendering, streaming/progress behavior,
+message-tool/final reply contracts, channel-specific voice/audio/document send
+semantics, and route/bot/agent policy. That belongs after the CLI and inbound
+transcription contracts are stable.
+
+### macOS permission model
+
+For file transcription on macOS, the main privacy gate is Speech Recognition,
+not Microphone:
+
+- audio file STT needs `Speech Recognition` permission for the process calling
+  Apple Speech
+- live mic, Talk mode, and wake-word listening need both `Microphone` and
+  `Speech Recognition`
+- system TTS through `say` or `AVSpeechSynthesizer` normally does not need a
+  separate privacy prompt
+
+The hard part is not the API call; it is macOS TCC identity. `clisbot` often
+runs as a CLI/background daemon through Terminal, tmux, Bun, Node, or an npm
+wrapper. If the Node daemon calls Apple Speech directly, the permission prompt
+may not appear reliably, and permission may attach to the wrong identity.
+Updates can also change the effective executable identity and make permission
+failures look unrelated.
+
+Use a stable native helper instead:
+
+- ship a Swift helper or small app with `Info.plist` usage text such as
+  `NSSpeechRecognitionUsageDescription`
+- expose `clisbot audio permissions status/request`
+- require permission requests to run interactively
+- let the background runtime call transcription only after permission is already
+  authorized
+- if permission is missing, return an actionable error rather than blocking the
+  chat request
+
+If the product needs stronger privacy, expose
+`requiresOnDeviceRecognition=true`, but treat it as a strict mode that can fail
+for unsupported locales or missing local models. A local Whisper fallback may be
+more predictable than Apple cloud recognition for privacy-sensitive hosts.
+
+### Expected blast radius
+
+Standalone CLI conversion has low blast radius. It adds a control utility and a
+service module without changing channel ingress, runner prompts, or message
+delivery.
+
+Inbound auto-transcription has medium blast radius because it changes attachment
+prompt shaping and request latency. It needs timeouts, max file limits, opt-in
+config, and regression coverage around Slack/Telegram audio uploads.
+
+Automatic spoken replies have higher blast radius because they touch outbound
+response policy and final delivery. Keep that separate from the first
+implementation slice.
+
 ## Implementation paths
 
 ### Add a core TTS provider

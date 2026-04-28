@@ -64,6 +64,66 @@ describe("tmux runner latency behavior", () => {
     ).resolves.toBe(currentId);
   });
 
+  test("captureTmuxSessionIdentity reads boxed Codex status output", async () => {
+    const staleId = "11111111-1111-1111-1111-111111111111";
+    const currentId = "019dd4ef-8e81-7410-a94b-90939550da64";
+    let snapshot = `old transcript mentions ${staleId}\n› `;
+    let state = {
+      cursorX: 0,
+      cursorY: 1,
+      historySize: 0,
+    };
+
+    const fakeTmux = {
+      async sendLiteral(_sessionName: string, text: string) {
+        snapshot = `${snapshot}${text}`;
+        state = {
+          cursorX: text.length,
+          cursorY: state.cursorY,
+          historySize: state.historySize,
+        };
+      },
+      async sendKey(_sessionName: string, key: string) {
+        if (key !== "Enter") {
+          return;
+        }
+        snapshot = [
+          snapshot,
+          "╭──────────────────────────────────────────────╮",
+          "│ >_ OpenAI Codex (v0.125.0)                   │",
+          "│  Session:              019dd4ef-8e81-7410-a94b-90939550da64  │",
+          "╰──────────────────────────────────────────────╯",
+          "",
+        ].join("\n");
+        state = {
+          cursorX: 0,
+          cursorY: state.cursorY + 5,
+          historySize: state.historySize + 5,
+        };
+      },
+      async getPaneState() {
+        return state;
+      },
+      async capturePane() {
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      captureTmuxSessionIdentity({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        promptSubmitDelayMs: 1,
+        captureLines: 80,
+        statusCommand: "/status",
+        pattern:
+          "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
+        timeoutMs: 100,
+        pollIntervalMs: 1,
+      }),
+    ).resolves.toBe(currentId);
+  });
+
   test("waitForTmuxSessionBootstrap returns before the full startup budget once output appears", async () => {
     let captureCount = 0;
     const fakeTmux = {

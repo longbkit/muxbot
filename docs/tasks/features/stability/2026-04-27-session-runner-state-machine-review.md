@@ -44,6 +44,13 @@ Important nuance:
 - startup or ingress reconciliation should clear it to `idle` when no live tmux runner exists
 - `status` may report `runner=lost` before reconciliation, but should not silently mutate state as a read-only command
 
+Observed 2026-04-28:
+
+- after stale runner sunset, a new Codex runner visibly ran `/status` and showed a `Session:` id
+- the session store still had no `sessionId` because session-id capture reused the cleaned interaction transcript path, and that path intentionally drops Codex boxed status rows as chrome
+- fixed capture to extract from the raw fresh `/status` delta first, while still falling back to the cleaned path for older/fake runner shapes
+- a separate retry-path regression cleared the stored `sessionId` while restarting tmux after startup faults; fixed automatic retry/recovery to preserve the mapping and added `/new` as the explicit native-session rotation path
+
 ## Scope
 
 - Review `SessionRuntimeState`, active run state, runner liveness, and final delivery boundaries.

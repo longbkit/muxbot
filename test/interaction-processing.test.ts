@@ -148,7 +148,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("Recovery succeeded. Continuing the current run.");
   });
 
-  test("keeps the working placeholder for silent fresh-session prompt retries", async () => {
+  test("keeps the working placeholder for silent prompt retries", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
 
@@ -3264,6 +3264,79 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted[0]).toBe("No active or resumable session to nudge for agent `default`.");
+  });
+
+  test("new rotates native session id for the current session", async () => {
+    const posted: string[] = [];
+    let rotatedTarget = "";
+
+    await processChannelInteraction({
+      agentService: {
+        isSessionBusy: async () => false,
+        startNewNativeSession: async (target: AgentSessionTarget) => {
+          rotatedTarget = target.sessionKey;
+          return {
+            agentId: target.agentId,
+            sessionKey: target.sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            command: "/new",
+            sessionId: "11111111-1111-1111-1111-111111111111",
+            restartedRunner: false,
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/new",
+      route: createRoute({
+        responseMode: "message-tool",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(rotatedTarget).toBe(createTarget().sessionKey);
+    expect(posted[0]).toContain("Started a new native CLI conversation");
+    expect(posted[0]).toContain("storedSessionId: `11111111-1111-1111-1111-111111111111`");
+    expect(posted[0]).toContain("nativeCommand: `/new`");
+  });
+
+  test("new rejects while the session is busy", async () => {
+    const posted: string[] = [];
+    let rotated = false;
+
+    await processChannelInteraction({
+      agentService: {
+        isSessionBusy: async () => true,
+        startNewNativeSession: async () => {
+          rotated = true;
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/new",
+      route: createRoute({
+        responseMode: "message-tool",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(rotated).toBe(false);
+    expect(posted[0]).toContain("This session is busy.");
   });
 
   test("loop times mode queues all iterations immediately and wraps prompts", async () => {
