@@ -18,7 +18,7 @@ describe("agent prompt envelope", () => {
     process.env.CLISBOT_CLI_NAME = previousCliName;
   });
 
-  test("renders final-only reply instructions when streaming is enabled for the current thread", () => {
+  test("keeps progress-capable reply instructions when streaming is enabled for the current thread", () => {
     previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
     previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;
     process.env.CLISBOT_WRAPPER_PATH = "/tmp/clisbot-wrapper";
@@ -50,22 +50,24 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("- time: 2026-04-27T07:02:27.000Z");
     expect(prompt).toContain("- sender: slack:U123 [slack:U123]");
     expect(prompt).toContain("- surface: Slack channel C123, thread 171234.5678 [slack:channel:C123:thread:171234.5678]");
-    expect(prompt).toContain("To send a user-visible final reply, use the following CLI command:");
+    expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
     expect(prompt).toContain("/tmp/clis message send \\");
     expect(prompt).toContain("  --channel slack \\");
     expect(prompt).toContain("  --target channel:C123 \\");
     expect(prompt).toContain("  --thread-id 171234.5678 \\");
     expect(prompt).toContain("  --input md \\");
     expect(prompt).toContain("  --render blocks \\");
-    expect(prompt).toContain("  --final \\");
+    expect(prompt).toContain("  --final|progress \\");
     expect(prompt).toContain("--message \"$(cat <<\\__CLISBOT_MESSAGE__");
     expect(prompt).toContain("__CLISBOT_MESSAGE__");
     expect(prompt).toContain("  [--file /absolute/path/to/file]");
     expect(prompt).toContain("When replying to the user:");
     expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
-    expect(prompt).toContain("- use that command only for the final user-facing reply");
-    expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
-    expect(prompt).toContain("- send exactly 1 final user-facing response");
+    expect(prompt).toContain("- use that command to send progress updates and the final reply back to the conversation");
+    expect(prompt).toContain("- send at most 3 short, meaningful progress updates; skip trivial internal steps");
+    expect(prompt).toContain(
+      "- send a single final user-facing message by default; split only when channel limits require it or clarity would otherwise suffer",
+    );
     expect(prompt).toContain(
       "Put readable hierarchical Markdown in the --message body.",
     );
@@ -76,7 +78,6 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain(
       "Before sensitive actions or clisbot configuration changes, check permissions with `clisbot auth get-permissions --sender slack:U123 --agent default --json`.",
     );
-    expect(prompt).not.toContain("- send at most 3 progress updates");
     expect(prompt).toContain("<user>\nplease investigate\n</user>");
   });
 
@@ -146,7 +147,7 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("  --topic-id 4 \\");
     expect(prompt).toContain("  --input md \\");
     expect(prompt).toContain("  --render native \\");
-    expect(prompt).toContain("  --final \\");
+    expect(prompt).toContain("  --final|progress \\");
     expect(prompt).toContain(
       "Put readable hierarchical Markdown in the --message body.",
     );
@@ -208,7 +209,7 @@ describe("agent prompt envelope", () => {
     expect(prompt).not.toContain("- send exactly 1 final user-facing response");
   });
 
-  test("uses the same final-only reply instructions for Gemini when streaming is enabled", () => {
+  test("uses the same progress-capable reply instructions for Gemini when streaming is enabled", () => {
     previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
     previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;
     process.env.CLISBOT_WRAPPER_PATH = "/tmp/clisbot-wrapper";
@@ -232,11 +233,11 @@ describe("agent prompt envelope", () => {
       streaming: "all",
     });
 
-    expect(prompt).toContain("To send a user-visible final reply, use the following CLI command:");
+    expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
     expect(prompt).toContain("When replying to the user:");
     expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
-    expect(prompt).toContain("- use that command only for the final user-facing reply");
-    expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
+    expect(prompt).toContain("- use that command to send progress updates and the final reply back to the conversation");
+    expect(prompt).toContain("- send at most 3 short, meaningful progress updates; skip trivial internal steps");
     expect(prompt).toContain(
       "Put readable hierarchical Markdown in the --message body.",
     );
@@ -272,9 +273,10 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("  --render native \\");
     expect(prompt).toContain("  --final|progress \\");
     expect(prompt).toContain("- use that command to send progress updates and the final reply back to the conversation");
-    expect(prompt).toContain("- send at most 3 progress updates");
-    expect(prompt).toContain("- send exactly 1 final user-facing response");
-    expect(prompt).toContain("- keep progress updates short and meaningful");
+    expect(prompt).toContain("- send at most 3 short, meaningful progress updates; skip trivial internal steps");
+    expect(prompt).toContain(
+      "- send a single final user-facing message by default; split only when channel limits require it or clarity would otherwise suffer",
+    );
     expect(prompt).toContain(
       "Put readable hierarchical Markdown in the --message body.",
     );

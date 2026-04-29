@@ -64,16 +64,11 @@ export const PROGRESS_FLAG_SUFFIX = "|progress";
 export const EMPTY_PROGRESS_FLAG_SUFFIX = "";
 
 export const PROGRESS_RULES_BLOCK = `- use that command to send progress updates and the final reply back to the conversation
-- send at most {{max_progress_messages}} progress updates
-- keep progress updates short and meaningful
-- do not send progress updates for trivial internal steps
+- send at most {{max_progress_messages}} short, meaningful progress updates; skip trivial internal steps
 `;
 
-export const FINAL_ONLY_RULES_BLOCK = `- use that command only for the final user-facing reply
-- do not send user-facing progress updates for this conversation
-`;
-
-export const FINAL_RULE_REQUIRED = "send exactly 1 final user-facing response";
+export const FINAL_RULE_REQUIRED =
+  "send a single final user-facing message by default; split only when channel limits require it or clarity would otherwise suffer";
 export const FINAL_RULE_OPTIONAL = "final response is optional";
 
 export const EMPTY_REPLY_COMMAND = "";
@@ -244,10 +239,9 @@ function renderMessagePromptParts(params: {
     };
   }
 
-  const allowProgress = (params.streaming ?? "off") === "off";
-  const progressPhrase = allowProgress ? PROGRESS_PHRASE : EMPTY_PROGRESS_PHRASE;
-  const progressFlagSuffix = allowProgress ? PROGRESS_FLAG_SUFFIX : EMPTY_PROGRESS_FLAG_SUFFIX;
-  const progressRulesBlock = allowProgress ? PROGRESS_RULES_BLOCK : FINAL_ONLY_RULES_BLOCK;
+  const progressPhrase = PROGRESS_PHRASE;
+  const progressFlagSuffix = PROGRESS_FLAG_SUFFIX;
+  const progressRulesBlock = PROGRESS_RULES_BLOCK;
   const finalRuleLine = params.config.requireFinalResponse
     ? FINAL_RULE_REQUIRED
     : FINAL_RULE_OPTIONAL;
@@ -284,7 +278,7 @@ function renderConfigurationGuidance() {
   return [
     `When the user asks to change ${cliName} configuration, use ${cliName} CLI commands; see ${renderCliCommand("--help", { inline: true })}, ${renderCliCommand("bots --help", { inline: true })}, ${renderCliCommand("routes --help", { inline: true })}, ${renderCliCommand("auth --help", { inline: true })}, or ${renderCliCommand("update --help", { inline: true })} for details.`,
     `For schedule/loop/reminder requests, inspect ${renderCliCommand("loops --help", { inline: true })} and use the loops CLI.`,
-    `For durable queue inspection or one-shot queued prompts, inspect ${renderCliCommand("queues --help", { inline: true })} and use ${renderCliCommand("queues create --channel <slack|telegram> --target <route> --sender <principal> <prompt>", { inline: true })}.`,
+    `For durable queue requests, inspect ${renderCliCommand("queues --help", { inline: true })} and use the queues CLI.`,
   ].join("\n");
 }
 

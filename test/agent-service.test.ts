@@ -2323,7 +2323,9 @@ describe("AgentService session identity", () => {
     expect(transcript.snapshot).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
     expect(transcript.snapshot).toContain("use that command to send progress updates and the final reply back to the conversation");
     expect(transcript.snapshot).not.toContain("legacy wrapped prompt with progress instructions");
-    expect(transcript.snapshot).toContain("send at most 3 progress updates");
+    expect(transcript.snapshot).toContain(
+      "send at most 3 short, meaningful progress updates; skip trivial internal steps",
+    );
 
     await service.stop();
   });

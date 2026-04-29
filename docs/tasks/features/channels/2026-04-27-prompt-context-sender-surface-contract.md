@@ -82,6 +82,8 @@ Current `capture-pane` delivery intro:
 channel auto-delivery remains enabled for this conversation; do not send user-facing progress updates or the final response with `clisbot message send`
 ```
 
+Current `message-tool` reply rules no longer switch to final-only when streaming is enabled; progress-capable `clisbot message send --final|progress` instructions still apply, bounded by the configured max progress count.
+
 Previous steering prompt template:
 
 ```text
