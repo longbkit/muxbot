@@ -68,6 +68,9 @@ Durable one-shot queue control is being staged for the next release.
 - Fixed `clisbot restart` recovery for the case where `stop` reports a timeout
   but `status` already shows the service is stopped; restart now continues into
   `start` and prints the stop warning instead of leaving the service down.
+- Fixed durable queued prompts in message-tool mode so a tool-delivered final
+  reply settles the running queue item without waiting for a later pane
+  settlement or posting a duplicate final.
 - Fixed running-state reconciliation for tmux panes that are already idle:
   stale active timer lines in scrollback no longer keep a session `running`,
   and rehydrated active runs can settle without waiting for another pane
@@ -78,6 +81,9 @@ Durable one-shot queue control is being staged for the next release.
 - Fixed operator active-run listing so stale persisted `running` projections
   with no matching tmux session are cleared instead of continuing to show
   `runner=lost`.
+- Fixed durable queue reconciliation so a persisted `running` queue item from a
+  completed or stopped run is cleared once the session is idle, allowing newer
+  pending queue items and follow-up routing to proceed.
 
 ### Security
 

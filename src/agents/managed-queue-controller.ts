@@ -6,6 +6,9 @@ import { AgentSessionState } from "./session-state.ts";
 import { SessionService } from "./session-service.ts";
 import { SurfaceRuntime } from "./surface-runtime.ts";
 import type { LatencyDebugContext } from "../control/latency-debug.ts";
+import { sleep } from "../shared/process.ts";
+
+const QUEUE_MESSAGE_TOOL_FINAL_POLL_MS = 250;
 
 type QueueConfig = {
   maxPendingItemsPerSession: number;
@@ -15,6 +18,10 @@ type ManagedQueueItem = {
   target: AgentSessionTarget;
   item: StoredQueueItem;
   persisting?: boolean;
+};
+
+type ManagedQueueRunUpdate = RunUpdate & {
+  messageToolFinalAlreadySent?: boolean;
 };
 
 type QueueControllerDeps = {
@@ -149,11 +156,29 @@ export class ManagedQueueController {
     }
 
     for (const persisted of persistedItems) {
-      if (persisted.status !== "pending" || this.queuedItems.has(persisted.id)) {
+      if (persisted.status === "running") {
+        await this.clearStaleRunningQueueItem(persisted);
+        continue;
+      }
+      if (this.queuedItems.has(persisted.id)) {
         continue;
       }
       this.enqueuePersistedQueueItem(persisted);
     }
+  }
+
+  private async clearStaleRunningQueueItem(item: QueuedPromptStatus) {
+    if (this.queuedItems.has(item.id)) {
+      return;
+    }
+    const target = {
+      agentId: item.agentId,
+      sessionKey: item.sessionKey,
+    };
+    if (await this.deps.hasBlockingActiveRun(target)) {
+      return;
+    }
+    await this.removeManagedQueueItem(target, item);
   }
 
   persistQueueItem(resolved: ResolvedAgentTarget, item: StoredQueueItem) {
@@ -194,7 +219,7 @@ export class ManagedQueueController {
 
   async markQueueItemRunning(target: AgentSessionTarget, item?: StoredQueueItem) {
     if (!item) {
-      return;
+      return undefined;
     }
     const now = Date.now();
     const next = {
@@ -211,6 +236,7 @@ export class ManagedQueueController {
       this.deps.resolveTarget(target),
       next,
     );
+    return next;
   }
 
   async removeManagedQueueItem(target: AgentSessionTarget, item?: StoredQueueItem) {
@@ -230,28 +256,47 @@ export class ManagedQueueController {
       target,
       item,
     });
-    const queued = this.deps.queue.enqueue(
+    const queued = this.deps.queue.enqueue<ManagedQueueRunUpdate>(
       item.sessionKey,
       async () => {
-        await this.markQueueItemRunning(target, item);
+        const runningItem = await this.markQueueItemRunning(target, item);
         await this.deps.surfaceRuntime.notifyManagedQueueStart(target, item);
         const promptText = await this.deps.surfaceRuntime.buildManagedQueuePrompt(
           item.agentId,
           item,
         );
-        return this.deps.activeRuns.executePrompt(target, promptText, {
+        const result = this.deps.activeRuns.executePrompt(target, promptText, {
           id: `queue:${item.id}`,
           mode: "live",
           onUpdate: async () => undefined,
         });
+        let stopWaitingForToolFinal = false;
+        try {
+          const outcome = await Promise.race([
+            result.then((update) => ({ kind: "result" as const, update })),
+            this.waitForMessageToolFinal(target, runningItem ?? item, () => stopWaitingForToolFinal)
+              .then((seen) => ({ kind: seen ? "message-tool-final" as const : "result" as const })),
+          ]);
+          if (outcome.kind === "message-tool-final") {
+            return this.createMessageToolFinalQueueUpdate(target, item);
+          }
+          return await result;
+        } finally {
+          stopWaitingForToolFinal = true;
+        }
       },
       {
         id: item.id,
         createdAt: item.createdAt,
         text: item.promptSummary,
         canStart: async () => !(await this.deps.hasBlockingActiveRun(target)),
-        onComplete: async (value: RunUpdate) => {
-          await this.deps.surfaceRuntime.notifyManagedQueueSettlement(target, item, value);
+        onComplete: async (value) => {
+          if (
+            !value.messageToolFinalAlreadySent &&
+            !(await this.hasMessageToolFinalForQueueItem(target, item))
+          ) {
+            await this.deps.surfaceRuntime.notifyManagedQueueSettlement(target, item, value);
+          }
           await this.removeManagedQueueItem(target, item);
         },
         onFailure: async (error: unknown) => {
@@ -267,5 +312,53 @@ export class ManagedQueueController {
       }
       console.error("queued prompt execution failed", error);
     });
+  }
+
+  private async waitForMessageToolFinal(
+    target: AgentSessionTarget,
+    item: StoredQueueItem,
+    shouldStop: () => boolean,
+  ) {
+    while (!shouldStop()) {
+      if (await this.hasMessageToolFinalForQueueItem(target, item)) {
+        return true;
+      }
+      await sleep(QUEUE_MESSAGE_TOOL_FINAL_POLL_MS);
+    }
+    return false;
+  }
+
+  private async hasMessageToolFinalForQueueItem(
+    target: AgentSessionTarget,
+    item: StoredQueueItem,
+  ) {
+    const startedAt = this.queuedItems.get(item.id)?.item.startedAt ?? item.startedAt;
+    if (typeof startedAt !== "number" || !Number.isFinite(startedAt)) {
+      return false;
+    }
+    const runtime = await this.deps.sessionState.getSessionRuntime(target);
+    return (
+      typeof runtime.messageToolFinalReplyAt === "number" &&
+      Number.isFinite(runtime.messageToolFinalReplyAt) &&
+      runtime.messageToolFinalReplyAt >= startedAt
+    );
+  }
+
+  private createMessageToolFinalQueueUpdate(
+    target: AgentSessionTarget,
+    item: StoredQueueItem,
+  ): ManagedQueueRunUpdate {
+    const resolved = this.deps.resolveTarget(target);
+    return {
+      status: "completed",
+      agentId: target.agentId,
+      sessionKey: target.sessionKey,
+      sessionName: resolved.sessionName,
+      workspacePath: resolved.workspacePath,
+      snapshot: "",
+      fullSnapshot: "",
+      initialSnapshot: "",
+      messageToolFinalAlreadySent: true,
+    };
   }
 }

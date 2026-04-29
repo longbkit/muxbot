@@ -52,6 +52,10 @@ drain used by `/queue`. Runtime-reconciled items post queue-start notifications
 and terminal settlement through the stored surface binding. If the runtime is
 stopped, queued prompts activate on the next `clisbot start`.
 
+Persisted `running` queue items are preserved while the session still has a
+blocking active run. Once reconciliation sees the session idle, clisbot removes
+the stale running queue item instead of letting it block newer queued prompts.
+
 The queue CLI intentionally has one public routed addressing shape: the same
 explicit `--channel/--target` route addressing used by loops.
 
