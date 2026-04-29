@@ -2,6 +2,7 @@ import { extractSessionId } from "../../agents/session-identity.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
 import { sleep } from "../../shared/process.ts";
 import {
+  deriveInteractionDiffText,
   deriveInteractionText,
   extractScrolledAppend,
   normalizePaneText,
@@ -193,8 +194,8 @@ export async function captureTmuxSessionIdentity(params: {
       continue;
     }
 
-    const sessionId = extractSessionId(
-      deriveSessionIdentityText(statusSubmission.submittedSnapshot, snapshot),
+    const sessionId = extractSessionIdFromCandidates(
+      deriveSessionIdentityTexts(statusSubmission.submittedSnapshot, snapshot),
       params.pattern,
     );
     if (sessionId) {
@@ -213,13 +214,27 @@ export async function captureTmuxSessionIdentity(params: {
   return null;
 }
 
-function deriveSessionIdentityText(submittedSnapshot: string, snapshot: string) {
+function deriveSessionIdentityTexts(submittedSnapshot: string, snapshot: string) {
   const rawSubmitted = normalizePaneText(submittedSnapshot);
   const rawSnapshot = normalizePaneText(snapshot);
-  return (
-    extractScrolledAppend(rawSubmitted, rawSnapshot) ||
-    deriveInteractionText(submittedSnapshot, snapshot)
+  return [
+    extractScrolledAppend(rawSubmitted, rawSnapshot),
+    deriveInteractionText(submittedSnapshot, snapshot),
+    deriveInteractionDiffText(submittedSnapshot, snapshot),
+  ].filter((candidate, index, candidates) =>
+    candidate && candidates.indexOf(candidate) === index
   );
+}
+
+function extractSessionIdFromCandidates(candidates: string[], pattern: string) {
+  for (const candidate of candidates) {
+    const sessionId = extractSessionId(candidate, pattern);
+    if (sessionId) {
+      return sessionId;
+    }
+  }
+
+  return null;
 }
 
 export async function dismissTmuxTrustPromptIfPresent(params: {

@@ -59,6 +59,9 @@ Durable one-shot queue control is being staged for the next release.
 - Fixed mid-run recovery for runners that use explicit session ids without a
   separate resume command; recovery now restarts with the stored id instead of
   clearing and rotating it.
+- Fixed status-command session-id capture fallback so full-pane rewrites can
+  still read the cleaned `/status` delta when the raw append exists but does
+  not contain the session id.
 
 ### Security
 

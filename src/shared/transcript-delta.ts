@@ -164,6 +164,12 @@ export function deriveInteractionText(initialSnapshot: string, currentSnapshot: 
   return extractScrolledAppend(previous, current) || diffText(previous, current);
 }
 
+export function deriveInteractionDiffText(initialSnapshot: string, currentSnapshot: string) {
+  const previous = cleanInteractionSnapshot(initialSnapshot);
+  const current = cleanInteractionSnapshot(currentSnapshot);
+  return diffText(previous, current);
+}
+
 export function appendInteractionText(currentBody: string, nextDelta: string) {
   const trimmedCurrent = currentBody.trim();
   const trimmedDelta = nextDelta.trim();

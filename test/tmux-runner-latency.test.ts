@@ -124,6 +124,67 @@ describe("tmux runner latency behavior", () => {
     ).resolves.toBe(currentId);
   });
 
+  test("captureTmuxSessionIdentity falls back when raw append has no session id", async () => {
+    const currentId = "33333333-3333-3333-3333-333333333333";
+    let snapshot = [
+      "runner status",
+      "stable footer line one",
+      "stable footer line two",
+    ].join("\n");
+    let state = {
+      cursorX: 0,
+      cursorY: 2,
+      historySize: 0,
+    };
+
+    const fakeTmux = {
+      async sendLiteral(_sessionName: string, text: string) {
+        state = {
+          cursorX: text.length,
+          cursorY: state.cursorY,
+          historySize: state.historySize,
+        };
+      },
+      async sendKey(_sessionName: string, key: string) {
+        if (key !== "Enter") {
+          return;
+        }
+        snapshot = [
+          "runner status",
+          `session id: ${currentId}`,
+          "stable footer line one",
+          "stable footer line two",
+          "status command accepted",
+        ].join("\n");
+        state = {
+          cursorX: 0,
+          cursorY: state.cursorY + 1,
+          historySize: state.historySize + 1,
+        };
+      },
+      async getPaneState() {
+        return state;
+      },
+      async capturePane() {
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      captureTmuxSessionIdentity({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        promptSubmitDelayMs: 1,
+        captureLines: 80,
+        statusCommand: "/status",
+        pattern:
+          "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+        timeoutMs: 100,
+        pollIntervalMs: 1,
+      }),
+    ).resolves.toBe(currentId);
+  });
+
   test("waitForTmuxSessionBootstrap returns before the full startup budget once output appears", async () => {
     let captureCount = 0;
     const fakeTmux = {
