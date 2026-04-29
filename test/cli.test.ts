@@ -71,6 +71,13 @@ describe("parseCliArgs", () => {
     });
   });
 
+  test("parses queues subcommands", () => {
+    expect(parseCliArgs(["bun", "src/main.ts", "queues", "list"])).toEqual({
+      name: "queues",
+      args: ["list"],
+    });
+  });
+
   test("parses message subcommands", () => {
     expect(
       parseCliArgs(["bun", "src/main.ts", "message", "send", "--channel", "slack"]),
@@ -231,8 +238,9 @@ describe("renderCliHelp", () => {
     expect(help).toContain("clisbot routes --help");
     expect(help).toContain("clisbot loops <subcommand>");
     expect(help).toContain("create --channel <slack|telegram> --target <route> [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--new-thread] <expression>");
-    expect(help).toContain("scoped status/cancel also accept --channel/--target/--thread-id/--topic-id");
+    expect(help).toContain("scoped list/status/cancel also accept --channel/--target/--thread-id/--topic-id");
     expect(help).toContain("`--target` selects the routed surface; use `--thread-id` for Slack threads, `--topic-id` for Telegram topics");
+    expect(help).toContain("clisbot queues <subcommand>");
     expect(help).toContain("clisbot message <subcommand>");
     expect(help).toContain("clisbot agents <subcommand>");
     expect(help).toContain("clisbot agents --help");

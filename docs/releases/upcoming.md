@@ -6,7 +6,7 @@ For beta or pre-release builds, keep notes here until the public version ships. 
 
 ## Summary
 
-No upcoming changes yet.
+Durable one-shot queue control is being staged for the next release.
 
 ## Operator Impact
 
@@ -24,7 +24,11 @@ No upcoming changes yet.
 
 ### Agents
 
-- None yet.
+- Added durable session-scoped queue items under `StoredSessionEntry.queues`.
+  Chat `/queue`, route `additionalMessageMode: "queue"`, and `clisbot queues`
+  now share the same queue item model.
+- Added a configurable per-session pending queue limit:
+  `control.queue.maxPendingItemsPerSession`, default `20` when omitted.
 
 ### Runners
 
@@ -32,11 +36,14 @@ No upcoming changes yet.
 
 ### Control
 
-- None yet.
+- Added `clisbot queues list|status|create|clear` for app-wide or scoped queue
+  inspection, explicit routed creation, and pending-only clear.
 
 ### Configuration
 
-- None yet.
+- Added optional `control.queue.maxPendingItemsPerSession`. The default config
+  template omits it so future release defaults can change without pinning old
+  generated config files.
 
 ### DX
 
@@ -66,8 +73,10 @@ No upcoming changes yet.
 
 ## Validation
 
-- Not run yet.
+- `bun run check`
+- `bun run build`
+- `git diff --check`
 
 ## Links
 
-- None yet.
+- [Queues CLI](../features/control/queues-cli.md)

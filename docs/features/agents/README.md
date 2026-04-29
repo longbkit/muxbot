@@ -75,9 +75,9 @@ The next important growth areas are:
   - stale runner cleanup that reclaims tmux resources without resetting logical conversation identity
 - agent self-knowledge and context bootstrap:
   - truthful identity, capability, and limit awareness from docs, source, and current environment
+- queueing:
+  - keep `StoredSessionEntry.queues` as the canonical queue inventory while the runtime drains those items with the same ordering and active-run guards used by `/queue`
 - agent runtime introspection:
-  - read and mutate queue, loop, and active-run state through a standard agent-facing bridge
-- agent-managed queueing:
-  - let an active agent create bounded same-session follow-up prompts through a documented queue control surface
+  - read loop, queue, and active-run state through standard control surfaces before adding any broader agent-facing bridge
 - agent work-management interface:
   - normalize task and work-item operations now, then split a dedicated feature area later only if backend adapters grow large enough

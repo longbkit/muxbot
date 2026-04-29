@@ -2,6 +2,12 @@ import { sleep } from "../shared/process.ts";
 
 type QueueTask<T> = () => Promise<T>;
 type QueueCanStart = () => Promise<boolean> | boolean;
+type QueueLifecycle<T> = {
+  onStart?: () => Promise<void> | void;
+  onComplete?: (value: T) => Promise<void> | void;
+  onFailure?: (error: unknown) => Promise<void> | void;
+  onClear?: () => Promise<void> | void;
+};
 
 const QUEUE_PENDING_POLL_INTERVAL_MS = 25;
 
@@ -15,12 +21,14 @@ type QueueEntry<T> = {
   id: string;
   text?: string;
   createdAt: number;
+  sequence: number;
   status: "pending" | "running";
   canStart?: QueueCanStart;
   task: QueueTask<T>;
   resolve: (value: T | PromiseLike<T>) => void;
   reject: (reason?: unknown) => void;
   result: Promise<T>;
+  lifecycle?: QueueLifecycle<T>;
 };
 
 type QueueState = {
@@ -38,14 +46,14 @@ export class ClearedQueuedTaskError extends Error {
 export class AgentJobQueue {
   private states = new Map<string, QueueState>();
   private nextId = 1;
+  private nextSequence = 1;
 
   enqueue<T>(
     key: string,
     task: QueueTask<T>,
-    options: { text?: string; canStart?: QueueCanStart } = {},
+    options: { id?: string; text?: string; createdAt?: number; canStart?: QueueCanStart } & QueueLifecycle<T> = {},
   ) {
     const state = this.getOrCreateState(key);
-    const positionAhead = state.entries.length;
     let resolve!: (value: T | PromiseLike<T>) => void;
     let reject!: (reason?: unknown) => void;
     const result = new Promise<T>((resolvePromise, rejectPromise) => {
@@ -54,17 +62,26 @@ export class AgentJobQueue {
     });
     void result.catch(() => undefined);
     const entry: QueueEntry<T> = {
-      id: String(this.nextId++),
+      id: options.id ?? String(this.nextId++),
       text: options.text,
-      createdAt: Date.now(),
+      createdAt: options.createdAt ?? Date.now(),
+      sequence: this.nextSequence++,
       status: "pending",
       canStart: options.canStart,
       task,
       resolve,
       reject,
       result,
+      lifecycle: {
+        onStart: options.onStart,
+        onComplete: options.onComplete,
+        onFailure: options.onFailure,
+        onClear: options.onClear,
+      },
     };
     state.entries.push(entry as QueueEntry<unknown>);
+    this.sortEntries(state);
+    const positionAhead = state.entries.indexOf(entry as QueueEntry<unknown>);
     void this.drain(key, state);
 
     return { positionAhead, result };
@@ -105,12 +122,36 @@ export class AgentJobQueue {
     const removedEntries = state.entries.filter((entry) => entry.status === "pending");
     state.entries = keptEntries;
     for (const entry of removedEntries) {
+      void Promise.resolve(entry.lifecycle?.onClear?.()).catch(() => undefined);
       entry.reject(new ClearedQueuedTaskError());
     }
     if (state.entries.length === 0 && !state.running) {
       this.states.delete(key);
     }
     return removedEntries.length;
+  }
+
+  clearPendingByIds(ids: Iterable<string>) {
+    const idSet = new Set(ids);
+    let cleared = 0;
+    for (const [key, state] of this.states.entries()) {
+      const keptEntries = state.entries.filter((entry) =>
+        entry.status === "running" || !idSet.has(entry.id)
+      );
+      const removedEntries = state.entries.filter((entry) =>
+        entry.status === "pending" && idSet.has(entry.id)
+      );
+      state.entries = keptEntries;
+      cleared += removedEntries.length;
+      for (const entry of removedEntries) {
+        void Promise.resolve(entry.lifecycle?.onClear?.()).catch(() => undefined);
+        entry.reject(new ClearedQueuedTaskError());
+      }
+      if (state.entries.length === 0 && !state.running) {
+        this.states.delete(key);
+      }
+    }
+    return cleared;
   }
 
   private getOrCreateState(key: string) {
@@ -125,6 +166,18 @@ export class AgentJobQueue {
     };
     this.states.set(key, state);
     return state;
+  }
+
+  private sortEntries(state: QueueState) {
+    state.entries.sort((left, right) => {
+      if (left.status !== right.status) {
+        return left.status === "running" ? -1 : 1;
+      }
+      if (left.createdAt !== right.createdAt) {
+        return left.createdAt - right.createdAt;
+      }
+      return left.sequence - right.sequence;
+    });
   }
 
   private async drain(key: string, state: QueueState) {
@@ -144,11 +197,19 @@ export class AgentJobQueue {
           await sleep(QUEUE_PENDING_POLL_INTERVAL_MS);
           continue;
         }
+        this.sortEntries(state);
+        if (state.entries.find((entry) => entry.status === "pending") !== nextEntry) {
+          continue;
+        }
 
         nextEntry.status = "running";
         try {
-          nextEntry.resolve(await nextEntry.task());
+          await Promise.resolve(nextEntry.lifecycle?.onStart?.()).catch(() => undefined);
+          const value = await nextEntry.task();
+          await Promise.resolve(nextEntry.lifecycle?.onComplete?.(value)).catch(() => undefined);
+          nextEntry.resolve(value);
         } catch (error) {
+          await Promise.resolve(nextEntry.lifecycle?.onFailure?.(error)).catch(() => undefined);
           nextEntry.reject(error);
         } finally {
           state.entries = state.entries.filter((entry) => entry !== nextEntry);

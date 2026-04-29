@@ -284,6 +284,7 @@ function renderConfigurationGuidance() {
   return [
     `When the user asks to change ${cliName} configuration, use ${cliName} CLI commands; see ${renderCliCommand("--help", { inline: true })}, ${renderCliCommand("bots --help", { inline: true })}, ${renderCliCommand("routes --help", { inline: true })}, ${renderCliCommand("auth --help", { inline: true })}, or ${renderCliCommand("update --help", { inline: true })} for details.`,
     `For schedule/loop/reminder requests, inspect ${renderCliCommand("loops --help", { inline: true })} and use the loops CLI.`,
+    `For durable queue inspection or one-shot queued prompts, inspect ${renderCliCommand("queues --help", { inline: true })} and use ${renderCliCommand("queues create --channel <slack|telegram> --target <route> --sender <principal> <prompt>", { inline: true })}.`,
   ].join("\n");
 }
 

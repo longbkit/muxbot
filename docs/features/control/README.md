@@ -30,6 +30,7 @@ Those belong to auth, because control is a surface that consumes auth decisions 
 - authorized chat-channel recovery ingress for the same control semantics
 - health and debug views
 - inspect and cancel persisted managed loops
+- inspect, create, and clear durable queued prompts
 - operator-safe intervention points
 - config reload watch behavior
 
@@ -47,6 +48,7 @@ Those belong to auth, because control is a surface that consumes auth decisions 
 ## Related Feature Docs
 
 - [loops-cli.md](./loops-cli.md)
+- [queues-cli.md](./queues-cli.md)
 - [runner-debug-cli.md](./runner-debug-cli.md)
 
 ## Related Test Docs

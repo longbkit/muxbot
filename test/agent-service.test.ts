@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { AgentService } from "../src/agents/agent-service.ts";
 import { ClearedQueuedTaskError } from "../src/agents/job-queue.ts";
 import { createStoredIntervalLoop } from "../src/agents/loop-control-shared.ts";
+import { createStoredQueueItem } from "../src/agents/queue-state.ts";
 import { resolveAgentTarget } from "../src/agents/resolved-target.ts";
 import { loadConfig, resolveSessionStorePath } from "../src/config/load-config.ts";
 import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/schema.ts";
@@ -2361,6 +2362,7 @@ describe("AgentService session identity", () => {
     );
 
     const loadedConfig = await loadConfig(configPath);
+    loadedConfig.raw.bots.slack.default.responseMode = "capture-pane";
     loadedConfig.raw.bots.slack.default.groups["channel:c4"] = {
       enabled: true,
       requireMention: true,
@@ -2417,6 +2419,168 @@ describe("AgentService session identity", () => {
     expect(notifications[0]).toContain("remaining `");
 
     await service.stop();
+  });
+
+  test("persisted queue items post surface start and capture-pane settlement notifications", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-queue-notify-"));
+    const storePath = join(tempDir, "sessions.json");
+    const socketPath = join(tempDir, "clisbot.sock");
+    const workspaceTemplate = join(tempDir, "workspaces", "{agentId}");
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify(
+        buildConfig({
+          socketPath,
+          storePath,
+          workspaceTemplate,
+          runnerCommand: "codex",
+          runnerArgs: ["-C", "{workspace}"],
+          sessionId: {
+            create: { mode: "runner", args: [] },
+            capture: {
+              mode: "status-command",
+              statusCommand: "/status",
+              pattern: RUNNER_GENERATED_ID,
+              timeoutMs: 10,
+              pollIntervalMs: 1,
+            },
+            resume: { mode: "command", args: ["resume", "{sessionId}"] },
+          },
+          cleanupEnabled: false,
+        }),
+        null,
+        2,
+      ),
+    );
+
+    const loadedConfig = await loadConfig(configPath);
+    loadedConfig.raw.bots.slack.default.groups["channel:c4"] = {
+      enabled: true,
+      requireMention: true,
+      allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
+      responseMode: "capture-pane",
+      surfaceNotifications: {
+        queueStart: "brief",
+        loopStart: "brief",
+      },
+    };
+
+    const target = {
+      agentId: "default",
+      sessionKey: "agent:default:slack:channel:c4:thread:queue-notify",
+    };
+    const state = new AgentSessionState(new SessionStore(storePath));
+    await state.setQueuedItem(
+      resolveAgentTarget(loadedConfig, target),
+      createStoredQueueItem({
+        promptText: "ping",
+        canonicalPromptText: "ping",
+        promptSummary: "ping",
+        createdBy: "U123",
+        sender: {
+          providerId: "U123",
+        },
+        surfaceBinding: {
+          platform: "slack",
+          accountId: "default",
+          conversationKind: "channel",
+          channelId: "c4",
+          threadTs: "queue-notify",
+        },
+      }),
+    );
+
+    const tmux = new FakeTmuxClient() as unknown as TmuxClient;
+    const service = new AgentService(loadedConfig, { tmux });
+    const notifications: string[] = [];
+    service.registerSurfaceNotificationHandler({
+      platform: "slack",
+      accountId: "default",
+      handler: async ({ text }) => {
+        notifications.push(text);
+      },
+    });
+
+    try {
+      await service.start();
+      const deadline = Date.now() + 5_000;
+      while (notifications.length < 2 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      expect(notifications[0]).toContain("Queued message is now running");
+      expect(notifications[0]).toContain("`ping`");
+      expect(notifications.length).toBeGreaterThanOrEqual(2);
+      expect(notifications.at(-1)).toContain("ping");
+      expect(await service.listQueuedPrompts(target)).toEqual([]);
+    } finally {
+      await service.stop();
+    }
+  });
+
+  test("does not let a new prompt jump ahead of an earlier persisted queue item", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-queue-order-"));
+    const storePath = join(tempDir, "sessions.json");
+    const socketPath = join(tempDir, "clisbot.sock");
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify(
+        buildConfig({
+          socketPath,
+          storePath,
+          workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+          runnerCommand: "codex",
+          runnerArgs: ["-C", "{workspace}"],
+          sessionId: {
+            create: { mode: "runner", args: [] },
+            capture: {
+              mode: "status-command",
+              statusCommand: "/status",
+              pattern: RUNNER_GENERATED_ID,
+              timeoutMs: 10,
+              pollIntervalMs: 1,
+            },
+            resume: { mode: "command", args: ["resume", "{sessionId}"] },
+          },
+          cleanupEnabled: false,
+        }),
+        null,
+        2,
+      ),
+    );
+
+    const loadedConfig = await loadConfig(configPath);
+    const target = {
+      agentId: "default",
+      sessionKey: "agent:default:slack:channel:c4:thread:queue-order",
+    };
+    const state = new AgentSessionState(new SessionStore(storePath));
+    await state.setQueuedItem(
+      resolveAgentTarget(loadedConfig, target),
+      createStoredQueueItem({
+        promptText: "old persisted prompt",
+        promptSummary: "old persisted prompt",
+      }),
+    );
+
+    const service = new AgentService(loadedConfig, {
+      tmux: new FakeTmuxClient() as unknown as TmuxClient,
+    });
+    const newer = service.enqueuePrompt(target, "new prompt", {
+      onUpdate: () => undefined,
+    });
+
+    const result = await newer.result;
+    const oldIndex = result.snapshot.indexOf("ECHO old persisted prompt");
+    const newIndex = result.snapshot.indexOf("ECHO new prompt");
+
+    expect(oldIndex).toBeGreaterThanOrEqual(0);
+    expect(newIndex).toBeGreaterThan(oldIndex);
+    expect(await service.listQueuedPrompts(target)).toEqual([]);
   });
 
   test("persists and restores managed calendar loops across service restart", async () => {
@@ -3106,6 +3270,10 @@ describe("AgentService session identity", () => {
 
       let secondSettled = false;
       const second = service.enqueuePrompt(target, "ping", {
+        queueItem: createStoredQueueItem({
+          promptText: "ping",
+          promptSummary: "ping",
+        }),
         onUpdate: () => undefined,
       });
       void second.result.then(
@@ -3119,9 +3287,9 @@ describe("AgentService session identity", () => {
 
       await Bun.sleep(80);
       expect(secondSettled).toBe(false);
-      expect(service.listQueuedPrompts(target).map((item) => item.text)).toEqual(["ping"]);
+      expect((await service.listQueuedPrompts(target)).map((item) => item.text)).toEqual(["ping"]);
 
-      const cleared = service.clearQueuedPrompts(target);
+      const cleared = await service.clearQueuedPrompts(target);
       expect(cleared).toBe(1);
 
       const queuedError = await second.result.catch((error) => error);
@@ -3194,6 +3362,10 @@ describe("AgentService session identity", () => {
 
       let secondSettled = false;
       const second = service.enqueuePrompt(target, "ping", {
+        queueItem: createStoredQueueItem({
+          promptText: "ping",
+          promptSummary: "ping",
+        }),
         onUpdate: () => undefined,
       });
       void second.result.then(
@@ -3208,9 +3380,9 @@ describe("AgentService session identity", () => {
       await Bun.sleep(80);
 
       expect(secondSettled).toBe(false);
-      expect(service.listQueuedPrompts(target).map((item) => item.text)).toEqual(["ping"]);
+      expect((await service.listQueuedPrompts(target)).map((item) => item.text)).toEqual(["ping"]);
 
-      const cleared = service.clearQueuedPrompts(target);
+      const cleared = await service.clearQueuedPrompts(target);
       expect(cleared).toBe(1);
 
       const queuedError = await second.result.catch((error) => error);
@@ -3296,6 +3468,10 @@ describe("AgentService session identity", () => {
 
       let secondSettled = false;
       const second = recoveredService.enqueuePrompt(target, "ping", {
+        queueItem: createStoredQueueItem({
+          promptText: "ping",
+          promptSummary: "ping",
+        }),
         onUpdate: () => undefined,
       });
       void second.result.then(
@@ -3308,9 +3484,9 @@ describe("AgentService session identity", () => {
       );
       await Bun.sleep(80);
       expect(secondSettled).toBe(false);
-      expect(recoveredService.listQueuedPrompts(target).map((item) => item.text)).toEqual(["ping"]);
+      expect((await recoveredService.listQueuedPrompts(target)).map((item) => item.text)).toEqual(["ping"]);
 
-      const cleared = recoveredService.clearQueuedPrompts(target);
+      const cleared = await recoveredService.clearQueuedPrompts(target);
       expect(cleared).toBe(1);
       const queuedError = await second.result.catch((error) => error);
       expect(queuedError).toBeInstanceOf(ClearedQueuedTaskError);

@@ -32,6 +32,11 @@ import {
   validateLoopInterval as validateManagedLoopInterval,
 } from "../agents/loop-control-shared.ts";
 import {
+  createStoredQueueItem,
+  summarizeQueuePrompt,
+  type StoredQueueItem,
+} from "../agents/queue-state.ts";
+import {
   renderChannelSnapshot,
   renderCompactChannelTranscript,
   escapeCodeFence,
@@ -605,6 +610,7 @@ async function executePromptDelivery<TChunk>(params: {
   forceQueuedDelivery?: boolean;
   queueStartMode?: SurfaceNotificationMode;
   notificationPromptSummary?: string;
+  queueItem?: StoredQueueItem;
   suppressDetachedSettlement?: boolean;
   onPromptAccepted?: () => Promise<void>;
 }) {
@@ -909,13 +915,14 @@ async function executePromptDelivery<TChunk>(params: {
   }
 
   try {
-    const { positionAhead, result } = params.agentService.enqueuePrompt(
+    const queued = params.agentService.enqueuePrompt(
       params.sessionTarget,
       params.promptText,
       {
         observerId: params.observerId,
         timingContext: params.timingContext,
         queueText: params.queueText,
+        queueItem: params.queueItem,
         onUpdate: async (update) => {
           assertRunUpdateBelongsToSession(update);
           if (update.status === "running" && !loggedFirstRunningUpdate) {
@@ -986,6 +993,8 @@ async function executePromptDelivery<TChunk>(params: {
         },
       },
     );
+    const { positionAhead, result } = queued;
+    await queued.persisted;
     queueStartPending =
       (positionAhead > 0 || params.forceQueuedDelivery === true) &&
       (params.queueStartMode ?? "none") !== "none";
@@ -1371,6 +1380,19 @@ export async function processChannelInteraction<TChunk>(params: {
     }
     return params.agentPromptText ?? params.text;
   };
+  const queueItem = forceQueuedDelivery
+    ? createStoredQueueItem({
+        promptText: delayedPromptQueueText,
+        canonicalPromptText: delayedPromptQueueText,
+        promptSummary:
+          explicitQueueMessage ??
+          summarizeQueuePrompt(delayedPromptQueueText),
+        createdBy: params.senderId,
+        sender: buildLoopSender(params.identity),
+        surfaceBinding: buildLoopSurfaceBinding(params.identity),
+        protectedControlMutationRule: params.protectedControlMutationRule,
+      })
+    : undefined;
   const isSensitiveCommand = slashCommand?.type === "bash";
 
   if (isSensitiveCommand && !auth.canUseShell) {
@@ -1703,7 +1725,7 @@ export async function processChannelInteraction<TChunk>(params: {
     }
 
     if (slashCommand.name === "queue-list") {
-      const queuedItems = params.agentService.listQueuedPrompts?.(params.sessionTarget) ?? [];
+      const queuedItems = await (params.agentService.listQueuedPrompts?.(params.sessionTarget) ?? []);
       await params.postText(renderQueuedMessagesList(queuedItems));
       await params.agentService.recordConversationReply(params.sessionTarget);
       return interactionResult;
@@ -1716,7 +1738,7 @@ export async function processChannelInteraction<TChunk>(params: {
     }
 
     if (slashCommand.name === "queue-clear") {
-      const clearedCount = params.agentService.clearQueuedPrompts?.(params.sessionTarget) ?? 0;
+      const clearedCount = await (params.agentService.clearQueuedPrompts?.(params.sessionTarget) ?? 0);
       await params.postText(
         clearedCount > 0
           ? `Cleared ${clearedCount} queued message${clearedCount === 1 ? "" : "s"}.`
@@ -2085,6 +2107,7 @@ export async function processChannelInteraction<TChunk>(params: {
     notificationPromptSummary:
       explicitQueueMessage ??
       summarizeSurfaceNotificationText(params.text),
+    queueItem,
     postText: params.postText,
     reconcileText: params.reconcileText,
     observerId,

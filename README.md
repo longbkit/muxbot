@@ -346,6 +346,8 @@ Most users only need a small set of commands at first:
 - `clisbot runner list`: list the live tmux-backed runner sessions and see what is active.
 - `clisbot runner watch <session-name>`: live-watch one specific session when debugging a real run.
 - `clisbot runner watch --latest --lines 100`: jump straight into the most recently active session with enough context to debug a just-submitted message.
+- `clisbot queues list`: inspect pending durable queued prompts across the app.
+- `clisbot queues create --channel telegram --target group:-1001234567890 --topic-id 4335 --sender telegram:1276408333 <prompt>`: create one durable same-session queued prompt, capped by `control.queue.maxPendingItemsPerSession` (default `20`).
 
 Full operator command reference:
 

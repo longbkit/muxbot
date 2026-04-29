@@ -514,7 +514,7 @@ describe("loops cli", () => {
     expect(store.sessionB?.intervalLoops).toBeUndefined();
   });
 
-  test("scoped status renders only loops for the targeted session", async () => {
+  test("scoped list and status render only loops for the targeted session", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-loops-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
@@ -597,23 +597,34 @@ describe("loops cli", () => {
       logs.push(String(value ?? ""));
     }) as typeof console.log;
 
-    await runLoopsCli([
-      "status",
-      "--channel",
-      "slack",
-      "--target",
-      "group:C1",
-      "--thread-id",
-      "100",
-    ]);
+    for (const command of ["list", "status"]) {
+      logs.length = 0;
+      await runLoopsCli([
+        command,
+        "--channel",
+        "slack",
+        "--target",
+        "group:C1",
+        "--thread-id",
+        "100",
+      ]);
 
-    const output = logs.join("\n");
-    expect(output).toContain("clisbot loops status --channel slack --target group:C1 --thread-id 100");
-    expect(output).toContain("sessionKey: `agent:default:slack:channel:c1:thread:100`");
-    expect(output).toContain("activeLoops.session: `1`");
-    expect(output).toContain("activeLoops.global: `2`");
-    expect(output).toContain("loop123");
-    expect(output).not.toContain("loop456");
+      const output = logs.join("\n");
+      expect(output).toContain(`clisbot loops ${command} --channel slack --target group:C1 --thread-id 100`);
+      expect(output).toContain("sessionKey: `agent:default:slack:channel:c1:thread:100`");
+      expect(output).toContain("activeLoops.session: `1`");
+      expect(output).toContain("activeLoops.global: `2`");
+      expect(output).toContain("loop123");
+      expect(output).not.toContain("loop456");
+    }
+
+    await expect(runLoopsCli(["list", "--surface", "slack:channel:C1:thread:100"]))
+      .rejects.toThrow("Loop commands use --channel/--target addressing");
+    await expect(runLoopsCli([
+      "status",
+      "--session-key",
+      "agent:default:slack:channel:c1:thread:100",
+    ])).rejects.toThrow("Loop commands use --channel/--target addressing");
   });
 
   test("bare scoped create persists a calendar loop and scoped cancel removes it", async () => {
@@ -750,7 +761,7 @@ describe("loops cli", () => {
       "--channel",
       "telegram",
       "--target",
-      "-1001",
+      "group:-1001",
       "--topic-id",
       "42",
       "--sender",
@@ -765,7 +776,7 @@ describe("loops cli", () => {
 
     const output = logs.join("\n");
     expect(output).toContain("Started loop `");
-    expect(output).toContain("cancel: `clisbot loops cancel --channel telegram --target -1001 --topic-id 42 ");
+    expect(output).toContain("cancel: `clisbot loops cancel --channel telegram --target group:-1001 --topic-id 42 ");
 
     const createdStore = JSON.parse(readFileSync(storePath, "utf8")) as Record<
       string,

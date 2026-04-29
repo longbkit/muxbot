@@ -72,6 +72,11 @@ clisbot start --help
 clisbot init --help
 ```
 
+For durable one-shot follow-up work, use `clisbot queues --help`. Queue
+creation requires explicit routed addressing plus `--sender`; there is no
+ambient `--current` mode, and queue commands use `--channel/--target`
+addressing.
+
 After your first successful `clisbot start`:
 
 1. Get your principal from a surface the bot can already see:
@@ -282,6 +287,9 @@ Important behavior:
 - managed loops are created with ids, bounded by `control.loop.maxRunsPerLoop`, and capped globally by `control.loop.maxActiveLoops`
 - managed loops use `skip-if-busy`, so a tick is dropped instead of stacking more queued work when the session is already busy
 - managed loops persist in session state and are restored after restart
+- queued prompts persist under the session entry, can be inspected with
+  `clisbot queues list`, and are capped per session by
+  `control.queue.maxPendingItemsPerSession` (default `20`)
 - `/stop` interrupts the current run only; use `/loop cancel` to cancel loops
 - `/nudge` sends one extra `Enter` to the current tmux session without resending the prompt body; use it only as a manual recovery tool when a session seems stuck after input delivery
 
@@ -356,8 +364,8 @@ Targeting rules:
 
 Important behavior:
 
-- `list` is always app-wide inventory
-- bare `status` is app-wide inventory; scoped `status --channel ... --target ...` matches `/loop status` for one routed session
+- bare `list` and `status` are app-wide inventory
+- scoped `list` or `status` with `--channel ... --target ...` matches one routed session
 - recurring CLI-created loops reuse the same parser family as `/loop` and land in the same persisted session store
 - CLI loop creation fails without `--sender` so delayed work keeps a real creator instead of rendering sender as unavailable
 - the CLI accepts the same expression families as `/loop`: interval, forced interval, times/count, and wall-clock schedules

@@ -60,11 +60,11 @@ If this page and runtime ever disagree, runtime wins.
 
 ## Queue And Steering
 
-- `/queue <message>` or `\q <message>`: enqueue a later message behind the active run
+- `/queue <message>` or `\q <message>`: create a durable queued prompt behind the active run in the same session
 - `/queue help`: show queue-specific help and examples
 - `/steer <message>` or `\s <message>`: inject a steering message into the active run immediately
 - `/queue list`: show queued messages that have not started yet
-- `/queue clear`: clear queued messages that have not started yet
+- `/queue clear`: clear queued messages that have not started yet without interrupting a running prompt
 
 ## Loops
 
@@ -85,6 +85,7 @@ If this page and runtime ever disagree, runtime wins.
 Useful operator note:
 
 - encourage users to try `/queue help` and `/loop help` directly in chat when they need the live syntax summary for the current surface
+- queued prompts are stored in the session store, survive runtime restart, and are also inspectable through `clisbot queues list`
 - chat `/loop` wall-clock creation is immediate to keep the conversational path low-friction; the creation response shows the resolved timezone, next run in local time plus UTC, and the exact cancel command
 - if the timezone is wrong, cancel the loop from that response, set the correct timezone, then create the loop again
 

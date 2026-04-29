@@ -1,0 +1,301 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DEFAULT_PROTECTED_CONTROL_RULE } from "../src/auth/defaults.ts";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { renderQueuesHelp, runQueuesCli } from "../src/control/queues-cli.ts";
+
+function buildConfig(params: {
+  socketPath: string;
+  storePath: string;
+  workspaceTemplate: string;
+}) {
+  const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
+  config.app.session.storePath = params.storePath;
+  config.agents.defaults.workspace = params.workspaceTemplate;
+  config.agents.defaults.runner.defaults.tmux.socketPath = params.socketPath;
+  config.agents.defaults.runner.defaults.trustWorkspace = false;
+  config.agents.list = [{ id: "default" }];
+  config.app.control.configReload.watch = false;
+  config.app.control.sessionCleanup.enabled = false;
+  config.bots.slack.defaults.enabled = false;
+  config.bots.telegram.defaults.enabled = true;
+  config.bots.telegram.default.groups["-1001"] = {
+    enabled: true,
+    policy: "open",
+    requireMention: true,
+    allowBots: false,
+    allowUsers: [],
+    blockUsers: [],
+    topics: {
+      "4335": {
+        enabled: true,
+        policy: "open",
+        requireMention: true,
+        allowBots: false,
+        allowUsers: [],
+        blockUsers: [],
+      },
+    },
+  };
+  return config;
+}
+
+describe("queues cli", () => {
+  let tempDir = "";
+  let previousConfigPath: string | undefined;
+  const originalLog = console.log;
+
+  beforeEach(() => {
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+  });
+
+  afterEach(() => {
+    process.env.CLISBOT_CONFIG_PATH = previousConfigPath;
+    console.log = originalLog;
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("help documents explicit addressing and no current queue", () => {
+    const help = renderQueuesHelp();
+
+    expect(help).toContain("queues create --channel telegram --target group:-1001234567890 --topic-id 4335 --sender telegram:1276408333");
+    expect(help).toContain("control.queue.maxPendingItemsPerSession");
+    expect(help).toContain("create requires explicit --channel/--target addressing plus --sender");
+    expect(help).not.toContain("--session-key");
+    expect(help).not.toContain("--surface");
+    expect(help).toContain("--current is not supported");
+  });
+
+  test("creates, lists, and clears a scoped telegram queue item", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-queues-cli-"));
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        buildConfig({
+          socketPath: join(tempDir, "clisbot.sock"),
+          storePath,
+          workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+        }),
+        null,
+        2,
+      ),
+    );
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+    const logs: string[] = [];
+    console.log = ((value?: unknown) => {
+      logs.push(String(value ?? ""));
+    }) as typeof console.log;
+
+    await runQueuesCli([
+      "create",
+      "--channel",
+      "telegram",
+      "--target",
+      "group:-1001",
+      "--topic-id",
+      "4335",
+      "--sender",
+      "telegram:1276408333",
+      "review",
+      "queue",
+      "state",
+    ]);
+    const storeDuring = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
+    const item = storeDuring["agent:default:telegram:group:-1001:topic:4335"].queues[0];
+    expect(item.canonicalPromptText).toBe("review queue state");
+    expect(item.surfaceBinding).toMatchObject({
+      platform: "telegram",
+      conversationKind: "topic",
+      chatId: "-1001",
+      topicId: "4335",
+    });
+    expect(item.protectedControlMutationRule).toBe(DEFAULT_PROTECTED_CONTROL_RULE);
+    await runQueuesCli(["list", "--channel", "telegram", "--target", "group:-1001", "--topic-id", "4335"]);
+    await runQueuesCli(["clear", "--channel", "telegram", "--target", "group:-1001", "--topic-id", "4335"]);
+
+    const output = logs.join("\n");
+    expect(output).toContain("Queued prompt");
+    expect(output).toContain("review queue state");
+    expect(output).toContain("Cleared 1 pending queued prompt");
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
+    expect(store["agent:default:telegram:group:-1001:topic:4335"].queues).toEqual([]);
+  });
+
+  test("create without --sender fails before persisting", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-queues-cli-no-sender-"));
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        buildConfig({
+          socketPath: join(tempDir, "clisbot.sock"),
+          storePath,
+          workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+        }),
+        null,
+        2,
+      ),
+    );
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+
+    await expect(runQueuesCli([
+      "create",
+      "--channel",
+      "telegram",
+      "--target",
+      "group:-1001",
+      "--topic-id",
+      "4335",
+      "review",
+      "queue",
+    ])).rejects.toThrow(
+      "Queue creation requires --sender <principal>, for example --sender telegram:1276408333 or --sender slack:U1234567890.",
+    );
+
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, unknown>;
+    expect(Object.keys(store)).toHaveLength(0);
+  });
+
+  test("create rejects --session-key before persisting", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-queues-cli-session-key-"));
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        buildConfig({
+          socketPath: join(tempDir, "clisbot.sock"),
+          storePath,
+          workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+        }),
+        null,
+        2,
+      ),
+    );
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        "agent:default:telegram:group:-1001:topic:4335": {
+          agentId: "default",
+          sessionKey: "agent:default:telegram:group:-1001:topic:4335",
+          workspacePath: join(tempDir, "workspaces", "default"),
+          runnerCommand: "codex",
+          updatedAt: Date.now(),
+        },
+        "agent:default:main": {
+          agentId: "default",
+          sessionKey: "agent:default:main",
+          workspacePath: join(tempDir, "workspaces", "default"),
+          runnerCommand: "codex",
+          updatedAt: Date.now(),
+        },
+      }, null, 2),
+    );
+    console.log = (() => undefined) as typeof console.log;
+
+    await expect(runQueuesCli([
+      "create",
+      "--session-key",
+      "agent:default:telegram:group:-1001:topic:4335",
+      "--sender",
+      "telegram:1276408333",
+      "review",
+      "session",
+      "queue",
+    ])).rejects.toThrow(
+      "Queue commands use --channel/--target addressing; --surface and --session-key are not supported.",
+    );
+    await expect(runQueuesCli([
+      "create",
+      "--channel",
+      "telegram",
+      "--target",
+      "group:-1001",
+      "--topic-id",
+      "4335",
+      "--sender",
+      "slack:U123",
+      "wrong",
+      "sender",
+    ])).rejects.toThrow("sender platform must match --channel telegram");
+
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
+    expect(store["agent:default:telegram:group:-1001:topic:4335"].queues).toBeUndefined();
+    expect(store["agent:default:main"].queues).toBeUndefined();
+  });
+
+  test("create rejects --surface before persisting", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-queues-cli-surface-create-"));
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        buildConfig({
+          socketPath: join(tempDir, "clisbot.sock"),
+          storePath,
+          workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+        }),
+        null,
+        2,
+      ),
+    );
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+    console.log = (() => undefined) as typeof console.log;
+
+    await expect(runQueuesCli([
+      "create",
+      "--surface",
+      "telegram:topic:-1001:4335",
+      "--sender",
+      "telegram:1276408333",
+      "review",
+      "queue",
+    ])).rejects.toThrow(
+      "Queue commands use --channel/--target addressing; --surface and --session-key are not supported.",
+    );
+
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, unknown>;
+    expect(Object.keys(store)).toHaveLength(0);
+  });
+
+  test("create enforces the configured per-session pending queue limit", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-queues-cli-limit-"));
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    const config = buildConfig({
+      socketPath: join(tempDir, "clisbot.sock"),
+      storePath,
+      workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+    });
+    config.app.control.queue.maxPendingItemsPerSession = 2;
+    writeFileSync(process.env.CLISBOT_CONFIG_PATH, JSON.stringify(config, null, 2));
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+    console.log = (() => undefined) as typeof console.log;
+
+    const base = [
+      "create",
+      "--channel",
+      "telegram",
+      "--target",
+      "group:-1001",
+      "--topic-id",
+      "4335",
+      "--sender",
+      "telegram:1276408333",
+    ];
+    await runQueuesCli([...base, "one"]);
+    await runQueuesCli([...base, "two"]);
+    await expect(runQueuesCli([...base, "three"])).rejects.toThrow(
+      "configured max of `2`",
+    );
+  });
+});

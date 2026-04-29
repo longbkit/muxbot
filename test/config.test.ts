@@ -158,6 +158,21 @@ describe("loadConfig", () => {
     expect(loaded.raw.agents.defaults.runner.codex.sessionId!.resume.mode).toBe("command");
   });
 
+  test("defaults queue limits without pinning them into the generated config template", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-queue-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const rawTemplate = JSON.parse(renderDefaultConfigTemplate()) as Record<string, any>;
+    expect(rawTemplate.app.control.queue).toBeUndefined();
+
+    rawTemplate.app.session.storePath = join(tempDir, "sessions.json");
+    rawTemplate.agents.defaults.runner.defaults.tmux.socketPath = join(tempDir, "clisbot.sock");
+    rawTemplate.agents.list = [{ id: "default" }];
+    await Bun.write(configPath, JSON.stringify(rawTemplate));
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+    expect(loaded.raw.control.queue.maxPendingItemsPerSession).toBe(20);
+  });
+
   test("applies codex session-id defaults when the codex family omits sessionId", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
     const configPath = join(tempDir, "clisbot.json");

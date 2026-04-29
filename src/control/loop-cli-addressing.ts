@@ -61,6 +61,9 @@ export function stripLoopContextArgs(args: string[]) {
 }
 
 export function parseAddressing(args: string[]): LoopCliAddressing {
+  if (parseOptionValue(args, "--surface") || parseOptionValue(args, "--session-key")) {
+    throw new Error("Loop commands use --channel/--target addressing; --surface and --session-key are not supported.");
+  }
   const channel = parseOptionValue(args, "--channel");
   if (channel && channel !== "slack" && channel !== "telegram") {
     throw new Error("--channel must be `slack` or `telegram`.");

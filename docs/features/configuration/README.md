@@ -26,6 +26,14 @@ For timezone, the important mental model is:
 
 Do not require new users to know IANA timezone values before first start. Fresh bootstrap may infer host timezone and write `app.timezone`, but start/status output must show what was inferred and how to change it.
 
+For queue bounds, the important config key is:
+
+- `app.control.queue.maxPendingItemsPerSession`: maximum pending durable queue
+  items per session; runtime default is `20` when omitted from config
+
+The generated default config intentionally omits `app.control.queue` so release
+defaults can evolve without pinning old generated files.
+
 ## State
 
 Active

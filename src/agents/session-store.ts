@@ -1,5 +1,6 @@
 import type { StoredFollowUpState } from "./follow-up-policy.ts";
 import type { StoredLoop } from "./loop-state.ts";
+import type { StoredQueueItem } from "./queue-state.ts";
 import type { StoredSessionRuntime } from "./run-observation.ts";
 import type { StoredRecentConversationState } from "../shared/recent-message-context.ts";
 import { dirname } from "node:path";
@@ -19,6 +20,7 @@ export type StoredSessionEntry = {
   runtime?: StoredSessionRuntime;
   loops?: StoredLoop[];
   intervalLoops?: StoredLoop[];
+  queues?: StoredQueueItem[];
   recentConversation?: StoredRecentConversationState;
   updatedAt: number;
 };
@@ -93,6 +95,7 @@ export class SessionStore {
       followUp: existing?.followUp,
       runtime: existing?.runtime,
       loops: existing?.loops ?? existing?.intervalLoops,
+      queues: existing?.queues,
       recentConversation: existing?.recentConversation,
       updatedAt: Date.now(),
     });

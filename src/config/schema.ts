@@ -536,6 +536,10 @@ const appControlLoopSchema = z.object({
   maxTimes: z.number().int().positive().optional(),
 });
 
+const appControlQueueSchema = z.object({
+  maxPendingItemsPerSession: z.number().int().positive().default(20),
+});
+
 const defaultRuntimeMonitorRestartBackoff = getDefaultRuntimeMonitorRestartBackoff();
 
 const appControlRuntimeMonitorSchema = z.object({
@@ -759,6 +763,9 @@ export const clisbotConfigSchema = z.object({
         maxRunsPerLoop: 20,
         maxActiveLoops: 10,
       }),
+      queue: appControlQueueSchema.default({
+        maxPendingItemsPerSession: 20,
+      }),
       runtimeMonitor: appControlRuntimeMonitorSchema.default({
         restartBackoff: defaultRuntimeMonitorRestartBackoff,
         ownerAlerts: {
@@ -778,6 +785,9 @@ export const clisbotConfigSchema = z.object({
       loop: {
         maxRunsPerLoop: 20,
         maxActiveLoops: 10,
+      },
+      queue: {
+        maxPendingItemsPerSession: 20,
       },
       runtimeMonitor: {
         restartBackoff: defaultRuntimeMonitorRestartBackoff,
@@ -806,6 +816,9 @@ export const clisbotConfigSchema = z.object({
       loop: {
         maxRunsPerLoop: 20,
         maxActiveLoops: 10,
+      },
+      queue: {
+        maxPendingItemsPerSession: 20,
       },
       runtimeMonitor: {
         restartBackoff: defaultRuntimeMonitorRestartBackoff,

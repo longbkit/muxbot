@@ -139,7 +139,15 @@ function resolveScopedLoopContext(
   });
 }
 
-async function listLoops(state: LoadedLoopControlState, commandLabel: "list" | "status") {
+async function listLoops(
+  state: LoadedLoopControlState,
+  commandLabel: "list" | "status",
+  addressing: LoopCliAddressing,
+) {
+  if (addressing.channel || addressing.target) {
+    await showScopedLoopInventory(state, addressing, commandLabel);
+    return;
+  }
   const loops = await state.sessionState.listIntervalLoops();
   console.log(
     renderLoopInventory({
@@ -151,7 +159,11 @@ async function listLoops(state: LoadedLoopControlState, commandLabel: "list" | "
   );
 }
 
-async function showScopedStatus(state: LoadedLoopControlState, addressing: LoopCliAddressing) {
+async function showScopedLoopInventory(
+  state: LoadedLoopControlState,
+  addressing: LoopCliAddressing,
+  commandLabel: "list" | "status",
+) {
   const context = resolveScopedLoopContext(state, addressing);
   const sessionLoops = selectScopedLoopsForAddressing(
     context,
@@ -163,7 +175,7 @@ async function showScopedStatus(state: LoadedLoopControlState, addressing: LoopC
   const globalLoopCount = (await state.sessionState.listIntervalLoops()).length;
   console.log(
     renderScopedLoopStatus({
-      commandLabel: renderScopedCommand("loops status", addressing),
+      commandLabel: renderScopedCommand(`loops ${commandLabel}`, addressing),
       configPath: state.configPath,
       sessionStorePath: state.sessionStorePath,
       sessionKey: context.sessionTarget.sessionKey,
@@ -818,10 +830,10 @@ async function runStatusSubcommand(
     throw new Error("`--new-thread` only applies when creating a Slack loop.");
   }
   if (addressing.channel || addressing.target) {
-    await showScopedStatus(state, addressing);
+    await showScopedLoopInventory(state, addressing, "status");
     return;
   }
-  await listLoops(state, "status");
+  await listLoops(state, "status", addressing);
 }
 
 export async function runLoopsCli(args: string[]) {
@@ -839,7 +851,7 @@ export async function runLoopsCli(args: string[]) {
   const addressing = parseAddressing(args);
 
   if (subcommand === "list") {
-    await listLoops(state, "list");
+    await listLoops(state, "list", addressing);
     return;
   }
 

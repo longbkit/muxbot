@@ -9,12 +9,13 @@ It is also the source of truth that AI agents should inspect when users ask to c
 Examples:
 
 - `clisbot loops list`
+- `clisbot loops list --channel slack --target group:C123 --thread-id 1712345678.123456`
 - `clisbot loops status`
 - `clisbot loops status --channel slack --target group:C123 --thread-id 1712345678.123456`
 - `clisbot loops create --channel slack --target group:C123 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI`
 - `clisbot loops create --channel slack --target group:C123 --new-thread --sender slack:U1234567890 every day at 07:00 check CI`
 - `clisbot loops create --channel slack --target dm:U1234567890 --new-thread --sender slack:U1234567890 every day at 09:00 check inbox`
-- `clisbot loops --channel telegram --target -1001234567890 --topic-id 42 --sender telegram:1276408333 5m check CI`
+- `clisbot loops --channel telegram --target group:-1001234567890 --topic-id 42 --sender telegram:1276408333 5m check CI`
 - `clisbot loops --channel slack --target group:C123 --thread-id 1712345678.123456 --sender slack:U1234567890 3 review backlog`
 - `clisbot loops cancel abc123`
 - `clisbot loops cancel --channel slack --target group:C123 --thread-id 1712345678.123456 --all`
@@ -25,7 +26,7 @@ Examples:
 - `--target` chooses the routed surface, not the schedule:
 - for Slack, `--target` accepts canonical `group:<id>` and `dm:<user-or-channel-id>`, plus raw `C...` / `G...` / `D...` ids
 - legacy `channel:<id>` input still works for compatibility, but it is not the preferred contract
-- for Telegram, `--target` is the numeric chat id
+- for Telegram, `--target` accepts `group:<chat-id>`, `topic:<chat-id>:<topic-id>`, or a raw numeric chat id
 - `--thread-id` narrows a Slack route to one existing thread ts
 - `--topic-id` narrows a Telegram route to one topic id
 - omitting the sub-surface flag means the parent surface itself: Slack channel/group/DM or Telegram chat
@@ -37,6 +38,7 @@ Examples:
 ## Scope
 
 - global inventory of persisted managed loops across the app
+- scoped loop inventory for one routed session
 - scoped loop creation for one routed Slack thread or Telegram chat/topic
 - scoped session status matching `/loop status`
 - scoped session cancellation matching `/loop cancel`
@@ -47,11 +49,11 @@ Examples:
 ## Non-Goals
 
 - immediate IPC into the live runtime process
-- a shared cross-process queue for one-shot count loops
+- routing one-shot count loops through durable queue items
 
 ## Invariants
 
-- `clisbot loops list` stays app-wide inventory
+- bare `clisbot loops list` stays app-wide inventory, while scoped `list --channel ... --target ...` narrows to one routed session
 - bare `clisbot loops status` stays app-wide inventory, while scoped `status --channel ... --target ...` answers the same session-scoped question as `/loop status`
 - recurring CLI-created loops are persisted into the same session store shape that channel `/loop` already uses
 - CLI loop creation fails without `--sender` so delayed work keeps a real creator instead of rendering sender as unavailable
@@ -83,7 +85,8 @@ Examples:
 - AI agents should not infer first-loop state; they should run the loops CLI and follow the confirmation output exactly
 - the live runtime periodically reconciles persisted loop state, so a running service can pick up new operator-created recurring loops without a restart
 - if runtime is stopped, recurring CLI-created loops activate on the next `clisbot start`
-- one-shot count loops run synchronously inside the CLI because the top-level operator process still has no shared queue IPC with the long-lived runtime
+- one-shot count loops still run synchronously inside the CLI; durable queue
+  support belongs to `clisbot queues`, not loop count mode
 - `clisbot loops cancel <id>` removes the matching loop record from persisted session state
 - `clisbot loops cancel --all` clears all persisted loop records across all sessions
 - runtime loop state updates use compare-on-write semantics, so a stale in-memory loop update cannot recreate a loop that the CLI already cancelled
@@ -93,7 +96,7 @@ Examples:
 
 ### Shared Rendering
 
-- global inventory and scoped status reuse the same schedule rendering and prompt-summary rules as channel `/loop`
+- global inventory plus scoped list/status reuse the same schedule rendering and prompt-summary rules as channel `/loop`
 - each loop row includes:
   - loop id
   - agent id
@@ -106,5 +109,6 @@ Examples:
 ## Related Docs
 
 - [Task Doc](../../tasks/features/control/2026-04-13-loops-cli-management.md)
+- [Scoped Loops List](../../tasks/features/control/2026-04-29-scoped-loops-list.md)
 - [User Guide](../../user-guide/README.md)
 - [Control Test Cases](../../tests/features/control/README.md)

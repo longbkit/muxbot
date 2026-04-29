@@ -158,6 +158,10 @@ Current session continuity metadata is intentionally small:
 - `sessionId`
 - `workspacePath`
 - `runnerCommand`
+- `runtime`
+- `loops`
+- `queues`
+- `recentConversation`
 - `updatedAt`
 
 Do not treat tmux pane ids, tmux window ids, or other transient runner artifacts as canonical state in the agents layer.

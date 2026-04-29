@@ -1,5 +1,6 @@
 import type { FollowUpMode, StoredFollowUpState } from "./follow-up-policy.ts";
 import type { IntervalLoopStatus, StoredLoop } from "./loop-state.ts";
+import type { QueuedPromptStatus, StoredQueueItem, StoredQueueStatus } from "./queue-state.ts";
 import type { ResolvedAgentTarget } from "./resolved-target.ts";
 import type { StoredSessionRuntime } from "./run-observation.ts";
 import type { SessionRuntimeInfo } from "./session-runtime.ts";
@@ -27,6 +28,7 @@ type SessionEntryUpdate = (existing: {
   runtime?: StoredSessionRuntime;
   loops?: StoredLoop[];
   intervalLoops?: StoredLoop[];
+  queues?: StoredQueueItem[];
   recentConversation?: StoredRecentConversationState;
 } | null) => {
   sessionId?: string;
@@ -35,6 +37,7 @@ type SessionEntryUpdate = (existing: {
   runnerCommand?: string;
   runtime?: StoredSessionRuntime;
   loops?: StoredLoop[];
+  queues?: StoredQueueItem[];
   recentConversation?: StoredRecentConversationState;
 };
 
@@ -205,6 +208,7 @@ export class AgentSessionState {
         followUp: existing?.followUp,
         runtime: existing?.runtime,
         loops: currentLoops.map((item) => (item.id === loop.id ? loop : item)),
+        queues: getStoredQueues(existing),
         recentConversation: existing?.recentConversation,
         updatedAt: Date.now(),
       };
@@ -373,6 +377,153 @@ export class AgentSessionState {
     }));
   }
 
+  async listQueuedItems(params?: {
+    sessionKey?: string;
+    statuses?: StoredQueueStatus[];
+  }): Promise<QueuedPromptStatus[]> {
+    const statuses = params?.statuses ? new Set(params.statuses) : undefined;
+    const entries = await this.sessionStore.list();
+    return entries.flatMap((entry) =>
+      getStoredQueues(entry)
+        .filter((item) => !params?.sessionKey || entry.sessionKey === params.sessionKey)
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => !statuses || statuses.has(item.status))
+        .map(({ item, index }) => ({
+          ...item,
+          agentId: entry.agentId,
+          sessionKey: entry.sessionKey,
+          positionAhead: index,
+        })),
+    ).sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  async countPendingQueuedItemsForSessionKey(
+    sessionKey: string,
+    params: { excludeId?: string } = {},
+  ) {
+    const entry = await this.sessionStore.get(sessionKey);
+    return getStoredQueues(entry).filter((item) =>
+      item.status === "pending" && item.id !== params.excludeId
+    ).length;
+  }
+
+  async setQueuedItem(resolved: ResolvedAgentTarget, item: StoredQueueItem) {
+    return this.upsertSessionEntry(resolved, (existing) => ({
+      sessionId: existing?.sessionId,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
+      followUp: existing?.followUp,
+      runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
+      runtime: existing?.runtime,
+      loops: getStoredLoops(existing),
+      queues: [...getStoredQueues(existing).filter((current) => current.id !== item.id), item],
+      recentConversation: existing?.recentConversation,
+    }));
+  }
+
+  async replaceQueuedItemIfPresent(resolved: ResolvedAgentTarget, item: StoredQueueItem) {
+    let replaced = false;
+    await this.sessionStore.update(resolved.sessionKey, (existing) => {
+      if (!existing || !getStoredQueues(existing).some((current) => current.id === item.id)) {
+        return existing;
+      }
+      replaced = true;
+      const { intervalLoops: _legacyLoops, ...rest } = existing;
+      return {
+        ...rest,
+        runnerCommand: rest.runnerCommand ?? resolved.runner.command,
+        loops: getStoredLoops(existing),
+        queues: getStoredQueues(existing).map((current) =>
+          current.id === item.id ? item : current
+        ),
+        updatedAt: Date.now(),
+      };
+    });
+    return replaced;
+  }
+
+  async removeQueuedItem(resolved: ResolvedAgentTarget, queueId: string) {
+    return this.upsertSessionEntry(resolved, (existing) => ({
+      sessionId: existing?.sessionId,
+      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
+      followUp: existing?.followUp,
+      runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
+      runtime: existing?.runtime,
+      loops: getStoredLoops(existing),
+      queues: getStoredQueues(existing).filter((item) => item.id !== queueId),
+      recentConversation: existing?.recentConversation,
+    }));
+  }
+
+  async clearPendingQueuedItemsForSessionKey(sessionKey: string) {
+    let cleared: StoredQueueItem[] = [];
+    await this.sessionStore.update(sessionKey, (existing) => {
+      if (!existing) {
+        return existing;
+      }
+      cleared = getStoredQueues(existing).filter((item) => item.status === "pending");
+      if (cleared.length === 0) {
+        return existing;
+      }
+      const { intervalLoops: _legacyLoops, ...rest } = existing;
+      return {
+        ...rest,
+        loops: getStoredLoops(existing),
+        queues: getStoredQueues(existing).filter((item) => item.status !== "pending"),
+        updatedAt: Date.now(),
+      };
+    });
+    return cleared;
+  }
+
+  async clearAllPendingQueuedItems() {
+    const entries = await this.sessionStore.list();
+    let cleared: StoredQueueItem[] = [];
+    for (const entry of entries) {
+      cleared = cleared.concat(await this.clearPendingQueuedItemsForSessionKey(entry.sessionKey));
+    }
+    return cleared;
+  }
+
+  async hasQueuedItemsForSession(sessionKey: string) {
+    const entry = await this.sessionStore.get(sessionKey);
+    return getStoredQueues(entry).some((item) =>
+      item.status === "pending" || item.status === "running"
+    );
+  }
+
+  async resetStaleRunningQueuedItems(activeSessionKeys: Set<string>) {
+    const entries = await this.sessionStore.list();
+    let reset = 0;
+    for (const entry of entries) {
+      if (activeSessionKeys.has(entry.sessionKey)) {
+        continue;
+      }
+      const running = getStoredQueues(entry).filter((item) => item.status === "running");
+      if (running.length === 0) {
+        continue;
+      }
+      reset += running.length;
+      await this.sessionStore.update(entry.sessionKey, (existing) => {
+        if (!existing) {
+          return existing;
+        }
+        const now = Date.now();
+        const { intervalLoops: _legacyLoops, ...rest } = existing;
+        return {
+          ...rest,
+          loops: getStoredLoops(existing),
+          queues: getStoredQueues(existing).map((item) =>
+            item.status === "running"
+              ? { ...item, status: "pending" as const, startedAt: undefined, updatedAt: now }
+              : item
+          ),
+          updatedAt: now,
+        };
+      });
+    }
+    return reset;
+  }
+
   async appendRecentConversationMessage(
     resolved: ResolvedAgentTarget,
     message: StoredRecentConversationMessage,
@@ -429,6 +580,7 @@ export class AgentSessionState {
         followUp: next.followUp,
         runtime: next.runtime ?? existing?.runtime,
         loops: next.loops ?? getStoredLoops(existing),
+        queues: next.queues ?? getStoredQueues(existing),
         recentConversation: next.recentConversation ?? existing?.recentConversation,
         updatedAt: Date.now(),
       };
@@ -441,6 +593,12 @@ function getStoredLoops(entry: {
   intervalLoops?: StoredLoop[];
 } | null | undefined) {
   return entry?.loops ?? entry?.intervalLoops ?? [];
+}
+
+function getStoredQueues(entry: {
+  queues?: StoredQueueItem[];
+} | null | undefined) {
+  return entry?.queues ?? [];
 }
 
 function hasActiveRuntime(

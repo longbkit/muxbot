@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentSessionState } from "../src/agents/session-state.ts";
 import { SessionStore } from "../src/agents/session-store.ts";
+import { createStoredQueueItem } from "../src/agents/queue-state.ts";
 import type { ResolvedAgentTarget } from "../src/agents/resolved-target.ts";
 
 function createResolvedTarget(tempDir: string): ResolvedAgentTarget {
@@ -101,5 +102,34 @@ describe("session state runtime reply markers", () => {
         },
       ],
     });
+  });
+
+  test("persists and clears pending queue items without removing running items", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-session-state-"));
+    const store = new SessionStore(join(tempDir, "sessions.json"));
+    const state = new AgentSessionState(store);
+    const resolved = createResolvedTarget(tempDir);
+    const pending = createStoredQueueItem({
+      promptText: "check CI",
+      promptSummary: "check CI",
+    });
+    const running = {
+      ...createStoredQueueItem({
+        promptText: "deploy",
+        promptSummary: "deploy",
+      }),
+      status: "running" as const,
+      startedAt: Date.now(),
+    };
+
+    await state.setQueuedItem(resolved, pending);
+    await state.setQueuedItem(resolved, running);
+
+    expect((await state.listQueuedItems({ statuses: ["pending"] })).map((item) => item.id))
+      .toEqual([pending.id]);
+
+    const cleared = await state.clearPendingQueuedItemsForSessionKey(resolved.sessionKey);
+    expect(cleared.map((item) => item.id)).toEqual([pending.id]);
+    expect((await state.listQueuedItems()).map((item) => item.id)).toEqual([running.id]);
   });
 });

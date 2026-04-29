@@ -98,6 +98,10 @@ Common fields for every stored loop:
 - `promptSummary`
 - `promptSource`
 - `createdBy`
+- `sender`
+- `surfaceBinding`
+- `canonicalPromptText` when the runtime needs to preserve the raw request
+- `protectedControlMutationRule`
 
 Interval loops also store:
 

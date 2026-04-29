@@ -123,13 +123,14 @@ function resolveSlackLoopCliContext(params: LoopCliContextParams): LoopCliContex
 }
 
 function resolveTelegramLoopCliContext(params: LoopCliContextParams): LoopCliContext {
-  const chatId = Number(params.target);
+  const target = normalizeTelegramLoopTarget(params.target, params.topicId ?? params.threadId);
+  const chatId = Number(target.chatId);
   if (!Number.isFinite(chatId)) {
-    throw new Error("Telegram loop targets must use the numeric chat id.");
+    throw new Error("Telegram loop targets must use `group:<chat-id>`, `topic:<chat-id>:<topic-id>`, or a numeric chat id.");
   }
 
   const rawThreadId = params.threadId?.trim();
-  const rawTopicId = params.topicId?.trim() || rawThreadId;
+  const rawTopicId = target.topicId ?? params.topicId?.trim() ?? rawThreadId;
   const topicId = rawTopicId ? Number(rawTopicId) : undefined;
   if (rawTopicId && !Number.isFinite(topicId)) {
     throw new Error("Telegram --topic-id must be a numeric topic id.");
@@ -177,7 +178,7 @@ function resolveTelegramLoopCliContext(params: LoopCliContextParams): LoopCliCon
   return {
     channel: "telegram",
     botId,
-    target: params.target,
+    target: target.chatId,
     threadId: Number.isFinite(topicId) ? String(topicId) : undefined,
     sessionTarget,
     identity,
@@ -199,6 +200,27 @@ function resolveTelegramLoopCliContext(params: LoopCliContextParams): LoopCliCon
           botTimezone: route.botTimezone,
         }).timezone,
       }),
+  };
+}
+
+function normalizeTelegramLoopTarget(rawTarget: string, explicitTopicId?: string) {
+  const target = rawTarget.trim();
+  if (target.startsWith("group:")) {
+    return {
+      chatId: target.slice("group:".length),
+      topicId: explicitTopicId,
+    };
+  }
+  if (target.startsWith("topic:")) {
+    const [, chatId, topicId] = target.split(":");
+    return {
+      chatId,
+      topicId: explicitTopicId ?? topicId,
+    };
+  }
+  return {
+    chatId: target,
+    topicId: explicitTopicId,
   };
 }
 

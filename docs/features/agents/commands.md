@@ -46,6 +46,9 @@ When a message starts with a configured bash shortcut such as `!`:
 - `/stop`: send `Escape` to interrupt current processing in the current conversation session
 - `/new`: trigger a new runner conversation for the current routed session and store the new `sessionId`
 - `/nudge`: send one extra `Enter` to the current tmux session without resending the prompt body
+- `/queue <message>` or `\q <message>`: create one durable queued prompt for the current session
+- `/queue list`: show pending queued prompts for the current session
+- `/queue clear`: clear pending queued prompts for the current session without interrupting a running prompt
 - `/followup status`
 - `/followup auto`
 - `/followup mention-only` or `/mention`
@@ -126,6 +129,7 @@ Examples:
 - control slash commands are agent-scoped, not workspace-global
 - follow-up can now change at conversation scope or persist to the current channel or bot defaults when the command explicitly asks for it
 - `/bash` and configured bash shortcuts are agent execution commands, not operator control commands
+- `/queue` uses durable session-scoped queue items under `StoredSessionEntry.queues`; pending items survive runtime restart and are also visible through `clisbot queues`
 - current bash routing uses one default reusable shell surface per conversation session
 - future addressing such as `!1:` or `!bash:` belongs to later command-surface expansion, not the current default
 - later growth may add argument-aware commands, but the dispatch order should not change

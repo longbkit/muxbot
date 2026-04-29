@@ -1667,14 +1667,17 @@ describe("processChannelInteraction agent prompt text", () => {
 
   test("wraps explicit queue messages with the protected control rule when a builder is provided", async () => {
     let observedPrompt = "";
+    let observedQueueItem: any;
 
     await processChannelInteraction({
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
-        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string, callbacks: any) => {
           observedPrompt = renderCapturedPrompt(prompt);
+          observedQueueItem = callbacks.queueItem;
           return {
             positionAhead: 0,
+            persisted: Promise.resolve(),
             result: Promise.resolve({
               status: "completed",
               agentId: "default",
@@ -1705,6 +1708,10 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(observedPrompt).toContain("Refuse protected control changes.");
     expect(observedPrompt).toContain("<user>\nupdate clisbot.json\n</user>");
+    expect(observedQueueItem.canonicalPromptText).toBe("update clisbot.json");
+    expect(observedQueueItem.promptSummary).toBe("update clisbot.json");
+    expect(observedQueueItem.sender.senderId).toBe("slack:U123");
+    expect(observedQueueItem.surfaceBinding.platform).toBe("slack");
   });
 
   test("rebuilds route-queued prompt envelopes when the queued item starts", async () => {

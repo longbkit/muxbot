@@ -23,6 +23,7 @@ Use this file before introducing a new concept name. If an existing term fits, r
 | `run` | One active execution for one session. | Agents/run lifecycle. |
 | `runner` | Backend executor boundary, such as tmux running Codex, Claude, or Gemini. | Runners. |
 | `queue` | Ordered pending messages for one session. | Agents. |
+| `queue item` | One queued prompt entry in a session queue. Pending/running queue items are durable; completed/failed items are removed after settlement instead of retained as history. | Agents persistence and runtime queue reconciliation. |
 | `loop` | Scheduled or repeated message tied to a session/surface. | Agents own schedule state; channels supply surface context for delivery. |
 | `steering` | A new user message injected while a run is still active. | Channels detect it; agents/runners submit it to the active run. |
 

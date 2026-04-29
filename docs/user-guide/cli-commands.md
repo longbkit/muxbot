@@ -89,6 +89,7 @@ Bot id rules:
 - `clisbot runner ...`
 - `clisbot pairing ...`
 - `clisbot loops ...`
+- `clisbot queues ...`
 - `clisbot init`
 
 ## Service Lifecycle
@@ -498,7 +499,7 @@ Important behavior:
 - `clisbot loops create --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI`
 - `clisbot loops create --channel slack --target group:C1234567890 --new-thread --sender slack:U1234567890 every day at 07:00 check CI`
 - `clisbot loops create --channel slack --target dm:U1234567890 --new-thread --sender slack:U1234567890 every day at 09:00 check inbox`
-- `clisbot loops --channel telegram --target -1001234567890 --topic-id 42 --sender telegram:1276408333 5m check CI`
+- `clisbot loops --channel telegram --target group:-1001234567890 --topic-id 42 --sender telegram:1276408333 5m check CI`
 - `clisbot loops --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 3 review backlog`
 - `clisbot loops cancel <id>`
 - `clisbot loops cancel --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --all`
@@ -508,7 +509,7 @@ Targeting:
 
 - `--target` selects the routed surface
 - Slack accepts `group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids
-- Telegram expects the numeric chat id in `--target`
+- Telegram accepts the route-style `group:<chat-id>` or `topic:<chat-id>:<topic-id>` target; raw numeric chat ids are accepted for compatibility
 - `--thread-id` means an existing Slack thread ts
 - `--topic-id` means a Telegram topic id
 - omitting the sub-surface flag targets the parent Slack channel/group/DM or Telegram chat
@@ -523,11 +524,39 @@ Examples:
 - use scoped `clisbot loops ... --channel ... --target ...` when you want the same session-specific create, status, or cancel behavior from the operator CLI
 - CLI loop creation fails without `--sender` so delayed work keeps a real creator instead of rendering sender as unavailable
 - use app-wide `clisbot loops list`, `clisbot loops status`, or `clisbot loops cancel --all` when you want global inventory or emergency cleanup
+- use scoped `clisbot loops list --channel ... --target ...` when you want one routed session
 - CLI creation accepts the same expression families as `/loop`: interval, forced interval, times/count, and calendar schedules
 - omit the prompt body to load `LOOP.md` from the target workspace for maintenance loops
 - count/times loops run synchronously in the CLI process today; recurring loops are persisted for the runtime scheduler
 - the first wall-clock loop create attempt returns confirmation-required output and does not persist a loop until rerun with `--confirm`
 - AI agents should inspect `clisbot loops --help` for schedule, loop, or reminder requests and follow the CLI output instead of guessing loop state
+
+## Queues
+
+- `clisbot queues list`
+- `clisbot queues list --channel telegram --target group:-1001234567890 --topic-id 4335`
+- `clisbot queues status`
+- `clisbot queues create --channel telegram --target group:-1001234567890 --topic-id 4335 --sender telegram:1276408333 review backlog`
+- `clisbot queues clear --channel telegram --target group:-1001234567890 --topic-id 4335`
+- `clisbot queues clear --all`
+
+Important behavior:
+
+- `list` shows pending queued prompts only
+- `status` shows pending and running queued prompts
+- `clear` removes pending prompts only and does not interrupt a running prompt
+- `create` matches the documented `loops create` addressing shape and requires
+  explicit `--channel/--target` routed addressing
+- `create` requires `--sender <principal>` so durable queued work has sender metadata
+- `create` is capped by `control.queue.maxPendingItemsPerSession`; the default
+  is `20` pending items per session when the config key is omitted
+- `--current` is not supported
+- use `--channel/--target` for scoped inspection, creation, and clearing
+- queued prompts are stored under `StoredSessionEntry.queues` in `session.storePath`
+- stored queue items are the canonical queue inventory; the live runtime
+  hydrates them into the same ordered drain used by `/queue`, so ordering,
+  `positionAhead`, active-run idle guards, lazy prompt rebuild, start
+  notifications, and cleared-pending settlement stay consistent
 
 ## Timezone
 

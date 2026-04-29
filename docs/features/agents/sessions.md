@@ -55,6 +55,10 @@ Current stored fields:
 - `lastAdmittedPromptAt`
 - `followUp.overrideMode`
 - `followUp.lastBotReplyAt`
+- `runtime`
+- `loops`
+- `queues`
+- `recentConversation`
 - `updatedAt`
 
 Current meaning:
@@ -102,6 +106,13 @@ Current queue and recovery ordering rule:
 - queued prompts wait until the prior logical run for that `sessionKey` is truly idle
 - mid-run recovery callbacks are bound to the current logical run instance, not only the shared `sessionKey`
 - this prevents stale recovery work from replaying old prompts or mutating a newer run that already started later on the same surface
+- durable queued prompts live under `StoredSessionEntry.queues`
+- stored queue items are the durable queue inventory; the runtime hydrates them
+  into the same ordered drain used by chat-created queue items
+- `/queue list` and `clisbot queues list` show pending items only
+- queue clear removes pending items and does not interrupt a running prompt
+- queue create is bounded by `control.queue.maxPendingItemsPerSession`, default
+  `20` when omitted
 
 ## Current Stale Runner Cleanup
 

@@ -146,4 +146,28 @@ describe("AgentJobQueue", () => {
     await expect(second.result).resolves.toBe("second");
     expect(order).toEqual(["first:start", "first:end", "second:start", "second:end"]);
   });
+
+  test("supports stable queue ids and lifecycle callbacks", async () => {
+    const queue = new AgentJobQueue();
+    const events: string[] = [];
+
+    const run = queue.enqueue(
+      "default",
+      async () => "done",
+      {
+        id: "queue-1",
+        createdAt: 42,
+        text: "persisted",
+        onStart: () => {
+          events.push("start");
+        },
+        onComplete: () => {
+          events.push("complete");
+        },
+      },
+    );
+
+    expect(await run.result).toBe("done");
+    expect(events).toEqual(["start", "complete"]);
+  });
 });

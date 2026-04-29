@@ -22,6 +22,7 @@ export type ParsedCliCommand =
   | { name: "channels"; args: string[] }
   | { name: "accounts"; args: string[] }
   | { name: "loops"; args: string[] }
+  | { name: "queues"; args: string[] }
   | { name: "message"; args: string[] }
   | { name: "agents"; args: string[] }
   | { name: "auth"; args: string[] }
@@ -117,6 +118,13 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
   if (command === "loops") {
     return {
       name: "loops",
+      args: args.slice(1),
+    };
+  }
+
+  if (command === "queues") {
+    return {
+      name: "queues",
       args: args.slice(1),
     };
   }
@@ -229,6 +237,7 @@ export function renderCliHelp() {
     `  ${renderCliCommand("bots <subcommand>")}`,
     `  ${renderCliCommand("routes <subcommand>")}`,
     `  ${renderCliCommand("loops <subcommand>")}`,
+    `  ${renderCliCommand("queues <subcommand>")}`,
     `  ${renderCliCommand("message <subcommand>")}`,
     `  ${renderCliCommand("agents <subcommand>")}`,
     `  ${renderCliCommand("auth <subcommand>")}`,
@@ -275,9 +284,14 @@ export function renderCliHelp() {
     "                     list|status",
     "                     create --channel <slack|telegram> --target <route> [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--new-thread] <expression>",
     "                     cancel <id>|--all",
-    "                     scoped status/cancel also accept --channel/--target/--thread-id/--topic-id",
+    "                     scoped list/status/cancel also accept --channel/--target/--thread-id/--topic-id",
     "                     `--target` selects the routed surface; use `--thread-id` for Slack threads, `--topic-id` for Telegram topics",
     `                     See ${renderCliCommand("loops --help", { inline: true })} for slash-compatible expressions and examples.`,
+    "  queues             Create, inspect, or clear durable queued prompts without interrupting running work.",
+    "                     list|status|create|clear",
+    "                     create --channel <slack|telegram> --target <route> --sender <principal> <prompt>",
+    "                     list shows pending only; status includes pending and running.",
+    `                     See ${renderCliCommand("queues --help", { inline: true })} for scoped queue examples.`,
     "  message            Run provider message actions such as send, react, read, edit, delete, and pins.",
     `                     See ${renderCliCommand("message --help", { inline: true })} for channel-specific syntax.`,
     "  agents             Manage configured agents, workspaces, bootstrap files, and per-agent mode overrides.",

@@ -137,6 +137,10 @@ Current persisted session continuity metadata is intentionally small:
 - active `sessionId`
 - `workspacePath`
 - `runnerCommand`
+- `runtime`
+- `loops`
+- `queues`
+- `recentConversation`
 - `updatedAt`
 
 Do not persist transient runner artifacts as canonical state in the agents layer without a documented reason.

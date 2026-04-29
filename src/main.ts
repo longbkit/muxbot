@@ -7,6 +7,7 @@ import { runBotsCli } from "./control/bots-cli.ts";
 import { runChannelsCli } from "./control/channels-cli.ts";
 import { runLoopsCli } from "./control/loops-cli.ts";
 import { runMessageCli } from "./control/message-cli.ts";
+import { runQueuesCli } from "./control/queues-cli.ts";
 import { runRoutesCli } from "./control/routes-cli.ts";
 import { runRunnerCli } from "./control/runner-cli.ts";
 import { runTimezoneCli } from "./control/timezone-cli.ts";
@@ -136,6 +137,11 @@ async function runControlCommand(command: ReturnType<typeof parseCliArgs>) {
 
   if (command.name === "loops") {
     await runLoopsCli(command.args);
+    return true;
+  }
+
+  if (command.name === "queues") {
+    await runQueuesCli(command.args);
     return true;
   }
 
