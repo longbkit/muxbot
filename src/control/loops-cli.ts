@@ -608,6 +608,7 @@ function buildRecurringLoopPromptMetadata(request: LoopCreateRequest) {
     promptSource: request.resolvedPrompt.maintenancePrompt
       ? ("LOOP.md" as const)
       : ("custom" as const),
+    loopStart: request.parsed.mode === "times" ? undefined : request.parsed.loopStart,
     maintenancePrompt: request.resolvedPrompt.maintenancePrompt,
     createdBy: request.creator.providerId,
     sender: request.creator,

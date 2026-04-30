@@ -13,7 +13,7 @@ import {
 } from "../shared/recent-message-context.ts";
 import { SessionStore } from "./session-store.ts";
 
-export type ActiveSessionRuntimeInfo = SessionRuntimeInfo & {
+export type LiveSessionRuntimeInfo = SessionRuntimeInfo & {
   state: "running" | "detached";
 };
 
@@ -138,22 +138,6 @@ export class AgentSessionState {
       sessionKey: target.sessionKey,
       agentId: target.agentId,
     };
-  }
-
-  async listActiveSessionRuntimes(): Promise<ActiveSessionRuntimeInfo[]> {
-    const entries = await this.sessionStore.list();
-    return entries
-      .filter(hasActiveRuntime)
-      .map((entry) => ({
-        state: entry.runtime.state,
-        startedAt: entry.runtime.startedAt,
-        detachedAt: entry.runtime.detachedAt,
-        finalReplyAt: entry.runtime.finalReplyAt,
-        lastMessageToolReplyAt: entry.runtime.lastMessageToolReplyAt,
-        messageToolFinalReplyAt: entry.runtime.messageToolFinalReplyAt,
-        sessionKey: entry.sessionKey,
-        agentId: entry.agentId,
-      }));
   }
 
   async listIntervalLoops(params?: {
@@ -491,6 +475,11 @@ export class AgentSessionState {
     );
   }
 
+  async hasQueuedItem(sessionKey: string, queueId: string) {
+    const entry = await this.sessionStore.get(sessionKey);
+    return getStoredQueues(entry).some((item) => item.id === queueId);
+  }
+
   async resetStaleRunningQueuedItems(activeSessionKeys: Set<string>) {
     const entries = await this.sessionStore.list();
     let reset = 0;
@@ -599,12 +588,4 @@ function getStoredQueues(entry: {
   queues?: StoredQueueItem[];
 } | null | undefined) {
   return entry?.queues ?? [];
-}
-
-function hasActiveRuntime(
-  entry: Awaited<ReturnType<SessionStore["list"]>>[number],
-): entry is Awaited<ReturnType<SessionStore["list"]>>[number] & {
-  runtime: StoredSessionRuntime & { state: "running" | "detached" };
-} {
-  return entry.runtime?.state === "running" || entry.runtime?.state === "detached";
 }

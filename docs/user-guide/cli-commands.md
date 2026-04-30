@@ -99,14 +99,14 @@ Bot id rules:
 - `clisbot stop [--hard]`: stop runtime, optionally clean all tmux sessions on the clisbot socket
 - `clisbot status`: inspect runtime, config, log, tmux state, and the five most recent runner sessions
 - `clisbot logs [--lines N]`: print recent logs
-- `clisbot update --help`: print the AI-readable package update guide, including stable/beta defaults, release notes, and migration index links
+- `clisbot update --help`: print the update guide, including stable/beta defaults plus migration, release-note, and release-guide links
 - `clisbot init [first-run flags...]`: bootstrap config and optional first agent without starting runtime
 
 Focused help:
 
 - `clisbot start --help`: first-run help for tokens, bot bootstrap, and examples
 - `clisbot init --help`: same bootstrap help without starting the runtime
-- `clisbot update --help`: package update checklist for humans and agents
+- `clisbot update --help`: install/update checklist for humans and agents
 
 ## Bots
 
@@ -527,6 +527,7 @@ Examples:
 - use app-wide `clisbot loops list`, `clisbot loops status`, or `clisbot loops cancel --all` when you want global inventory or emergency cleanup
 - use scoped `clisbot loops list --channel ... --target ...` when you want one routed session
 - CLI creation accepts the same expression families as `/loop`: interval, forced interval, times/count, and calendar schedules
+- advanced recurring loop creation also accepts `--loop-start <none|brief|full>` to override the default scheduled start notification behavior for that one loop; omit it to keep the route default
 - omit the prompt body to load `LOOP.md` from the target workspace for maintenance loops
 - count/times loops run synchronously in the CLI process today; recurring loops are persisted for the runtime scheduler
 - the first wall-clock loop create attempt returns confirmation-required output and does not persist a loop until rerun with `--confirm`
@@ -551,6 +552,8 @@ Important behavior:
 - `create` requires `--sender <principal>` so durable queued work has sender metadata
 - `create` is capped by `control.queue.maxPendingItemsPerSession`; the default
   is `20` pending items per session when the config key is omitted
+- `create` posts a visible acknowledgement to the target surface after
+  persistence, for example `Queued: 2 ahead. Prompt: ...`
 - `--current` is not supported
 - use `--channel/--target` for scoped inspection, creation, and clearing
 - queued prompts are stored under `StoredSessionEntry.queues` in `session.storePath`

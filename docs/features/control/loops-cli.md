@@ -78,6 +78,8 @@ Examples:
 
 - recurring interval and wall-clock loops created from the CLI are persisted first into the routed session entry
 - CLI creation accepts the same loop expression families as `/loop`: interval, forced interval, times/count, and calendar wall-clock schedules
+- recurring interval and wall-clock CLI creation also accepts advanced `--loop-start <none|brief|full>` override syntax; if omitted, the route default still applies
+- count/times loops do not accept `--loop-start` because they run immediately in the CLI instead of creating recurring scheduled ticks
 - CLI creation requires `--sender <principal>` and persists creator metadata on recurring loops
 - if no wall-clock loop has been created successfully yet, the first wall-clock create command returns `confirmation_required` and does not persist a loop
 - the confirmation-required output includes the proposed schedule, resolved timezone, next run, and the exact retry command with `--confirm`

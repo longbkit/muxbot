@@ -299,7 +299,7 @@ export async function getRuntimeOperatorSummary(params: {
     },
     agentSummaries,
     channelSummaries,
-    activeRuns: await agentService.listActiveSessionRuntimes(),
+    activeRuns: await agentService.listLiveSessionRuntimes(),
     configuredAgents: agentSummaries.length,
     bootstrapPendingAgents: agentSummaries.filter((item) =>
       item.bootstrapState === "missing" || item.bootstrapState === "not-bootstrapped"

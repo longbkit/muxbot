@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -190,6 +190,7 @@ class FakeTmuxClient {
       params.command.includes("resume ") &&
       this.invalidResumeSessionIds.has(sessionId)
     ) {
+      this.writeExitRecord(params.command, params.sessionName, 1);
       this.nextDropPromptLiteralCount = 0;
       return;
     }
@@ -416,6 +417,24 @@ class FakeTmuxClient {
     return `${this.stripPendingPrompt(snapshot, text)}\n> ${text}`;
   }
 
+  private writeExitRecord(command: string, sessionName: string, exitCode: number) {
+    const match = command.match(/rm -f\s+'?([^'; ]+\/runner-exits\/[^'; ]+\.json)'?/);
+    const exitRecordPath = match?.[1];
+    if (!exitRecordPath) {
+      return;
+    }
+
+    writeFileSync(
+      exitRecordPath,
+      `${JSON.stringify({
+        sessionName,
+        exitCode,
+        command,
+        exitedAt: new Date().toISOString(),
+      })}\n`,
+    );
+  }
+
   private stripPendingPrompt(snapshot: string, text: string) {
     if (!text) {
       return snapshot;
@@ -436,7 +455,12 @@ function readSessionId(storePath: string, sessionKey: string) {
 function readSessionEntry(storePath: string, sessionKey: string) {
   const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<
     string,
-    { sessionId?: string; runtime?: { state: string }; updatedAt: number }
+    {
+      sessionId?: string;
+      runtime?: { state: string };
+      queues?: Array<{ status: string }>;
+      updatedAt: number;
+    }
   >;
   return store[sessionKey] ?? null;
 }
@@ -897,7 +921,7 @@ describe("AgentService session identity", () => {
     }
   });
 
-  test("automatic startup retry preserves stored session id when resume readiness fails", async () => {
+  test("automatic startup retry falls back to a fresh runner session after stale resume startup failure", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 
     try {
@@ -942,6 +966,7 @@ describe("AgentService session identity", () => {
           2,
         ),
       );
+      const staleResumeSessionId = "33333333-3333-3333-3333-333333333333";
       await Bun.write(
         storePath,
         JSON.stringify(
@@ -949,7 +974,7 @@ describe("AgentService session identity", () => {
             [target.sessionKey]: {
               agentId: target.agentId,
               sessionKey: target.sessionKey,
-              sessionId: RUNNER_GENERATED_ID,
+              sessionId: staleResumeSessionId,
               workspacePath: join(tempDir, "default"),
               runnerCommand: "fake-cli",
               runtime: { state: "idle" },
@@ -962,21 +987,21 @@ describe("AgentService session identity", () => {
       );
 
       const fakeTmux = new FakeTmuxClient();
-      fakeTmux.markInvalidResumeSessionId(RUNNER_GENERATED_ID);
+      fakeTmux.markInvalidResumeSessionId(staleResumeSessionId);
       const loaded = await loadConfig(configPath);
       const service = new AgentService(loaded, {
         tmux: fakeTmux as unknown as TmuxClient,
       });
 
-      const error = await service.enqueuePrompt(target, "ping", {
+      const run = await service.enqueuePrompt(target, "ping", {
         onUpdate: () => undefined,
-      }).result.catch((caught) => caught);
+      }).result;
 
-      expect(error).toBeInstanceOf(Error);
+      expect(run.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
       expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
-      expect(fakeTmux.sessionCommands.every((command) =>
-        command.includes(`resume ${RUNNER_GENERATED_ID}`),
-      )).toBe(true);
+      expect(fakeTmux.sessionCommands[0]).toContain(`resume ${staleResumeSessionId}`);
+      expect(fakeTmux.sessionCommands[1]).not.toContain("resume ");
+      expect(fakeTmux.sessionCommands[1]).toContain("fake-cli -C");
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -2503,6 +2528,93 @@ describe("AgentService session identity", () => {
     await service.stop();
   });
 
+  test("managed interval loops can override loop-start notifications per loop", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-loop-notify-"));
+    const storePath = join(tempDir, "sessions.json");
+    const socketPath = join(tempDir, "clisbot.sock");
+    const workspaceTemplate = join(tempDir, "workspaces", "{agentId}");
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify(
+        buildConfig({
+          socketPath,
+          storePath,
+          workspaceTemplate,
+          runnerCommand: "codex",
+          runnerArgs: ["-C", "{workspace}"],
+          sessionId: {
+            create: { mode: "runner", args: [] },
+            capture: {
+              mode: "status-command",
+              statusCommand: "/status",
+              pattern: RUNNER_GENERATED_ID,
+              timeoutMs: 10,
+              pollIntervalMs: 1,
+            },
+            resume: { mode: "command", args: ["resume", "{sessionId}"] },
+          },
+          cleanupEnabled: false,
+        }),
+        null,
+        2,
+      ),
+    );
+
+    const loadedConfig = await loadConfig(configPath);
+    loadedConfig.raw.bots.slack.default.responseMode = "capture-pane";
+    loadedConfig.raw.bots.slack.default.groups["channel:c4"] = {
+      enabled: true,
+      requireMention: true,
+      allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
+      surfaceNotifications: {
+        queueStart: "brief",
+        loopStart: "brief",
+      },
+    };
+
+    const tmux = new FakeTmuxClient() as unknown as TmuxClient;
+    const service = new AgentService(loadedConfig, { tmux });
+    const notifications: string[] = [];
+    service.registerSurfaceNotificationHandler({
+      platform: "slack",
+      accountId: "default",
+      handler: async ({ text }) => {
+        notifications.push(text);
+      },
+    });
+    const target = {
+      agentId: "default",
+      sessionKey: "agent:default:slack:channel:c4:thread:loop-notify-override",
+    };
+
+    await service.createIntervalLoop({
+      target,
+      promptText: "check deploy",
+      promptSummary: "check deploy",
+      promptSource: "custom",
+      loopStart: "none",
+      surfaceBinding: {
+        platform: "slack",
+        accountId: "default",
+        conversationKind: "channel",
+        channelId: "c4",
+        threadTs: "loop-notify-override",
+      },
+      intervalMs: 300,
+      maxRuns: 2,
+      createdBy: "U123",
+      force: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    expect(notifications).toEqual([]);
+    await service.stop();
+  });
+
   test("persisted queue items post surface start and capture-pane settlement notifications", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-queue-notify-"));
     const storePath = join(tempDir, "sessions.json");
@@ -2798,7 +2910,14 @@ describe("AgentService session identity", () => {
     expect(service.listIntervalLoops({ sessionKey: target.sessionKey })).toHaveLength(1);
 
     await state.removeIntervalLoopById(created!.id);
-    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    const deadline = Date.now() + 1_000;
+    while (
+      service.listIntervalLoops({ sessionKey: target.sessionKey }).length > 0 &&
+      Date.now() < deadline
+    ) {
+      await Bun.sleep(20);
+    }
 
     expect(service.listIntervalLoops({ sessionKey: target.sessionKey })).toHaveLength(0);
     await service.stop();
@@ -3578,6 +3697,138 @@ describe("AgentService session identity", () => {
     }
   });
 
+  test("service start reports only rehydrated live runs and resets stale running queued items", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+    let service: AgentService | undefined;
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              updateIntervalMs: 5,
+              idleTimeoutMs: 5000,
+              noOutputTimeoutMs: 5000,
+              maxRuntimeSec: 1,
+            },
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const loaded = await loadConfig(configPath);
+      const liveTarget = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:live:thread:1",
+      };
+      const staleTarget = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:stale:thread:2",
+      };
+      const liveResolved = resolveAgentTarget(loaded, liveTarget);
+      const staleResolved = resolveAgentTarget(loaded, staleTarget);
+      const fakeTmux = new FakeTmuxClient();
+      await fakeTmux.newSession({
+        sessionName: liveResolved.sessionName,
+        cwd: liveResolved.workspacePath,
+        command: "fake-cli -C /tmp",
+      });
+      await fakeTmux.sendLiteral(liveResolved.sessionName, "stream-forever");
+      await fakeTmux.sendKey(liveResolved.sessionName, "Enter");
+
+      writeFileSync(
+        storePath,
+        JSON.stringify(
+          {
+            [liveTarget.sessionKey]: {
+              agentId: liveTarget.agentId,
+              sessionKey: liveTarget.sessionKey,
+              workspacePath: liveResolved.workspacePath,
+              runnerCommand: "fake-cli",
+              runtime: {
+                state: "running",
+                startedAt: 111,
+              },
+              updatedAt: Date.now(),
+            },
+            [staleTarget.sessionKey]: {
+              agentId: staleTarget.agentId,
+              sessionKey: staleTarget.sessionKey,
+              workspacePath: staleResolved.workspacePath,
+              runnerCommand: "fake-cli",
+              runtime: {
+                state: "running",
+                startedAt: 222,
+              },
+              queues: [
+                {
+                  ...createStoredQueueItem({
+                    promptText: "stale queued prompt",
+                    promptSummary: "stale queued prompt",
+                  }),
+                  id: "stale-running",
+                  status: "running" as const,
+                  startedAt: 222,
+                },
+              ],
+              updatedAt: Date.now(),
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      (service as any).managedQueues.reconcilePersistedQueueItems = mock(async () => undefined);
+      await service.start();
+
+      const liveRuns = await service.listLiveSessionRuntimes();
+      expect(liveRuns).toHaveLength(1);
+      expect(liveRuns[0]?.sessionKey).toBe(liveTarget.sessionKey);
+      expect(["running", "detached"]).toContain(liveRuns[0]?.state);
+
+      const staleEntry = readSessionEntry(storePath, staleTarget.sessionKey);
+      expect(staleEntry?.runtime?.state).toBe("idle");
+      expect(staleEntry?.queues?.[0]?.status).toBe("pending");
+
+      await service.stop();
+    } finally {
+      await service?.stop().catch(() => undefined);
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test("clears persisted active run state on graceful stop", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 
@@ -3639,12 +3890,12 @@ describe("AgentService session identity", () => {
       }).result;
       expect(first.status).toBe("detached");
       expect(readSessionEntry(storePath, target.sessionKey)?.runtime?.state).toBe("detached");
-      expect((await service.listActiveSessionRuntimes()).length).toBe(1);
+      expect((await service.listLiveSessionRuntimes()).length).toBe(1);
 
       await service.stop();
 
       expect(readSessionEntry(storePath, target.sessionKey)?.runtime?.state).toBe("idle");
-      expect(await service.listActiveSessionRuntimes()).toEqual([]);
+      expect(await service.listLiveSessionRuntimes()).toEqual([]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -3725,7 +3976,7 @@ describe("AgentService session identity", () => {
       const stopped = await service.interruptSession(target);
       expect(stopped.interrupted).toBe(true);
       expect(readSessionEntry(storePath, target.sessionKey)?.runtime?.state).toBe("idle");
-      expect(await service.listActiveSessionRuntimes()).toEqual([]);
+      expect(await service.listLiveSessionRuntimes()).toEqual([]);
 
       const secondResult = await Promise.race([
         second.result,
@@ -4181,9 +4432,13 @@ describe("AgentService session identity", () => {
       const resolved = resolveAgentTarget(loaded, target);
       await fakeTmux.killSession(resolved.sessionName);
 
-      const second = service.enqueuePrompt(target, "ping", {
-        onUpdate: () => undefined,
-      });
+      const second = {
+        result: sessionService.executePrompt(target, "stream-forever", {
+          id: "stale-callback-observer",
+          mode: "live",
+          onUpdate: () => undefined,
+        }),
+      };
       const deadline = Date.now() + 1_000;
       let currentRun = sessionService.activeRuns.get(target.sessionKey);
       while (
@@ -4204,7 +4459,7 @@ describe("AgentService session identity", () => {
       expect(sessionService.activeRuns.get(target.sessionKey)?.runId).toBe(currentRun?.runId);
 
       const result = await second.result;
-      expect(result.status).not.toBe("error");
+      expect(result.status).toBe("detached");
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

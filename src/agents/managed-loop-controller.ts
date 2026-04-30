@@ -1,5 +1,6 @@
 import {
   computeNextCalendarLoopRunAtMs,
+  type LoopStartNotificationMode,
   type LoopCalendarCadence,
 } from "./loop-command.ts";
 import {
@@ -58,6 +59,7 @@ export type CreateIntervalLoopParams = {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  loopStart?: LoopStartNotificationMode;
   surfaceBinding?: StoredLoopSurfaceBinding;
   intervalMs: number;
   maxRuns: number;
@@ -73,6 +75,7 @@ export type CreateCalendarLoopParams = {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  loopStart?: LoopStartNotificationMode;
   surfaceBinding?: StoredLoopSurfaceBinding;
   cadence: LoopCalendarCadence;
   dayOfWeek?: number;
@@ -106,17 +109,18 @@ export class ManagedLoopController {
 
   async reconcilePersistedIntervalLoops() {
     const persistedLoops = await this.deps.sessionState.listIntervalLoops();
-    const persistedIds = new Set<string>();
+    const persistedKeys = new Set<string>();
     for (const persisted of persistedLoops) {
-      persistedIds.add(persisted.id);
+      const managedKey = this.buildManagedLoopKey(persisted.sessionKey, persisted.id);
+      persistedKeys.add(managedKey);
       if (persisted.attemptedRuns >= persisted.maxRuns) {
-        this.dropManagedIntervalLoop(persisted.id);
+        this.dropManagedIntervalLoop(managedKey);
         continue;
       }
-      if (this.intervalLoops.has(persisted.id)) {
+      if (this.intervalLoops.has(managedKey)) {
         continue;
       }
-      this.intervalLoops.set(persisted.id, {
+      this.intervalLoops.set(managedKey, {
         target: {
           agentId: persisted.agentId,
           sessionKey: persisted.sessionKey,
@@ -124,14 +128,14 @@ export class ManagedLoopController {
         loop: persisted,
       });
       this.scheduleIntervalLoopTimer(
-        persisted.id,
+        managedKey,
         Math.max(0, persisted.nextRunAt - Date.now()),
       );
     }
 
-    for (const loopId of this.intervalLoops.keys()) {
-      if (!persistedIds.has(loopId)) {
-        this.dropManagedIntervalLoop(loopId);
+    for (const managedKey of this.intervalLoops.keys()) {
+      if (!persistedKeys.has(managedKey)) {
+        this.dropManagedIntervalLoop(managedKey);
       }
     }
   }
@@ -139,69 +143,63 @@ export class ManagedLoopController {
   async createIntervalLoop(params: CreateIntervalLoopParams) {
     this.assertActiveLoopCapacity();
     const loop = createStoredIntervalLoop(params);
+    const managedKey = this.buildManagedLoopKey(params.target.sessionKey, loop.id);
     await this.deps.sessionState.setIntervalLoop(
       this.deps.resolveTarget(params.target),
       loop,
     );
-    this.intervalLoops.set(loop.id, {
+    this.intervalLoops.set(managedKey, {
       target: params.target,
       loop,
     });
-    await this.runIntervalLoopIteration(loop.id, {
+    await this.runIntervalLoopIteration(managedKey, {
       notifyStart: false,
     });
-    return this.getIntervalLoop(loop.id);
+    return this.getIntervalLoop(params.target.sessionKey, loop.id);
   }
 
   async createCalendarLoop(params: CreateCalendarLoopParams) {
     this.assertActiveLoopCapacity();
     const loop = createStoredCalendarLoop(params);
+    const managedKey = this.buildManagedLoopKey(params.target.sessionKey, loop.id);
     await this.deps.sessionState.setIntervalLoop(
       this.deps.resolveTarget(params.target),
       loop,
     );
-    this.intervalLoops.set(loop.id, {
+    this.intervalLoops.set(managedKey, {
       target: params.target,
       loop,
     });
-    this.scheduleIntervalLoopTimer(loop.id, Math.max(0, loop.nextRunAt - Date.now()));
-    return this.getIntervalLoop(loop.id);
+    this.scheduleIntervalLoopTimer(managedKey, Math.max(0, loop.nextRunAt - Date.now()));
+    return this.getIntervalLoop(params.target.sessionKey, loop.id);
   }
 
-  async cancelIntervalLoop(loopId: string) {
-    const managed = this.intervalLoops.get(loopId);
+  async cancelIntervalLoop(target: AgentSessionTarget, loopId: string) {
+    const managedKey = this.buildManagedLoopKey(target.sessionKey, loopId);
+    const managed = this.intervalLoops.get(managedKey);
     if (!managed) {
       return false;
     }
-
-    if (managed.timer) {
-      clearTimeout(managed.timer);
-      this.loopTimers.delete(managed.timer);
-    }
-    this.intervalLoops.delete(loopId);
-    await this.deps.sessionState.removeIntervalLoop(
-      this.deps.resolveTarget(managed.target),
-      loopId,
-    );
+    await this.cancelManagedIntervalLoop(managedKey, managed);
     return true;
   }
 
   async cancelIntervalLoopsForSession(target: AgentSessionTarget) {
-    const matching = [...this.intervalLoops.values()]
-      .filter((managed) => managed.target.sessionKey === target.sessionKey)
-      .map((managed) => managed.loop.id);
-    for (const loopId of matching) {
-      await this.cancelIntervalLoop(loopId);
+    const matching = [...this.intervalLoops.entries()].filter(
+      ([, managed]) => managed.target.sessionKey === target.sessionKey,
+    );
+    for (const [managedKey, managed] of matching) {
+      await this.cancelManagedIntervalLoop(managedKey, managed);
     }
     return matching.length;
   }
 
   async cancelAllIntervalLoops() {
-    const ids = [...this.intervalLoops.keys()];
-    for (const loopId of ids) {
-      await this.cancelIntervalLoop(loopId);
+    const matching = [...this.intervalLoops.entries()];
+    for (const [managedKey, managed] of matching) {
+      await this.cancelManagedIntervalLoop(managedKey, managed);
     }
-    return ids.length;
+    return matching.length;
   }
 
   listIntervalLoops(params?: { sessionKey?: string }): IntervalLoopStatus[] {
@@ -211,8 +209,8 @@ export class ManagedLoopController {
       .sort((left, right) => left.nextRunAt - right.nextRunAt);
   }
 
-  getIntervalLoop(loopId: string): IntervalLoopStatus | null {
-    const managed = this.intervalLoops.get(loopId);
+  getIntervalLoop(sessionKey: string, loopId: string): IntervalLoopStatus | null {
+    const managed = this.intervalLoops.get(this.buildManagedLoopKey(sessionKey, loopId));
     return managed ? this.toLoopStatus(managed) : null;
   }
 
@@ -243,8 +241,8 @@ export class ManagedLoopController {
     return (entry?.loops ?? entry?.intervalLoops ?? []).some((loop) => loop.id === managed.loop.id);
   }
 
-  private dropManagedIntervalLoop(loopId: string) {
-    const managed = this.intervalLoops.get(loopId);
+  private dropManagedIntervalLoop(managedKey: string) {
+    const managed = this.intervalLoops.get(managedKey);
     if (!managed) {
       return;
     }
@@ -253,19 +251,30 @@ export class ManagedLoopController {
       clearTimeout(managed.timer);
       this.loopTimers.delete(managed.timer);
     }
-    this.intervalLoops.delete(loopId);
+    this.intervalLoops.delete(managedKey);
+  }
+
+  private async cancelManagedIntervalLoop(
+    managedKey: string,
+    managed: ManagedIntervalLoop,
+  ) {
+    this.dropManagedIntervalLoop(managedKey);
+    await this.deps.sessionState.removeIntervalLoop(
+      this.deps.resolveTarget(managed.target),
+      managed.loop.id,
+    );
   }
 
   private async runIntervalLoopIteration(
-    loopId: string,
+    managedKey: string,
     options: { notifyStart?: boolean } = {},
   ) {
-    const managed = this.intervalLoops.get(loopId);
+    const managed = this.intervalLoops.get(managedKey);
     if (!managed) {
       return;
     }
     if (!(await this.isManagedLoopPersisted(managed))) {
-      this.dropManagedIntervalLoop(loopId);
+      this.dropManagedIntervalLoop(managedKey);
       return;
     }
 
@@ -273,17 +282,17 @@ export class ManagedLoopController {
     const now = Date.now();
     const nextLoopState = this.buildNextLoopState(managed.loop, attemptedRuns, now);
     if (await this.deps.isSessionBusy(managed.target)) {
-      await this.skipLoopIteration(loopId, managed, nextLoopState, attemptedRuns, now);
+      await this.skipLoopIteration(managedKey, managed, nextLoopState, attemptedRuns, now);
       return;
     }
 
     nextLoopState.executedRuns += 1;
     if (!(await this.updateManagedIntervalLoop(managed, nextLoopState))) {
-      this.dropManagedIntervalLoop(loopId);
+      this.dropManagedIntervalLoop(managedKey);
       return;
     }
     await this.executeLoopIteration(
-      loopId,
+      managedKey,
       managed.target,
       nextLoopState,
       attemptedRuns,
@@ -302,7 +311,7 @@ export class ManagedLoopController {
   }
 
   private async skipLoopIteration(
-    loopId: string,
+    managedKey: string,
     managed: ManagedIntervalLoop,
     nextLoopState: StoredLoop,
     attemptedRuns: number,
@@ -310,34 +319,42 @@ export class ManagedLoopController {
   ) {
     nextLoopState.skippedRuns += 1;
     if (!(await this.updateManagedIntervalLoop(managed, nextLoopState))) {
-      this.dropManagedIntervalLoop(loopId);
+      this.dropManagedIntervalLoop(managedKey);
       return;
     }
     if (attemptedRuns >= managed.loop.maxRuns) {
-      await this.cancelIntervalLoop(loopId);
+      this.dropManagedIntervalLoop(managedKey);
+      await this.deps.sessionState.removeIntervalLoop(
+        this.deps.resolveTarget(managed.target),
+        managed.loop.id,
+      );
       return;
     }
-    this.scheduleIntervalLoopTimer(loopId, Math.max(0, nextLoopState.nextRunAt - now));
+    this.scheduleIntervalLoopTimer(managedKey, Math.max(0, nextLoopState.nextRunAt - now));
   }
 
   private async executeLoopIteration(
-    loopId: string,
+    managedKey: string,
     target: AgentSessionTarget,
     nextLoopState: StoredLoop,
     attemptedRuns: number,
     now: number,
     notifyStart: boolean,
   ) {
-    await this.notifyAndEnqueueLoop(loopId, target, nextLoopState, attemptedRuns, notifyStart);
+    await this.notifyAndEnqueueLoop(managedKey, target, nextLoopState, attemptedRuns, notifyStart);
     if (attemptedRuns >= nextLoopState.maxRuns) {
-      await this.cancelIntervalLoop(loopId);
+      this.dropManagedIntervalLoop(managedKey);
+      await this.deps.sessionState.removeIntervalLoop(
+        this.deps.resolveTarget(target),
+        nextLoopState.id,
+      );
       return;
     }
-    this.scheduleIntervalLoopTimer(loopId, Math.max(0, nextLoopState.nextRunAt - now));
+    this.scheduleIntervalLoopTimer(managedKey, Math.max(0, nextLoopState.nextRunAt - now));
   }
 
   private async notifyAndEnqueueLoop(
-    loopId: string,
+    managedKey: string,
     target: AgentSessionTarget,
     nextLoopState: StoredLoop,
     attemptedRuns: number,
@@ -351,7 +368,7 @@ export class ManagedLoopController {
       nextLoopState,
     );
     const { result } = this.deps.enqueuePrompt(target, promptText, {
-      observerId: `loop:${loopId}:${attemptedRuns}`,
+      observerId: `loop:${managedKey}:${attemptedRuns}`,
       onUpdate: async () => undefined,
     });
     void result.catch((error) => {
@@ -361,8 +378,8 @@ export class ManagedLoopController {
     });
   }
 
-  private scheduleIntervalLoopTimer(loopId: string, delayMs: number) {
-    const managed = this.intervalLoops.get(loopId);
+  private scheduleIntervalLoopTimer(managedKey: string, delayMs: number) {
+    const managed = this.intervalLoops.get(managedKey);
     if (!managed) {
       return;
     }
@@ -374,12 +391,12 @@ export class ManagedLoopController {
 
     const timer = setTimeout(() => {
       this.loopTimers.delete(timer);
-      const current = this.intervalLoops.get(loopId);
+      const current = this.intervalLoops.get(managedKey);
       if (!current) {
         return;
       }
       current.timer = undefined;
-      void this.runIntervalLoopIteration(loopId, { notifyStart: true }).catch((error) => {
+      void this.runIntervalLoopIteration(managedKey, { notifyStart: true }).catch((error) => {
         if (!this.deps.shouldSuppressShutdownError(error)) {
           console.error("loop execution failed", error);
         }
@@ -402,6 +419,10 @@ export class ManagedLoopController {
     }
     managed.loop = nextLoopState;
     return true;
+  }
+
+  private buildManagedLoopKey(sessionKey: string, loopId: string) {
+    return `${sessionKey}::${loopId}`;
   }
 
   private computeNextManagedLoopRunAtMs(loop: StoredLoop, nowMs: number) {

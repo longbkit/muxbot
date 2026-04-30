@@ -76,6 +76,9 @@ describe("agent prompt envelope", () => {
       "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot bots --help`, `clisbot routes --help`, `clisbot auth --help`, or `clisbot update --help` for details.",
     );
     expect(prompt).toContain(
+      "For clisbot install or update requests, check `clisbot update --help` first and follow it.",
+    );
+    expect(prompt).toContain(
       "Before sensitive actions or clisbot configuration changes, check permissions with `clisbot auth get-permissions --sender slack:U123 --agent default --json`.",
     );
     expect(prompt).toContain("<user>\nplease investigate\n</user>");
@@ -283,6 +286,9 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("Keep the Markdown body under 3000 chars.");
     expect(prompt).toContain(
       "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot bots --help`, `clisbot routes --help`, `clisbot auth --help`, or `clisbot update --help` for details.",
+    );
+    expect(prompt).toContain(
+      "For clisbot install or update requests, check `clisbot update --help` first and follow it.",
     );
   });
 

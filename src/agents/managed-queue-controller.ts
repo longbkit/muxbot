@@ -1,4 +1,4 @@
-import { AgentJobQueue, type PendingQueueItem } from "./job-queue.ts";
+import { AgentJobQueue, ClearedQueuedTaskError, type PendingQueueItem } from "./job-queue.ts";
 import type { QueuedPromptStatus, StoredQueueItem } from "./queue-state.ts";
 import type { RunUpdate } from "./run-observation.ts";
 import type { AgentSessionTarget, ResolvedAgentTarget } from "./resolved-target.ts";
@@ -73,7 +73,7 @@ export class ManagedQueueController {
   async clearQueuedPrompts(target: AgentSessionTarget) {
     const clearedStored =
       await this.deps.sessionState.clearPendingQueuedItemsForSessionKey(target.sessionKey);
-    this.deps.queue.clearPendingByIds(clearedStored.map((item) => item.id));
+    this.deps.queue.clearPendingByIdsForKey(target.sessionKey, clearedStored.map((item) => item.id));
     return clearedStored.length;
   }
 
@@ -122,9 +122,9 @@ export class ManagedQueueController {
     }
     this.setManagedQueueItem(target, item, true);
     return this.persistQueueItem(this.deps.resolveTarget(target), item)
-      .then(() => this.markPersisted(item))
+      .then(() => this.markPersisted(target, item))
       .catch((error) => {
-        this.clearPendingById(item);
+        this.clearPendingById(target, item);
         throw error;
       });
   }
@@ -140,18 +140,39 @@ export class ManagedQueueController {
     return !(await this.deps.hasBlockingActiveRun(target));
   }
 
+  private async canStartPersistedQueueItem(
+    target: AgentSessionTarget,
+    item: StoredQueueItem,
+  ) {
+    if (await this.deps.hasBlockingActiveRun(target)) {
+      return false;
+    }
+    if (!(await this.deps.sessionState.hasQueuedItem(target.sessionKey, item.id))) {
+      this.clearPendingById(target, item);
+      return false;
+    }
+    return true;
+  }
+
   async reconcilePersistedQueueItems() {
     const persistedItems = await this.deps.sessionState.listQueuedItems({
       statuses: ["pending", "running"],
     });
-    const persistedIds = new Set(persistedItems.map((item) => item.id));
-    const removedIds = [...this.queuedItems.entries()]
-      .filter(([id, managed]) => !managed.persisting && !persistedIds.has(id))
-      .map(([id]) => id);
-    if (removedIds.length > 0) {
-      this.deps.queue.clearPendingByIds(removedIds);
-      for (const id of removedIds) {
-        this.queuedItems.delete(id);
+    const persistedKeys = new Set(
+      persistedItems.map((item) => this.buildManagedQueueKey(item.sessionKey, item.id)),
+    );
+    const removedManagedItems = [...this.queuedItems.entries()]
+      .filter(([key, managed]) => !managed.persisting && !persistedKeys.has(key));
+    if (removedManagedItems.length > 0) {
+      const removedBySession = new Map<string, string[]>();
+      for (const [key, managed] of removedManagedItems) {
+        const ids = removedBySession.get(managed.target.sessionKey) ?? [];
+        ids.push(managed.item.id);
+        removedBySession.set(managed.target.sessionKey, ids);
+        this.queuedItems.delete(key);
+      }
+      for (const [sessionKey, itemIds] of removedBySession.entries()) {
+        this.deps.queue.clearPendingByIdsForKey(sessionKey, itemIds);
       }
     }
 
@@ -160,7 +181,7 @@ export class ManagedQueueController {
         await this.clearStaleRunningQueueItem(persisted);
         continue;
       }
-      if (this.queuedItems.has(persisted.id)) {
+      if (this.queuedItems.has(this.buildManagedQueueKey(persisted.sessionKey, persisted.id))) {
         continue;
       }
       this.enqueuePersistedQueueItem(persisted);
@@ -168,7 +189,7 @@ export class ManagedQueueController {
   }
 
   private async clearStaleRunningQueueItem(item: QueuedPromptStatus) {
-    if (this.queuedItems.has(item.id)) {
+    if (this.queuedItems.has(this.buildManagedQueueKey(item.sessionKey, item.id))) {
       return;
     }
     const target = {
@@ -198,23 +219,24 @@ export class ManagedQueueController {
   }
 
   setManagedQueueItem(target: AgentSessionTarget, item: StoredQueueItem, persisting?: boolean) {
-    this.queuedItems.set(item.id, {
+    this.queuedItems.set(this.buildManagedQueueKey(target.sessionKey, item.id), {
       target,
       item,
       persisting,
     });
   }
 
-  markPersisted(item: StoredQueueItem) {
-    const managed = this.queuedItems.get(item.id);
+  markPersisted(target: AgentSessionTarget, item: StoredQueueItem) {
+    const key = this.buildManagedQueueKey(target.sessionKey, item.id);
+    const managed = this.queuedItems.get(key);
     if (managed) {
-      this.queuedItems.set(item.id, { ...managed, persisting: false });
+      this.queuedItems.set(key, { ...managed, persisting: false });
     }
   }
 
-  clearPendingById(item: StoredQueueItem) {
-    this.deps.queue.clearPendingByIds([item.id]);
-    this.queuedItems.delete(item.id);
+  clearPendingById(target: AgentSessionTarget, item: StoredQueueItem) {
+    this.deps.queue.clearPendingByIdsForKey(target.sessionKey, [item.id]);
+    this.queuedItems.delete(this.buildManagedQueueKey(target.sessionKey, item.id));
   }
 
   async markQueueItemRunning(target: AgentSessionTarget, item?: StoredQueueItem) {
@@ -228,7 +250,7 @@ export class ManagedQueueController {
       startedAt: now,
       updatedAt: now,
     };
-    this.queuedItems.set(item.id, {
+    this.queuedItems.set(this.buildManagedQueueKey(target.sessionKey, item.id), {
       target,
       item: next,
     });
@@ -243,7 +265,7 @@ export class ManagedQueueController {
     if (!item) {
       return;
     }
-    this.queuedItems.delete(item.id);
+    this.queuedItems.delete(this.buildManagedQueueKey(target.sessionKey, item.id));
     await this.deps.sessionState.removeQueuedItem(this.deps.resolveTarget(target), item.id);
   }
 
@@ -252,7 +274,7 @@ export class ManagedQueueController {
       agentId: item.agentId,
       sessionKey: item.sessionKey,
     };
-    this.queuedItems.set(item.id, {
+    this.queuedItems.set(this.buildManagedQueueKey(target.sessionKey, item.id), {
       target,
       item,
     });
@@ -289,7 +311,7 @@ export class ManagedQueueController {
         id: item.id,
         createdAt: item.createdAt,
         text: item.promptSummary,
-        canStart: async () => !(await this.deps.hasBlockingActiveRun(target)),
+        canStart: async () => this.canStartPersistedQueueItem(target, item),
         onComplete: async (value) => {
           if (
             !value.messageToolFinalAlreadySent &&
@@ -307,6 +329,9 @@ export class ManagedQueueController {
       },
     );
     void queued.result.catch((error) => {
+      if (error instanceof ClearedQueuedTaskError) {
+        return;
+      }
       if (this.deps.shouldSuppressShutdownError(error)) {
         return;
       }
@@ -332,7 +357,9 @@ export class ManagedQueueController {
     target: AgentSessionTarget,
     item: StoredQueueItem,
   ) {
-    const startedAt = this.queuedItems.get(item.id)?.item.startedAt ?? item.startedAt;
+    const startedAt =
+      this.queuedItems.get(this.buildManagedQueueKey(target.sessionKey, item.id))?.item.startedAt ??
+      item.startedAt;
     if (typeof startedAt !== "number" || !Number.isFinite(startedAt)) {
       return false;
     }
@@ -360,5 +387,9 @@ export class ManagedQueueController {
       initialSnapshot: "",
       messageToolFinalAlreadySent: true,
     };
+  }
+
+  private buildManagedQueueKey(sessionKey: string, itemId: string) {
+    return `${sessionKey}::${itemId}`;
   }
 }

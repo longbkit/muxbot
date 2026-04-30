@@ -144,6 +144,9 @@ Good first tests:
 - `/status`
 - `/whoami`
 
+After the route is bound, `/whoami` also works as a session check because it
+shows the persisted `storedSessionId` directly in chat.
+
 If DM pairing is already approved, the bot should answer normally after that.
 
 ## Step 4: Add The Bot To A Telegram Group
@@ -271,6 +274,9 @@ Good group and topic test prompts:
 - `reply with exactly PONG`
 - `/status`
 - `/whoami`
+
+Once the group or topic is routed, `/whoami` is also the easiest way to see
+the persisted `storedSessionId` for that conversation.
 
 ## Privacy Mode And Group Visibility
 

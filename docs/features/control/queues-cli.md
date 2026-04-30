@@ -26,6 +26,9 @@ session entry.
 - `create` requires `--sender <principal>`.
 - `create` is capped by `control.queue.maxPendingItemsPerSession`, which
   defaults to `20` when omitted from config.
+- `create` posts a visible surface acknowledgement after persistence, using
+  the same queue-position wording as `/queue` plus the full submitted prompt:
+  `Queued: 2 ahead. Prompt: ...`.
 - `--current` is intentionally unsupported because a short-lived operator CLI
   does not have a reliable ambient current surface.
 
@@ -47,10 +50,12 @@ settlement all follow one queue contract instead of a separate persisted table
 plus a separate legacy runtime queue.
 
 The CLI persists queue items but does not execute prompt delivery itself. A
-running runtime reconciles persisted pending queue items into the same runtime
-drain used by `/queue`. Runtime-reconciled items post queue-start notifications
-and terminal settlement through the stored surface binding. If the runtime is
-stopped, queued prompts activate on the next `clisbot start`.
+successful `create` posts a queue-created acknowledgement to the stored surface
+so CLI-created work is visible before it starts. A running runtime reconciles
+persisted pending queue items into the same runtime drain used by `/queue`.
+Runtime-reconciled items still post queue-start notifications and terminal
+settlement through the stored surface binding. If the runtime is stopped,
+queued prompts activate on the next `clisbot start`.
 
 Persisted `running` queue items are preserved while the session still has a
 blocking active run. Once reconciliation sees the session idle, clisbot removes

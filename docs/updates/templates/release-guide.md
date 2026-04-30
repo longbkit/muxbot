@@ -1,4 +1,4 @@
-# clisbot vX.Y.Z Operator Brief
+# clisbot vX.Y.Z Release Guide
 
 Date: YYYY-MM-DD
 
@@ -25,5 +25,6 @@ Date: YYYY-MM-DD
 ## Links
 
 - Release note:
+- Update guide:
 - Migration:
 - Changelog:

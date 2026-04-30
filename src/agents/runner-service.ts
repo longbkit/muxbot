@@ -187,7 +187,12 @@ export class RunnerService {
     };
   }
 
-  private async syncSessionIdentity(resolved: ResolvedAgentTarget) {
+  async syncStoredSessionId(target: AgentSessionTarget) {
+    const resolved = this.resolveTarget(target);
+    return this.syncStoredSessionIdForResolvedTarget(resolved);
+  }
+
+  private async syncStoredSessionIdForResolvedTarget(resolved: ResolvedAgentTarget) {
     const existing = await this.sessionState.getEntry(resolved.sessionKey);
     if (existing?.sessionId) {
       this.sessionIdentityCaptureRetryAt.delete(resolved.sessionKey);
@@ -274,7 +279,20 @@ export class RunnerService {
     resolved: ResolvedAgentTarget,
     error: unknown,
     remainingFreshRetries: number,
+    allowFreshResumeFallback: boolean,
   ) {
+    if (allowFreshResumeFallback) {
+      const resumedFresh = await this.retryFreshStartAfterStoredResumeFailure(
+        target,
+        resolved,
+        error,
+        remainingFreshRetries,
+      );
+      if (resumedFresh) {
+        return resumedFresh;
+      }
+    }
+
     if (!isRetryableFreshStartFault(error)) {
       return null;
     }
@@ -284,6 +302,44 @@ export class RunnerService {
       resolved,
       remainingFreshRetries,
     );
+  }
+
+  private async retryFreshStartAfterStoredResumeFailure(
+    target: AgentSessionTarget,
+    resolved: ResolvedAgentTarget,
+    error: unknown,
+    remainingFreshRetries: number,
+  ) {
+    if (!isRecoverableStartupSessionLoss(error)) {
+      return null;
+    }
+
+    if (
+      resolved.runner.sessionId.resume.mode !== "command" ||
+      resolved.runner.sessionId.create.mode !== "runner"
+    ) {
+      return null;
+    }
+
+    const existing = await this.sessionState.getEntry(resolved.sessionKey);
+    if (!existing?.sessionId) {
+      return null;
+    }
+
+    const exitRecord = await readRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
+    if (!exitRecord || exitRecord.exitCode === 0) {
+      return null;
+    }
+
+    console.log(
+      `clisbot clearing stored sessionId after failed runner resume startup ${resolved.sessionName}`,
+    );
+    await this.sessionState.clearSessionIdEntry(resolved, {
+      runnerCommand: resolved.runner.command,
+    });
+    return this.ensureSessionReady(target, {
+      remainingFreshRetries,
+    });
   }
 
   private async retryAfterStartupTimeout(
@@ -438,7 +494,7 @@ export class RunnerService {
       });
       try {
         await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
-        await this.syncSessionIdentity(resolved);
+        await this.syncStoredSessionIdForResolvedTarget(resolved);
       } catch (error) {
         throw await this.mapSessionError(error, resolved.sessionName, "during startup");
       }
@@ -532,6 +588,7 @@ export class RunnerService {
         resolved,
         error,
         remainingFreshRetries,
+        options.allowFreshRetry !== false,
       );
       if (retried) {
         return retried;
@@ -564,7 +621,7 @@ export class RunnerService {
       return;
     }
 
-    await this.syncSessionIdentity(resolved);
+    await this.syncStoredSessionIdForResolvedTarget(resolved);
   }
 
   private async dismissTrustPrompt(resolved: ResolvedAgentTarget) {

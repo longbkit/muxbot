@@ -263,10 +263,25 @@ describe("buildTelegramCommandRegistrations", () => {
     const config = createTelegramConfig();
     const registrations = buildTelegramCommandRegistrations(config);
 
-    expect(registrations.some((entry) => entry.scope?.type === "all_private_chats")).toBe(true);
+    const privateCommands = registrations.find((entry) => entry.scope?.type === "all_private_chats")
+      ?.commands;
+    const sharedChatCommands = registrations.find(
+      (entry) => entry.scope?.type === "chat" && entry.scope.chat_id === -1003455688247,
+    )?.commands;
+
+    expect(privateCommands).toContainEqual({
+      command: "new",
+      description: "Start new session",
+    });
     expect(
-      registrations.some((entry) => entry.scope?.type === "chat" && entry.scope.chat_id === -1003455688247),
-    ).toBe(true);
+      sharedChatCommands,
+    ).toContainEqual({
+      command: "new",
+      description: "Start new session",
+    });
+    const minimalCommandNames =
+      registrations.find((entry) => !entry.scope)?.commands.map((command) => command.command) ?? [];
+    expect(minimalCommandNames).not.toContain("new");
   });
 });
 

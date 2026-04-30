@@ -250,6 +250,18 @@ describe("parseAgentCommand", () => {
       },
     });
 
+    expect(parseAgentCommand("/loop 5m --loop-start none check CI")).toEqual({
+      type: "loop",
+      params: {
+        mode: "interval",
+        intervalMs: 300_000,
+        promptText: "check CI",
+        force: false,
+        syntax: "leading-interval",
+        loopStart: "none",
+      },
+    });
+
     expect(parseAgentCommand("/loop check deploy every 2h --force")).toEqual({
       type: "loop",
       params: {
@@ -258,6 +270,18 @@ describe("parseAgentCommand", () => {
         promptText: "check deploy",
         force: true,
         syntax: "every-clause",
+      },
+    });
+
+    expect(parseAgentCommand("/loop check deploy every 2h --loop-start full")).toEqual({
+      type: "loop",
+      params: {
+        mode: "interval",
+        intervalMs: 7_200_000,
+        promptText: "check deploy",
+        force: false,
+        syntax: "every-clause",
+        loopStart: "full",
       },
     });
 
@@ -294,6 +318,21 @@ describe("parseAgentCommand", () => {
         promptText: "check CI",
         force: false,
         syntax: "calendar-at",
+      },
+    });
+
+    expect(parseAgentCommand("/loop every day at 07:00 --loop-start brief check CI")).toEqual({
+      type: "loop",
+      params: {
+        mode: "calendar",
+        cadence: "daily",
+        localTime: "07:00",
+        hour: 7,
+        minute: 0,
+        promptText: "check CI",
+        force: false,
+        syntax: "calendar-at",
+        loopStart: "brief",
       },
     });
 
@@ -390,6 +429,21 @@ describe("parseAgentCommand", () => {
       message: "Loop wall-clock time must use `HH:MM` in 24-hour format.",
     });
 
+    expect(parseAgentCommand("/loop 3 --loop-start none check CI")).toEqual({
+      type: "loop-error",
+      message: "`--loop-start` is only supported for recurring interval and wall-clock loops.",
+    });
+
+    expect(parseAgentCommand("/loop status --loop-start none")).toEqual({
+      type: "loop-error",
+      message: "`--loop-start` is only supported when creating recurring interval and wall-clock loops.",
+    });
+
+    expect(parseAgentCommand("/loop cancel --all --loop-start none")).toEqual({
+      type: "loop-error",
+      message: "`--loop-start` is only supported when creating recurring interval and wall-clock loops.",
+    });
+
     expect(parseAgentCommand("/loop 1m check CI --force")).toEqual({
       type: "loop-error",
       message:
@@ -400,6 +454,18 @@ describe("parseAgentCommand", () => {
       type: "loop-error",
       message:
         "For `every ...` interval loops, `--force` must appear at the end, for example `/loop check CI every 1m --force`.",
+    });
+
+    expect(parseAgentCommand("/loop check CI every 1m --loop-start none --force")).toEqual({
+      type: "loop-error",
+      message:
+        "For `every ...` interval loops, `--loop-start` must appear at the end of the loop schedule, for example `/loop check deploy every 2h --loop-start none`.",
+    });
+
+    expect(parseAgentCommand("/loop every day at 07:00 check CI --loop-start none")).toEqual({
+      type: "loop-error",
+      message:
+        "For wall-clock loops, `--loop-start` must appear immediately after the `at HH:MM` clause, for example `/loop every day at 07:00 --loop-start none morning brief`.",
     });
 
     expect(parseAgentCommand("/loop 3 check CI --force")).toEqual({

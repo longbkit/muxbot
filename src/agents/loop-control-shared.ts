@@ -8,6 +8,7 @@ import {
   formatLoopIntervalShort,
   LOOP_FORCE_FLAG,
   MIN_LOOP_INTERVAL_MS,
+  type LoopStartNotificationMode,
   type LoopCalendarCadence,
 } from "./loop-command.ts";
 import { fileExists, readTextFile } from "../shared/fs.ts";
@@ -47,6 +48,7 @@ function createStoredLoopBase(params: {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  loopStart?: LoopStartNotificationMode;
   createdBy?: string;
   sender?: StoredLoopSender;
   surfaceBinding?: StoredLoopSurfaceBinding;
@@ -67,6 +69,7 @@ function createStoredLoopBase(params: {
     protectedControlMutationRule: params.protectedControlMutationRule,
     promptSummary: params.promptSummary,
     promptSource: params.promptSource,
+    loopStart: params.loopStart,
     createdBy: params.createdBy,
     sender: params.sender ?? deriveLegacyLoopSender({
       createdBy: params.createdBy,
@@ -99,6 +102,7 @@ export function createStoredIntervalLoop(params: {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  loopStart?: LoopStartNotificationMode;
   surfaceBinding?: StoredLoopSurfaceBinding;
   intervalMs: number;
   maxRuns: number;
@@ -114,6 +118,7 @@ export function createStoredIntervalLoop(params: {
       protectedControlMutationRule: params.protectedControlMutationRule,
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
+      loopStart: params.loopStart,
       createdBy: params.createdBy,
       sender: params.sender,
       surfaceBinding: params.surfaceBinding,
@@ -130,6 +135,7 @@ export function createStoredCalendarLoop(params: {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  loopStart?: LoopStartNotificationMode;
   surfaceBinding?: StoredLoopSurfaceBinding;
   cadence: LoopCalendarCadence;
   dayOfWeek?: number;
@@ -163,6 +169,7 @@ export function createStoredCalendarLoop(params: {
       protectedControlMutationRule: params.protectedControlMutationRule,
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
+      loopStart: params.loopStart,
       createdBy: params.createdBy,
       sender: params.sender,
       surfaceBinding: params.surfaceBinding,

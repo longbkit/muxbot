@@ -128,25 +128,6 @@ function renderStartupSteeringUnavailableMessage() {
   ].join("\n");
 }
 
-function renderPrincipalFormat(identity: ChannelInteractionIdentity) {
-  if (identity.platform === "slack") {
-    return "slack:<nativeUserId>";
-  }
-  return "telegram:<nativeUserId>";
-}
-
-function renderPrincipalExample(identity: ChannelInteractionIdentity) {
-  if (identity.senderId) {
-    return `${identity.platform}:${identity.senderId}`;
-  }
-
-  if (identity.platform === "slack") {
-    return "slack:U123ABC456";
-  }
-
-  return "telegram:1276408333";
-}
-
 function renderWhoAmIMessage(params: {
   identity: ChannelInteractionIdentity;
   route: ChannelInteractionRoute;
@@ -160,8 +141,8 @@ function renderWhoAmIMessage(params: {
     `platform: \`${params.identity.platform}\``,
     `conversationKind: \`${params.identity.conversationKind}\``,
     `agentId: \`${params.route.agentId}\``,
-    `sessionKey: \`${params.sessionTarget.sessionKey}\``,
-    `storedSessionId: \`${params.sessionDiagnostics.sessionId ?? "(not captured yet)"}\``,
+    `sessionName: \`${params.sessionDiagnostics.sessionName ?? "(not available)"}\``,
+    `storedSessionId: \`${params.sessionDiagnostics.storedSessionId ?? "(not captured yet)"}\``,
   ];
 
   if (params.identity.senderId) {
@@ -187,8 +168,6 @@ function renderWhoAmIMessage(params: {
   lines.push(
     `resumeCommand: \`${params.sessionDiagnostics.resumeCommand ?? "(not available yet)"}\``,
     `principal: \`${params.auth.principal ?? "(none)"}\``,
-    `principalFormat: \`${renderPrincipalFormat(params.identity)}\``,
-    `principalExample: \`${renderPrincipalExample(params.identity)}\``,
     `appRole: \`${params.auth.appRole}\``,
     `agentRole: \`${params.auth.agentRole}\``,
     `mayBypassPairing: \`${params.auth.mayBypassPairing}\``,
@@ -232,8 +211,8 @@ function renderRouteStatusMessage(params: {
     `platform: \`${params.identity.platform}\``,
     `conversationKind: \`${params.identity.conversationKind}\``,
     `agentId: \`${params.route.agentId}\``,
-    `sessionKey: \`${params.sessionTarget.sessionKey}\``,
-    `storedSessionId: \`${params.sessionDiagnostics.sessionId ?? "(not captured yet)"}\``,
+    `sessionName: \`${params.sessionDiagnostics.sessionName ?? "(not available)"}\``,
+    `storedSessionId: \`${params.sessionDiagnostics.storedSessionId ?? "(not captured yet)"}\``,
   ];
 
   if (params.identity.senderId) {
@@ -255,11 +234,8 @@ function renderRouteStatusMessage(params: {
   lines.push(
     `resumeCommand: \`${params.sessionDiagnostics.resumeCommand ?? "(not available yet)"}\``,
     `principal: \`${params.auth.principal ?? "(none)"}\``,
-    `principalFormat: \`${renderPrincipalFormat(params.identity)}\``,
-    `principalExample: \`${renderPrincipalExample(params.identity)}\``,
     `streaming: \`${params.route.streaming}\``,
     `response: \`${params.route.response}\``,
-    `responseMode: \`${params.route.responseMode}\``,
     `additionalMessageMode: \`${params.route.additionalMessageMode}\``,
     `surfaceNotifications.queueStart: \`${params.route.surfaceNotifications.queueStart}\``,
     `surfaceNotifications.loopStart: \`${params.route.surfaceNotifications.loopStart}\``,
@@ -1808,7 +1784,10 @@ export async function processChannelInteraction<TChunk>(params: {
       return interactionResult;
     }
 
-    const cancelled = await params.agentService.cancelIntervalLoop(targetLoopId);
+    const cancelled = await params.agentService.cancelIntervalLoop(
+      params.sessionTarget,
+      targetLoopId,
+    );
     await params.postText(
       cancelled
         ? `Cancelled loop \`${targetLoopId}\`.`
@@ -1918,6 +1897,7 @@ export async function processChannelInteraction<TChunk>(params: {
           resolvedLoopPrompt.maintenancePrompt,
         ),
         promptSource: resolvedLoopPrompt.maintenancePrompt ? "LOOP.md" : "custom",
+        loopStart: slashCommand.params.loopStart,
         surfaceBinding: buildLoopSurfaceBinding(params.identity),
         cadence: slashCommand.params.cadence,
         dayOfWeek: slashCommand.params.dayOfWeek,
@@ -1963,6 +1943,7 @@ export async function processChannelInteraction<TChunk>(params: {
         resolvedLoopPrompt.maintenancePrompt,
       ),
       promptSource: resolvedLoopPrompt.maintenancePrompt ? "LOOP.md" : "custom",
+      loopStart: slashCommand.params.loopStart,
       surfaceBinding: buildLoopSurfaceBinding(params.identity),
       intervalMs: effectiveIntervalMs!,
       maxRuns: maxRunsPerLoop,

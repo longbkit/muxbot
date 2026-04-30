@@ -1,6 +1,6 @@
 import { renderLoopStatusSchedule } from "../agents/loop-control-shared.ts";
 import type { IntervalLoopStatus } from "../agents/loop-state.ts";
-import { LOOP_APP_FLAG, LOOP_FORCE_FLAG } from "../agents/loop-command.ts";
+import { LOOP_APP_FLAG, LOOP_FORCE_FLAG, LOOP_START_FLAG } from "../agents/loop-command.ts";
 import { renderSlackTargetSyntax } from "../config/route-contract.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 import { collapseHomePath } from "../shared/paths.ts";
@@ -109,6 +109,7 @@ export function renderLoopsCreateHelp() {
     "  - `--new-thread` creates a Slack thread anchor before persisting the loop",
     "  - `--timezone <iana>` freezes a one-off wall-clock timezone on the loop record",
     "  - `--confirm` persists the first wall-clock loop after reviewing the confirmation output",
+    `  - advanced: \`${LOOP_START_FLAG} <none|brief|full>\` overrides the default scheduled loop-start notification behavior for that recurring loop`,
     "",
     "Examples:",
     `  ${renderCliCommand("loops create --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI")}`,

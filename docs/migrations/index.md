@@ -10,7 +10,7 @@ Risk: low
 Automatic config update: yes
 Breaking change: no
 Migration runbook: none
-Read next: ../update/README.md
+Read next: ../updates/update-guide.md
 Release note: ../releases/v0.1.45.md
 ```
 

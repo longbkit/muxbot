@@ -118,40 +118,17 @@ export class AgentJobQueue {
       return 0;
     }
 
-    const keptEntries = state.entries.filter((entry) => entry.status === "running");
-    const removedEntries = state.entries.filter((entry) => entry.status === "pending");
-    state.entries = keptEntries;
-    for (const entry of removedEntries) {
-      void Promise.resolve(entry.lifecycle?.onClear?.()).catch(() => undefined);
-      entry.reject(new ClearedQueuedTaskError());
-    }
-    if (state.entries.length === 0 && !state.running) {
-      this.states.delete(key);
-    }
-    return removedEntries.length;
+    return this.clearPendingEntriesForState(key, state, () => true);
   }
 
-  clearPendingByIds(ids: Iterable<string>) {
-    const idSet = new Set(ids);
-    let cleared = 0;
-    for (const [key, state] of this.states.entries()) {
-      const keptEntries = state.entries.filter((entry) =>
-        entry.status === "running" || !idSet.has(entry.id)
-      );
-      const removedEntries = state.entries.filter((entry) =>
-        entry.status === "pending" && idSet.has(entry.id)
-      );
-      state.entries = keptEntries;
-      cleared += removedEntries.length;
-      for (const entry of removedEntries) {
-        void Promise.resolve(entry.lifecycle?.onClear?.()).catch(() => undefined);
-        entry.reject(new ClearedQueuedTaskError());
-      }
-      if (state.entries.length === 0 && !state.running) {
-        this.states.delete(key);
-      }
+  clearPendingByIdsForKey(key: string, ids: Iterable<string>) {
+    const state = this.states.get(key);
+    if (!state) {
+      return 0;
     }
-    return cleared;
+
+    const idSet = new Set(ids);
+    return this.clearPendingEntriesForState(key, state, (entry) => idSet.has(entry.id));
   }
 
   private getOrCreateState(key: string) {
@@ -178,6 +155,28 @@ export class AgentJobQueue {
       }
       return left.sequence - right.sequence;
     });
+  }
+
+  private clearPendingEntriesForState(
+    key: string,
+    state: QueueState,
+    shouldClear: (entry: QueueEntry<unknown>) => boolean,
+  ) {
+    const keptEntries = state.entries.filter((entry) =>
+      entry.status === "running" || !shouldClear(entry)
+    );
+    const removedEntries = state.entries.filter((entry) =>
+      entry.status === "pending" && shouldClear(entry)
+    );
+    state.entries = keptEntries;
+    for (const entry of removedEntries) {
+      void Promise.resolve(entry.lifecycle?.onClear?.()).catch(() => undefined);
+      entry.reject(new ClearedQueuedTaskError());
+    }
+    if (state.entries.length === 0 && !state.running) {
+      this.states.delete(key);
+    }
+    return removedEntries.length;
   }
 
   private async drain(key: string, state: QueueState) {

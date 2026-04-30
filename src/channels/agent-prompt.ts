@@ -277,6 +277,7 @@ function renderConfigurationGuidance() {
   const cliName = getRenderedCliName();
   return [
     `When the user asks to change ${cliName} configuration, use ${cliName} CLI commands; see ${renderCliCommand("--help", { inline: true })}, ${renderCliCommand("bots --help", { inline: true })}, ${renderCliCommand("routes --help", { inline: true })}, ${renderCliCommand("auth --help", { inline: true })}, or ${renderCliCommand("update --help", { inline: true })} for details.`,
+    `For ${cliName} install or update requests, check ${renderCliCommand("update --help", { inline: true })} first and follow it.`,
     `For schedule/loop/reminder requests, inspect ${renderCliCommand("loops --help", { inline: true })} and use the loops CLI.`,
     `For durable queue requests, inspect ${renderCliCommand("queues --help", { inline: true })} and use the queues CLI.`,
   ].join("\n");

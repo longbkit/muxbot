@@ -76,10 +76,11 @@ export class SurfaceRuntime {
 
     const identity = this.buildLoopChannelIdentity(loop);
     const notifications = this.resolveSurfaceNotifications(identity);
+    const mode = loop.loopStart ?? notifications.loopStart;
     const text =
       loop.kind === "calendar"
         ? renderLoopStartNotification({
-            mode: notifications.loopStart,
+            mode,
             agentId: target.agentId,
             loopId: loop.id,
             promptSummary: loop.promptSummary,
@@ -93,7 +94,7 @@ export class SurfaceRuntime {
             kind: "calendar",
           })
         : renderLoopStartNotification({
-            mode: notifications.loopStart,
+            mode,
             agentId: target.agentId,
             loopId: loop.id,
             promptSummary: loop.promptSummary,

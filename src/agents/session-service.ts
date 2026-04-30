@@ -4,7 +4,7 @@ import {
   type RunObserver,
   type RunUpdate,
 } from "./run-observation.ts";
-import type { AgentSessionState } from "./session-state.ts";
+import type { LiveSessionRuntimeInfo, AgentSessionState } from "./session-state.ts";
 import type { AgentSessionTarget, ResolvedAgentTarget } from "./resolved-target.ts";
 import { deriveInteractionText, normalizePaneText } from "../shared/transcript.ts";
 import {
@@ -173,16 +173,21 @@ export class SessionService {
   ) {}
 
   async recoverPersistedRuns() {
+    const activeSessionKeys = new Set<string>();
     const entries = await this.sessionState.listEntries();
     for (const entry of entries) {
       if (!entry.runtime || entry.runtime.state === "idle") {
         continue;
       }
-      await this.reconcilePersistedActiveRun({
+      const run = await this.reconcilePersistedActiveRun({
         agentId: entry.agentId,
         sessionKey: entry.sessionKey,
       });
+      if (run) {
+        activeSessionKeys.add(run.resolved.sessionKey);
+      }
     }
+    return activeSessionKeys;
   }
 
   async clearLostPersistedActiveRuns() {
@@ -466,6 +471,15 @@ export class SessionService {
       });
     }
     this.activeRuns.clear();
+  }
+
+  listLiveSessionRuntimes(): LiveSessionRuntimeInfo[] {
+    return [...this.activeRuns.values()].map((run) => ({
+      state: run.latestUpdate.status === "detached" ? "detached" : "running",
+      startedAt: run.startedAt,
+      sessionKey: run.resolved.sessionKey,
+      agentId: run.resolved.agentId,
+    }));
   }
 
   private buildDetachedNote(resolved: ResolvedAgentTarget) {

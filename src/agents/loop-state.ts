@@ -1,4 +1,4 @@
-import type { LoopCalendarCadence } from "./loop-command.ts";
+import type { LoopCalendarCadence, LoopStartNotificationMode } from "./loop-command.ts";
 import type { ChannelIdentity } from "../channels/channel-identity.ts";
 
 export type StoredLoopSender = {
@@ -38,6 +38,7 @@ type StoredLoopBase = {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  loopStart?: LoopStartNotificationMode;
   createdBy?: string;
   sender?: StoredLoopSender;
   surfaceBinding?: StoredLoopSurfaceBinding;

@@ -6,7 +6,7 @@ Use `docs/releases/` as the canonical version-bound release history for `clisbot
 
 Release notes answer: what changed in this version, what user or operator impact it has, and which update or validation facts matter later.
 
-Keep narrative catch-up material in [`docs/updates/`](../updates/README.md). Keep the general package update runbook in [`docs/update/`](../update/README.md). Keep manual migration procedures in [`docs/migrations/`](../migrations/README.md).
+Keep user-facing catch-up and install/update docs in [`docs/updates/`](../updates/README.md). Keep manual migration procedures in [`docs/migrations/`](../migrations/README.md).
 GitHub Releases and npm notes should stay shorter and link back to the matching release note here.
 
 ## File Layout
@@ -46,8 +46,8 @@ For a normal release, update:
 
 1. [`CHANGELOG.md`](../../CHANGELOG.md): short version index only.
 2. `docs/releases/vX.Y.Z.md`: canonical version note.
-3. `docs/updates/releases/vX.Y.Z-operator-brief.md`: only for large releases where operators need a 3-5 minute digest.
-4. `docs/update/README.md`: update the current stable update note when the public update path changes.
+3. `docs/updates/releases/vX.Y.Z-release-guide.md`: only for large releases where users or operators need a 3-5 minute catch-up guide.
+4. `docs/updates/update-guide.md`: update the current stable install/update guide when the public update path changes.
 5. `docs/migrations/vA.B.C-to-vX.Y.Z.md`: only when config, schema, or runtime update steps require manual operator action beyond install/restart/status.
 
 Do not duplicate the full release detail across these files. Link between them.
@@ -59,7 +59,7 @@ Use beta notes to support testers and operators, not as a second release-history
 - If a beta is part of an upcoming public release, track it in `upcoming.md` until the release ships.
 - When the public release note is cut, summarize meaningful beta history inside that release note under `Pre-Release History`.
 - Do not add every beta to `CHANGELOG.md`; keep `CHANGELOG.md` focused on public release targets.
-- Create `docs/updates/releases/vX.Y.Z-beta.N-operator-brief.md` only when a beta is sent to users/operators and needs a rollout note.
+- Create `docs/updates/releases/vX.Y.Z-beta.N-release-guide.md` only when a beta is sent to users/operators and needs a rollout note.
 - Create a migration note for a beta only when beta testers need a concrete update or rollback runbook.
 
 ## Current Notes

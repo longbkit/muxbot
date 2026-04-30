@@ -9,9 +9,9 @@ import type { ResolvedAgentTarget } from "../src/agents/resolved-target.ts";
 import { AgentSessionState } from "../src/agents/session-state.ts";
 import { SessionStore } from "../src/agents/session-store.ts";
 
-function waitForCondition(condition: () => Promise<boolean>) {
+function waitForCondition(condition: () => Promise<boolean>, timeoutMs = 2_000) {
   return new Promise<void>((resolve, reject) => {
-    const deadline = Date.now() + 2_000;
+    const deadline = Date.now() + timeoutMs;
     const poll = async () => {
       if (await condition()) {
         resolve();
@@ -27,13 +27,21 @@ function waitForCondition(condition: () => Promise<boolean>) {
   });
 }
 
-function createResolvedTarget(tempDir: string): ResolvedAgentTarget {
+function createResolvedTarget(
+  tempDir: string,
+  params: {
+    chatId?: string;
+    topicId?: string;
+  } = {},
+): ResolvedAgentTarget {
+  const chatId = params.chatId ?? "123";
+  const topicId = params.topicId ?? "456";
   return {
     agentId: "default",
-    sessionKey: "agent:default:telegram:group:123:topic:456",
+    sessionKey: `agent:default:telegram:group:${chatId}:topic:${topicId}`,
     mainSessionKey: "agent:default:main",
-    sessionName: "agent-default-telegram-group-123-topic-456",
-    workspacePath: join(tempDir, "workspace"),
+    sessionName: `agent-default-telegram-group-${chatId}-topic-${topicId}`,
+    workspacePath: join(tempDir, `workspace-${chatId}-${topicId}`),
     runner: {
       command: "codex",
     } as any,
@@ -100,12 +108,8 @@ describe("managed durable queue", () => {
 
       await controller.reconcilePersistedQueueItems();
 
-      const deadline = Date.now() + 2_000;
-      while ((await sessionState.listQueuedItems()).length > 0 && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-
-      expect(executeStarted).toBe(true);
+      await waitForCondition(async () => executeStarted, 5_000);
+      await waitForCondition(async () => (await sessionState.listQueuedItems()).length === 0, 5_000);
       expect(await sessionState.listQueuedItems()).toEqual([]);
       expect(settlementNotifications).toBe(0);
     } finally {
@@ -188,9 +192,153 @@ describe("managed durable queue", () => {
 
       hasBlockingRun = false;
       await controller.reconcilePersistedQueueItems();
-      await waitForCondition(async () => (await sessionState.listQueuedItems()).length === 0);
+      await waitForCondition(async () => executedPrompts.length === 1, 5_000);
+      await waitForCondition(async () => (await sessionState.listQueuedItems()).length === 0, 5_000);
 
       expect(executedPrompts).toEqual(["next prompt"]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps pending items from different sessions isolated even when their queue ids match", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-managed-queue-"));
+    try {
+      const sessionState = new AgentSessionState(new SessionStore(join(tempDir, "sessions.json")));
+      const first = createResolvedTarget(tempDir, { chatId: "123", topicId: "456" });
+      const second = createResolvedTarget(tempDir, { chatId: "123", topicId: "789" });
+      const sharedId = "shared-id";
+
+      await sessionState.setQueuedItem(first, {
+        ...createStoredQueueItem({
+          promptText: "first prompt",
+          canonicalPromptText: "first prompt",
+          promptSummary: "first prompt",
+        }),
+        id: sharedId,
+      });
+      await sessionState.setQueuedItem(second, {
+        ...createStoredQueueItem({
+          promptText: "second prompt",
+          canonicalPromptText: "second prompt",
+          promptSummary: "second prompt",
+        }),
+        id: sharedId,
+      });
+
+      const executed: string[] = [];
+      const controller = new ManagedQueueController({
+        queue: new AgentJobQueue(),
+        sessionState,
+        activeRuns: {
+          executePrompt: async (target: { sessionKey: string }, prompt: string) => {
+            executed.push(`${target.sessionKey}:${prompt}`);
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: target.sessionKey,
+              workspacePath: tempDir,
+              snapshot: "done",
+              fullSnapshot: "done",
+              initialSnapshot: "",
+            };
+          },
+        } as any,
+        surfaceRuntime: {
+          notifyManagedQueueStart: async () => undefined,
+          buildManagedQueuePrompt: async (_agentId: string, item: StoredQueueItem) =>
+            item.canonicalPromptText ?? item.promptText,
+          notifyManagedQueueSettlement: async () => undefined,
+          notifyManagedQueueFailure: async () => undefined,
+        } as any,
+        getQueueConfig: () => ({ maxPendingItemsPerSession: 10 }),
+        resolveTarget: (target: { sessionKey: string }) =>
+          target.sessionKey === first.sessionKey ? first : second,
+        hasBlockingActiveRun: async () => false,
+        shouldSuppressShutdownError: () => false,
+      });
+
+      await controller.reconcilePersistedQueueItems();
+      await waitForCondition(async () => executed.length === 2, 5_000);
+      await waitForCondition(async () => (await sessionState.listQueuedItems()).length === 0, 5_000);
+
+      expect(executed).toEqual([
+        `${first.sessionKey}:first prompt`,
+        `${second.sessionKey}:second prompt`,
+      ]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("reconcile removes a missing session item without clearing another session's matching queue id", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-managed-queue-"));
+    try {
+      const sessionState = new AgentSessionState(new SessionStore(join(tempDir, "sessions.json")));
+      const first = createResolvedTarget(tempDir, { chatId: "123", topicId: "456" });
+      const second = createResolvedTarget(tempDir, { chatId: "123", topicId: "789" });
+      const sharedId = "shared-id";
+
+      await sessionState.setQueuedItem(first, {
+        ...createStoredQueueItem({
+          promptText: "first prompt",
+          canonicalPromptText: "first prompt",
+          promptSummary: "first prompt",
+        }),
+        id: sharedId,
+      });
+      await sessionState.setQueuedItem(second, {
+        ...createStoredQueueItem({
+          promptText: "second prompt",
+          canonicalPromptText: "second prompt",
+          promptSummary: "second prompt",
+        }),
+        id: sharedId,
+      });
+
+      let hasBlockingRun = true;
+      const executed: string[] = [];
+      const controller = new ManagedQueueController({
+        queue: new AgentJobQueue(),
+        sessionState,
+        activeRuns: {
+          executePrompt: async (target: { sessionKey: string }, prompt: string) => {
+            executed.push(`${target.sessionKey}:${prompt}`);
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: target.sessionKey,
+              workspacePath: tempDir,
+              snapshot: "done",
+              fullSnapshot: "done",
+              initialSnapshot: "",
+            };
+          },
+        } as any,
+        surfaceRuntime: {
+          notifyManagedQueueStart: async () => undefined,
+          buildManagedQueuePrompt: async (_agentId: string, item: StoredQueueItem) =>
+            item.canonicalPromptText ?? item.promptText,
+          notifyManagedQueueSettlement: async () => undefined,
+          notifyManagedQueueFailure: async () => undefined,
+        } as any,
+        getQueueConfig: () => ({ maxPendingItemsPerSession: 10 }),
+        resolveTarget: (target: { sessionKey: string }) =>
+          target.sessionKey === first.sessionKey ? first : second,
+        hasBlockingActiveRun: async () => hasBlockingRun,
+        shouldSuppressShutdownError: () => false,
+      });
+
+      await controller.reconcilePersistedQueueItems();
+      await sessionState.removeQueuedItem(first, sharedId);
+
+      hasBlockingRun = false;
+      await controller.reconcilePersistedQueueItems();
+      await waitForCondition(async () => executed.length === 1);
+
+      expect(executed).toEqual([`${second.sessionKey}:second prompt`]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

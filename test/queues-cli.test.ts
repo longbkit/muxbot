@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../src/auth/defaults.ts";
 import { clisbotConfigSchema } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
-import { renderQueuesHelp, runQueuesCli } from "../src/control/queues-cli.ts";
+import {
+  renderQueueCreatedNotification,
+  renderQueuesHelp,
+  runQueuesCli,
+} from "../src/control/queues-cli.ts";
 
 function buildConfig(params: {
   socketPath: string;
@@ -47,6 +51,9 @@ describe("queues cli", () => {
   let tempDir = "";
   let previousConfigPath: string | undefined;
   const originalLog = console.log;
+  const noQueueNotification = {
+    sendQueueCreatedNotification: async () => undefined,
+  };
 
   beforeEach(() => {
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
@@ -106,7 +113,7 @@ describe("queues cli", () => {
       "review",
       "queue",
       "state",
-    ]);
+    ], noQueueNotification);
     const storeDuring = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
     const item = storeDuring["agent:default:telegram:group:-1001:topic:4335"].queues[0];
     expect(item.canonicalPromptText).toBe("review queue state");
@@ -126,6 +133,83 @@ describe("queues cli", () => {
     expect(output).toContain("Cleared 1 pending queued prompt");
     const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
     expect(store["agent:default:telegram:group:-1001:topic:4335"].queues).toEqual([]);
+  });
+
+  test("create posts a surface acknowledgement with position and full prompt", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-queues-cli-notify-"));
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        buildConfig({
+          socketPath: join(tempDir, "clisbot.sock"),
+          storePath,
+          workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+        }),
+        null,
+        2,
+      ),
+    );
+    const older = {
+      id: "older",
+      status: "pending",
+      createdAt: Date.now() - 1_000,
+      updatedAt: Date.now() - 1_000,
+      promptText: "older prompt",
+      promptSummary: "older prompt",
+      promptSource: "custom",
+    };
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        "agent:default:telegram:group:-1001:topic:4335": {
+          agentId: "default",
+          sessionKey: "agent:default:telegram:group:-1001:topic:4335",
+          workspacePath: join(tempDir, "workspaces", "default"),
+          runnerCommand: "codex",
+          queues: [older],
+          updatedAt: Date.now(),
+        },
+      }, null, 2),
+    );
+
+    const notifications: Array<{ positionAhead: number; text: string }> = [];
+    await runQueuesCli([
+      "create",
+      "--channel",
+      "telegram",
+      "--target",
+      "group:-1001",
+      "--topic-id",
+      "4335",
+      "--sender",
+      "telegram:1276408333",
+      "review",
+      "queue",
+      "state",
+    ], {
+      print: () => undefined,
+      sendQueueCreatedNotification: async ({ positionAhead, text }) => {
+        notifications.push({ positionAhead, text });
+      },
+    });
+
+    expect(notifications).toEqual([
+      {
+        positionAhead: 1,
+        text: "Queued: 1 ahead.\n\nPrompt:\nreview queue state",
+      },
+    ]);
+  });
+
+  test("renders queue created notifications without truncating the prompt", () => {
+    const prompt = "line one\nline two with `code` and enough detail";
+
+    expect(renderQueueCreatedNotification({ positionAhead: 0, promptText: prompt }))
+      .toBe("Queued.\n\nPrompt:\nline one\nline two with `code` and enough detail");
+    expect(renderQueueCreatedNotification({ positionAhead: 2, promptText: prompt }))
+      .toBe("Queued: 2 ahead.\n\nPrompt:\nline one\nline two with `code` and enough detail");
   });
 
   test("create without --sender fails before persisting", async () => {
@@ -292,8 +376,8 @@ describe("queues cli", () => {
       "--sender",
       "telegram:1276408333",
     ];
-    await runQueuesCli([...base, "one"]);
-    await runQueuesCli([...base, "two"]);
+    await runQueuesCli([...base, "one"], noQueueNotification);
+    await runQueuesCli([...base, "two"], noQueueNotification);
     await expect(runQueuesCli([...base, "three"])).rejects.toThrow(
       "configured max of `2`",
     );

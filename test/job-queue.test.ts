@@ -101,6 +101,59 @@ describe("AgentJobQueue", () => {
     await expect(third.result).rejects.toBeInstanceOf(ClearedQueuedTaskError);
   });
 
+  test("clears pending ids only for the requested key", async () => {
+    const queue = new AgentJobQueue();
+    let releaseAlpha!: () => void;
+    let releaseBeta!: () => void;
+    const alphaGate = new Promise<void>((resolve) => {
+      releaseAlpha = resolve;
+    });
+    const betaGate = new Promise<void>((resolve) => {
+      releaseBeta = resolve;
+    });
+
+    const alphaRunning = queue.enqueue(
+      "alpha",
+      async () => {
+        await alphaGate;
+        return "alpha-running";
+      },
+      { text: "alpha-running" },
+    );
+    const alphaPending = queue.enqueue(
+      "alpha",
+      async () => "alpha-pending",
+      { id: "shared-id", text: "alpha-pending" },
+    );
+    const betaRunning = queue.enqueue(
+      "beta",
+      async () => {
+        await betaGate;
+        return "beta-running";
+      },
+      { text: "beta-running" },
+    );
+    const betaPending = queue.enqueue(
+      "beta",
+      async () => "beta-pending",
+      { id: "shared-id", text: "beta-pending" },
+    );
+
+    await Bun.sleep(0);
+
+    expect(queue.clearPendingByIdsForKey("alpha", ["shared-id"])).toBe(1);
+    expect(queue.listPending("alpha")).toEqual([]);
+    expect(queue.listPending("beta").map((item) => item.text)).toEqual(["beta-pending"]);
+
+    releaseAlpha();
+    releaseBeta();
+
+    await expect(alphaRunning.result).resolves.toBe("alpha-running");
+    await expect(alphaPending.result).rejects.toBeInstanceOf(ClearedQueuedTaskError);
+    await expect(betaRunning.result).resolves.toBe("beta-running");
+    await expect(betaPending.result).resolves.toBe("beta-pending");
+  });
+
   test("keeps the next job pending until canStart allows it", async () => {
     const queue = new AgentJobQueue();
     const order: string[] = [];

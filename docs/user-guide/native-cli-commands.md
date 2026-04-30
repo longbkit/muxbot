@@ -26,6 +26,7 @@ Related CLI-specific notes:
 - `/whoami`
 - `/transcript`
 - `/stop`
+- `/new`
 - `/nudge`
 - `/followup ...`
 - `/streaming ...`

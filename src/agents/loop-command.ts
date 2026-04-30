@@ -1,10 +1,12 @@
 import { parseCommandDurationMs } from "./run-observation.ts";
 export const DEFAULT_LOOP_MAX_TIMES = 50;
 export const LOOP_FORCE_FLAG = "--force";
+export const LOOP_START_FLAG = "--loop-start";
 export const LOOP_ALL_FLAG = "--all";
 export const LOOP_APP_FLAG = "--app";
 export const MIN_LOOP_INTERVAL_MS = 60_000;
 export const FORCE_LOOP_INTERVAL_MS = 5 * 60_000;
+const LOOP_START_MODES = ["none", "brief", "full"] as const;
 
 const LOOP_WEEKDAY_LABELS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 const LOOP_WEEKDAY_ALIASES: Record<string, number> = {
@@ -29,6 +31,7 @@ const LOOP_WEEKDAY_ALIASES: Record<string, number> = {
 };
 
 export type LoopCalendarCadence = "daily" | "weekday" | "day-of-week";
+export type LoopStartNotificationMode = (typeof LOOP_START_MODES)[number];
 
 export type ParsedLoopSlashCommand =
   | {
@@ -37,6 +40,7 @@ export type ParsedLoopSlashCommand =
       promptText?: string;
       force: boolean;
       syntax: "leading-interval" | "every-clause";
+      loopStart?: LoopStartNotificationMode;
     }
   | {
       mode: "times";
@@ -55,6 +59,7 @@ export type ParsedLoopSlashCommand =
       promptText?: string;
       force: false;
       syntax: "calendar-at";
+      loopStart?: LoopStartNotificationMode;
     };
 
 export type ParsedLoopSlashCommandResult =
@@ -72,7 +77,13 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
     };
   }
 
-  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  const modifier = extractLoopStartModifier(trimmed);
+  if ("error" in modifier) {
+    return modifier;
+  }
+
+  const normalizedText = modifier.normalizedText;
+  const tokens = modifier.normalizedText.split(/\s+/).filter(Boolean);
   const forceTokenIndexes = tokens
     .map((token, index) => (token.toLowerCase() === LOOP_FORCE_FLAG ? index : -1))
     .filter((index) => index >= 0);
@@ -85,7 +96,7 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
   const forceTokenIndex = forceTokenIndexes[0];
   const leadingToken = tokens[0] ?? "";
 
-  const everyDayMatch = trimmed.match(/^every\s+day\s+at\s+(\S+)(?:\s+(.*))?$/i);
+  const everyDayMatch = normalizedText.match(/^every\s+day\s+at\s+(\S+)(?:\s+(.*))?$/i);
   if (everyDayMatch) {
     if (forceTokenIndex !== undefined) {
       return {
@@ -98,7 +109,7 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
         error: "Loop wall-clock time must use `HH:MM` in 24-hour format.",
       };
     }
-    return {
+    const parsed: Extract<ParsedLoopSlashCommand, { mode: "calendar" }> = {
       mode: "calendar",
       cadence: "daily",
       localTime: parsedTime.localTime,
@@ -108,9 +119,19 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
       force: false,
       syntax: "calendar-at",
     };
+    const validationError = validateLoopStartModifierPlacement(parsed, modifier, modifier.tokens.length);
+    if (validationError) {
+      return {
+        error: validationError,
+      };
+    }
+    return {
+      ...parsed,
+      ...(modifier.loopStart ? { loopStart: modifier.loopStart } : {}),
+    };
   }
 
-  const everyWeekdayMatch = trimmed.match(/^every\s+weekday\s+at\s+(\S+)(?:\s+(.*))?$/i);
+  const everyWeekdayMatch = normalizedText.match(/^every\s+weekday\s+at\s+(\S+)(?:\s+(.*))?$/i);
   if (everyWeekdayMatch) {
     if (forceTokenIndex !== undefined) {
       return {
@@ -123,7 +144,7 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
         error: "Loop wall-clock time must use `HH:MM` in 24-hour format.",
       };
     }
-    return {
+    const parsed: Extract<ParsedLoopSlashCommand, { mode: "calendar" }> = {
       mode: "calendar",
       cadence: "weekday",
       localTime: parsedTime.localTime,
@@ -133,9 +154,19 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
       force: false,
       syntax: "calendar-at",
     };
+    const validationError = validateLoopStartModifierPlacement(parsed, modifier, modifier.tokens.length);
+    if (validationError) {
+      return {
+        error: validationError,
+      };
+    }
+    return {
+      ...parsed,
+      ...(modifier.loopStart ? { loopStart: modifier.loopStart } : {}),
+    };
   }
 
-  const everyDayOfWeekMatch = trimmed.match(/^every\s+([a-z]+)\s+at\s+(\S+)(?:\s+(.*))?$/i);
+  const everyDayOfWeekMatch = normalizedText.match(/^every\s+([a-z]+)\s+at\s+(\S+)(?:\s+(.*))?$/i);
   if (everyDayOfWeekMatch) {
     const dayOfWeek = resolveLoopDayOfWeek(everyDayOfWeekMatch[1] ?? "");
     if (dayOfWeek != null) {
@@ -150,7 +181,7 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
           error: "Loop wall-clock time must use `HH:MM` in 24-hour format.",
         };
       }
-      return {
+      const parsed: Extract<ParsedLoopSlashCommand, { mode: "calendar" }> = {
         mode: "calendar",
         cadence: "day-of-week",
         dayOfWeek,
@@ -160,6 +191,16 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
         promptText: everyDayOfWeekMatch[3]?.trim() || undefined,
         force: false,
         syntax: "calendar-at",
+      };
+      const validationError = validateLoopStartModifierPlacement(parsed, modifier, modifier.tokens.length);
+      if (validationError) {
+        return {
+          error: validationError,
+        };
+      }
+      return {
+        ...parsed,
+        ...(modifier.loopStart ? { loopStart: modifier.loopStart } : {}),
       };
     }
   }
@@ -173,16 +214,31 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
     }
     const promptTokens = tokens.slice(forceTokenIndex === 1 ? 2 : 1);
     const promptText = promptTokens.join(" ").trim() || undefined;
-    return {
+    const parsed: Extract<ParsedLoopSlashCommand, { mode: "interval" }> = {
       mode: "interval",
       intervalMs: leadingIntervalMs,
       promptText,
       force: forceTokenIndex === 1,
       syntax: "leading-interval",
     };
+    const validationError = validateLoopStartModifierPlacement(parsed, modifier, modifier.tokens.length);
+    if (validationError) {
+      return {
+        error: validationError,
+      };
+    }
+    return {
+      ...parsed,
+      ...(modifier.loopStart ? { loopStart: modifier.loopStart } : {}),
+    };
   }
 
   if (/^-?\d+$/.test(leadingToken)) {
+    if (modifier.loopStart) {
+      return {
+        error: `\`${LOOP_START_FLAG}\` is only supported for recurring interval and wall-clock loops.`,
+      };
+    }
     if (forceTokenIndex !== undefined) {
       return {
         error: `\`${LOOP_FORCE_FLAG}\` is only supported for interval loops.`,
@@ -204,8 +260,13 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
     };
   }
 
-  const trailingTimes = trimmed.match(/^(.*?)(?:\s+)?(-?\d+)\s+times$/i);
+  const trailingTimes = normalizedText.match(/^(.*?)(?:\s+)?(-?\d+)\s+times$/i);
   if (trailingTimes) {
+    if (modifier.loopStart) {
+      return {
+        error: `\`${LOOP_START_FLAG}\` is only supported for recurring interval and wall-clock loops.`,
+      };
+    }
     if (forceTokenIndex !== undefined) {
       return {
         error: `\`${LOOP_FORCE_FLAG}\` is only supported for interval loops.`,
@@ -230,7 +291,7 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
   const withoutTrailingForce =
     forceTokenIndex === tokens.length - 1
       ? tokens.slice(0, -1).join(" ")
-      : trimmed;
+      : normalizedText;
   const normalizedEveryInput = withoutTrailingForce.trim();
   const hasTrailingForce = forceTokenIndex === tokens.length - 1;
   if (forceTokenIndex !== undefined && !hasTrailingForce) {
@@ -249,12 +310,22 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
     }
 
     const promptText = everyCompactClause[1]?.trim() || undefined;
-    return {
+    const parsed: Extract<ParsedLoopSlashCommand, { mode: "interval" }> = {
       mode: "interval",
       intervalMs,
       promptText,
       force: hasTrailingForce,
       syntax: "every-clause",
+    };
+    const validationError = validateLoopStartModifierPlacement(parsed, modifier, modifier.tokens.length);
+    if (validationError) {
+      return {
+        error: validationError,
+      };
+    }
+    return {
+      ...parsed,
+      ...(modifier.loopStart ? { loopStart: modifier.loopStart } : {}),
     };
   }
 
@@ -276,12 +347,22 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
     }
 
     const promptText = everyClause[1]?.trim() || undefined;
-    return {
+    const parsed: Extract<ParsedLoopSlashCommand, { mode: "interval" }> = {
       mode: "interval",
       intervalMs,
       promptText,
       force: hasTrailingForce,
       syntax: "every-clause",
+    };
+    const validationError = validateLoopStartModifierPlacement(parsed, modifier, modifier.tokens.length);
+    if (validationError) {
+      return {
+        error: validationError,
+      };
+    }
+    return {
+      ...parsed,
+      ...(modifier.loopStart ? { loopStart: modifier.loopStart } : {}),
     };
   }
 
@@ -289,6 +370,81 @@ export function parseLoopSlashCommand(raw: string): ParsedLoopSlashCommandResult
     error:
       "Loop requires an interval, count, or schedule. Try `/loop 5m check CI`, `/loop 3 check CI`, `/loop every day at 07:00 check CI`, or `/loop 3` for maintenance mode.",
   };
+}
+
+type ExtractedLoopStartModifier =
+  | {
+      normalizedText: string;
+      tokens: string[];
+      loopStart?: LoopStartNotificationMode;
+      flagIndex?: number;
+    }
+  | {
+      error: string;
+    };
+
+function extractLoopStartModifier(raw: string): ExtractedLoopStartModifier {
+  const tokens = raw.split(/\s+/).filter(Boolean);
+  const indexes = tokens
+    .map((token, index) => token.trim().toLowerCase() === LOOP_START_FLAG ? index : -1)
+    .filter((index) => index >= 0);
+  if (indexes.length > 1) {
+    return {
+      error: `Loop accepts at most one \`${LOOP_START_FLAG}\` flag.`,
+    };
+  }
+  const flagIndex = indexes[0];
+  if (flagIndex == null) {
+    return {
+      normalizedText: raw,
+      tokens,
+    };
+  }
+  const rawMode = tokens[flagIndex + 1]?.trim().toLowerCase();
+  if (!rawMode) {
+    return {
+      error: `Loop requires \`${LOOP_START_FLAG} <none|brief|full>\`.`,
+    };
+  }
+  if (!LOOP_START_MODES.includes(rawMode as LoopStartNotificationMode)) {
+    return {
+      error: `\`${LOOP_START_FLAG}\` must be one of \`none\`, \`brief\`, or \`full\`.`,
+    };
+  }
+  const strippedTokens = tokens.filter((_, index) => index !== flagIndex && index !== flagIndex + 1);
+  return {
+    normalizedText: strippedTokens.join(" "),
+    tokens,
+    flagIndex,
+    loopStart: rawMode as LoopStartNotificationMode,
+  };
+}
+
+function validateLoopStartModifierPlacement(
+  parsed: Extract<ParsedLoopSlashCommand, { mode: "interval" | "calendar" }>,
+  modifier: Exclude<ExtractedLoopStartModifier, { error: string }>,
+  tokenCount: number,
+) {
+  if (!modifier.loopStart || modifier.flagIndex == null) {
+    return undefined;
+  }
+  if (parsed.mode === "calendar") {
+    if (modifier.flagIndex === 4) {
+      return undefined;
+    }
+    return `For wall-clock loops, \`${LOOP_START_FLAG}\` must appear immediately after the \`at HH:MM\` clause, for example \`/loop every day at 07:00 --loop-start none morning brief\`.`;
+  }
+  if (parsed.syntax === "leading-interval") {
+    const expectedIndex = parsed.force ? 2 : 1;
+    if (modifier.flagIndex === expectedIndex) {
+      return undefined;
+    }
+    return `For leading interval loops, \`${LOOP_START_FLAG}\` must appear after the interval and optional \`${LOOP_FORCE_FLAG}\`, before the prompt, for example \`/loop 5m --loop-start none check CI\`.`;
+  }
+  if (modifier.flagIndex === tokenCount - 2) {
+    return undefined;
+  }
+  return `For \`every ...\` interval loops, \`${LOOP_START_FLAG}\` must appear at the end of the loop schedule, for example \`/loop check deploy every 2h --loop-start none\`.`;
 }
 
 export function formatLoopIntervalShort(intervalMs: number) {
@@ -322,6 +478,7 @@ export function renderLoopHelpLines() {
     "- `/loop status`: show active loops for this session",
     `- \`/loop cancel\`, \`/loop cancel <id>\`, \`/loop cancel --all\`, \`/loop cancel --all ${LOOP_APP_FLAG}\`: cancel active loops`,
     `- intervals must be at least \`1m\`; intervals below \`5m\` require \`${LOOP_FORCE_FLAG}\` right after the interval clause; wall-clock schedules use \`every ... at HH:MM\`; the first wall-clock loop created with \`clisbot loops create\` requires \`--confirm\`; timezone resolves from route/topic, agent, bot, app timezone, then legacy defaults and host; bare numbers mean times, compact durations such as \`5m\` mean intervals, and the historical default loop cap was \`${DEFAULT_LOOP_MAX_TIMES}\``,
+    `- Advanced: loop creation also accepts \`${LOOP_START_FLAG} <none|brief|full>\` to override the default start notification behavior for that loop. Example: \`/loop every day at 07:00 --loop-start none morning brief\``,
   ];
 }
 

@@ -260,7 +260,7 @@ export function renderCliHelp() {
     "  status             Show runtime process, config, log, tmux socket status, and recent runner sessions.",
     "  version            Show the installed clisbot version.",
     "  logs               Print the most recent clisbot log lines.",
-    "  update             Print the AI-readable package update guide and release/migration doc links.",
+    "  update             Print the update guide and release/migration doc links.",
     `                     See ${renderCliCommand("update --help", { inline: true })} before asking an agent to update clisbot.`,
     "  timezone           Manage the app-wide wall-clock timezone used by schedules and loops.",
     `                     See ${renderCliCommand("timezone --help", { inline: true })} for override guidance.`,

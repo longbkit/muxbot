@@ -85,6 +85,7 @@ After your first successful `clisbot start`:
    - `principal`
    - `principalFormat`
    - `principalExample`
+   Routed `/whoami` also shows `storedSessionId` so you can inspect the persisted session continuity directly from chat.
    Typical values look like `telegram:1276408333` or `slack:U123ABC456`.
 2. Grant the first app owner with `clisbot auth add-user app --role owner --user <principal>`, for example `clisbot auth add-user app --role owner --user telegram:1276408333`.
 3. Inspect and tune role permissions with `clisbot auth --help`.
@@ -281,6 +282,7 @@ Important behavior:
 - interval loops below `5m` require `--force`
 - with leading interval syntax, place `--force` immediately after the interval token
 - with `every ...` syntax, place `--force` immediately after the interval clause
+- advanced recurring loop creation also accepts `--loop-start <none|brief|full>` to override the default scheduled start notification behavior for that one loop; omit it to keep the route default
 - wall-clock schedules must use `HH:MM` in 24-hour format and wait until the next matching local time instead of firing immediately
 - wall-clock schedules resolve timezone from the effective timezone resolver: one-off loop override, route/topic, agent, bot, `app.timezone`, legacy fallbacks, then host fallback only when config is missing
 - chat `/loop` wall-clock creation persists immediately and returns the resolved timezone, local next run, UTC next run, and exact cancel command so a wrong timezone can be fixed quickly
@@ -353,7 +355,7 @@ Targeting rules:
 
 - `--target` chooses the routed surface
 - on Slack, use `group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids
-- on Telegram, `--target` is the numeric chat id
+- on Telegram, use `group:<chat-id>` or `topic:<chat-id>:<topic-id>`; raw numeric chat ids are still accepted for compatibility
 - `--thread-id` means an existing Slack thread ts
 - `--topic-id` means a Telegram topic id
 - omitting the sub-surface flag targets the parent Slack channel/group/DM or the parent Telegram chat
@@ -369,6 +371,7 @@ Important behavior:
 - recurring CLI-created loops reuse the same parser family as `/loop` and land in the same persisted session store
 - CLI loop creation fails without `--sender` so delayed work keeps a real creator instead of rendering sender as unavailable
 - the CLI accepts the same expression families as `/loop`: interval, forced interval, times/count, and wall-clock schedules
+- advanced recurring `clisbot loops create` also accepts `--loop-start <none|brief|full>` to override the default scheduled start notification behavior for that one loop
 - omitting the prompt body loads `LOOP.md` from the target workspace, matching maintenance-loop behavior from chat
 - every row includes `agentId` and `sessionKey` because the operator CLI is app-wide rather than route-scoped
 - `cancel --all` is app-wide when no routed target is given

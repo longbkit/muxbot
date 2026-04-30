@@ -51,6 +51,8 @@ Examples:
 - wall-clock schedules wait until the next matching local time; they do not fire immediately on creation
 - wall-clock schedules resolve timezone through the shared effective timezone resolver: one-off loop timezone, route/topic timezone, agent timezone, bot timezone, `app.timezone`, legacy default fallbacks, then host fallback only if no configured timezone exists
 - once created, a wall-clock loop stores the resolved effective timezone on the loop itself so later config changes do not silently shift old schedules
+- recurring interval and wall-clock loop creation also accepts advanced `--loop-start <none|brief|full>` override syntax; if omitted, the route default still applies
+- times/count loops plus `/loop status` and `/loop cancel` reject `--loop-start` because they do not create recurring scheduled ticks
 - chat `/loop` wall-clock creation persists immediately; the no-side-effect first-loop confirmation gate is for operator CLI creation
 - every chat wall-clock creation response must include the resolved timezone, next run in local time plus UTC, and the exact cancel command so the user can quickly undo and recreate if timezone is wrong
 - AI agents should inspect `clisbot loops --help` for schedule/loop/reminder requests when they need to create loops through the CLI
@@ -97,6 +99,7 @@ Common fields for every stored loop:
 - `promptText`
 - `promptSummary`
 - `promptSource`
+- `loopStart` when a recurring loop overrides the route default scheduled start-notification mode
 - `createdBy`
 - `sender`
 - `surfaceBinding`

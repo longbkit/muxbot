@@ -139,7 +139,7 @@ Need the step-by-step setup docs instead of the shortest path?
 
 - Telegram: [Telegram Bot Setup](docs/user-guide/telegram-setup.md)
 - Slack: [Slack App Setup](docs/user-guide/slack-setup.md)
-- Release history: [CHANGELOG.md](CHANGELOG.md), [release notes](docs/releases/README.md), [update guide](docs/update/README.md), [operator updates](docs/updates/README.md), and [migration index](docs/migrations/index.md)
+- Release history: [CHANGELOG.md](CHANGELOG.md), [release notes](docs/releases/README.md), [update guide](docs/updates/update-guide.md), [release guides](docs/updates/README.md), and [migration index](docs/migrations/index.md)
 - Slack app manifest template: [app-manifest.json](templates/slack/default/app-manifest.json)
 - Slack app manifest guide: [app-manifest-guide.md](templates/slack/default/app-manifest-guide.md)
 

@@ -165,6 +165,7 @@ describe("loops cli", () => {
     const help = logs.join("\n");
     expect(help).toContain("clisbot loops create");
     expect(help).toContain("--sender <principal>");
+    expect(help).toContain("--loop-start <none|brief|full>");
     expect(help).toContain("create without `--sender` fails by design");
   });
 
@@ -206,6 +207,8 @@ describe("loops cli", () => {
       "day",
       "at",
       "07:00",
+      "--loop-start",
+      "none",
       "check",
       "CI",
     ]);
@@ -214,6 +217,7 @@ describe("loops cli", () => {
     expect(logs.join("\n")).toContain("timezone: America/Los_Angeles");
     expect(logs.join("\n")).toContain("--sender slack:U123");
     expect(logs.join("\n")).toContain("--sender-name 'The Longbkit'");
+    expect(logs.join("\n")).toContain("--loop-start none");
     expect(logs.join("\n")).toContain("--confirm");
     const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, unknown>;
     expect(Object.keys(store)).toHaveLength(0);
@@ -671,6 +675,8 @@ describe("loops cli", () => {
       "day",
       "at",
       "07:00",
+      "--loop-start",
+      "full",
       "check",
       "CI",
       "--confirm",
@@ -687,6 +693,7 @@ describe("loops cli", () => {
         loops?: Array<{
           id: string;
           kind?: string;
+          loopStart?: string;
           promptSummary?: string;
           createdBy?: string;
           sender?: { senderId?: string; providerId?: string; displayName?: string; handle?: string };
@@ -696,6 +703,7 @@ describe("loops cli", () => {
     const sessionEntry = createdStore["agent:default:slack:channel:c1:thread:100"];
     expect(sessionEntry?.loops).toHaveLength(1);
     expect(sessionEntry?.loops?.[0]?.kind).toBe("calendar");
+    expect(sessionEntry?.loops?.[0]?.loopStart).toBe("full");
     expect(sessionEntry?.loops?.[0]?.promptSummary).toBe("check CI");
     expect(sessionEntry?.loops?.[0]?.createdBy).toBe("U123");
     expect(sessionEntry?.loops?.[0]?.sender).toEqual({

@@ -9,7 +9,7 @@ import { SessionStore } from "./session-store.ts";
 import {
   AgentSessionState,
   type ConversationReplySource,
-  type ActiveSessionRuntimeInfo,
+  type LiveSessionRuntimeInfo,
   type ConversationReplyKind,
 } from "./session-state.ts";
 import type { SessionRuntimeInfo } from "./session-runtime.ts";
@@ -68,7 +68,8 @@ const LOOP_RECONCILE_INTERVAL_MS = 1_000;
 const QUEUE_RECONCILE_INTERVAL_MS = 1_000;
 
 export type SessionDiagnostics = {
-  sessionId?: string;
+  sessionName?: string;
+  storedSessionId?: string;
   resumeCommand?: string;
 };
 
@@ -157,11 +158,10 @@ export class AgentService {
   }
 
   async start() {
-    await this.activeRuns.recoverPersistedRuns();
-    const activeSessions = new Set(
-      (await this.sessionState.listActiveSessionRuntimes()).map((runtime) => runtime.sessionKey),
-    );
-    await this.sessionState.resetStaleRunningQueuedItems(activeSessions);
+    const activeSessionKeys = await this.activeRuns.recoverPersistedRuns();
+    // Persisted runtime is only a projection. Queue reset must follow the live
+    // runs that were actually rehydrated above, not the stale projection.
+    await this.sessionState.resetStaleRunningQueuedItems(activeSessionKeys);
     await this.managedQueues.reconcilePersistedQueueItems();
     this.queueReconcileTimer = setInterval(() => {
       void this.managedQueues.reconcilePersistedQueueItems().catch((error) => {
@@ -254,16 +254,17 @@ export class AgentService {
   async getSessionDiagnostics(target: AgentSessionTarget): Promise<SessionDiagnostics> {
     const resolved = this.resolveTarget(target);
     const entry = await this.sessionState.getEntry(target.sessionKey);
-    const sessionId = entry?.sessionId?.trim() || undefined;
+    const storedSessionId = entry?.sessionId?.trim() || undefined;
     return {
-      sessionId,
-      resumeCommand: buildResumeCommandPreview(resolved, sessionId),
+      sessionName: resolved.sessionName,
+      storedSessionId,
+      resumeCommand: buildResumeCommandPreview(resolved, storedSessionId),
     };
   }
 
-  async listActiveSessionRuntimes(): Promise<ActiveSessionRuntimeInfo[]> {
+  async listLiveSessionRuntimes(): Promise<LiveSessionRuntimeInfo[]> {
     await this.activeRuns.clearLostPersistedActiveRuns();
-    return this.sessionState.listActiveSessionRuntimes();
+    return this.activeRuns.listLiveSessionRuntimes();
   }
 
   async setConversationFollowUpMode(target: AgentSessionTarget, mode: FollowUpMode) {
@@ -427,8 +428,8 @@ export class AgentService {
     return this.managedLoops.createCalendarLoop(params);
   }
 
-  async cancelIntervalLoop(loopId: string) {
-    return this.managedLoops.cancelIntervalLoop(loopId);
+  async cancelIntervalLoop(target: AgentSessionTarget, loopId: string) {
+    return this.managedLoops.cancelIntervalLoop(target, loopId);
   }
 
   async cancelIntervalLoopsForSession(target: AgentSessionTarget) {
@@ -445,8 +446,8 @@ export class AgentService {
     return this.managedLoops.listIntervalLoops(params);
   }
 
-  getIntervalLoop(loopId: string): IntervalLoopStatus | null {
-    return this.managedLoops.getIntervalLoop(loopId);
+  getIntervalLoop(target: AgentSessionTarget, loopId: string): IntervalLoopStatus | null {
+    return this.managedLoops.getIntervalLoop(target.sessionKey, loopId);
   }
 
   getActiveIntervalLoopCount() {

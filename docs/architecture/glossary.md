@@ -20,7 +20,9 @@ Use this file before introducing a new concept name. If an existing term fits, r
 | `session` | One durable conversation owned by clisbot. | Agents own session continuity. |
 | `sessionKey` | Stable clisbot-side session identity. | Agents persistence. |
 | `sessionId` | Current runner-side conversation identity. | Runners provide it; agents store it for continuity. |
+| `storedSessionId` | Persisted copy of the current runner-side `sessionId` for continuity, resume, and operator inspection. | Agents persistence and operator/status surfaces. |
 | `run` | One active execution for one session. | Agents/run lifecycle. |
+| `runtime projection` | Persisted session-runtime record such as `idle`, `running`, or `detached`. It helps recovery, but it is not live run truth by itself. | Agents persistence only. |
 | `runner` | Backend executor boundary, such as tmux running Codex, Claude, or Gemini. | Runners. |
 | `queue` | Ordered pending messages for one session. | Agents. |
 | `queue item` | One queued prompt entry in a session queue. Pending/running queue items are durable; completed/failed items are removed after settlement instead of retained as history. | Agents persistence and runtime queue reconciliation. |

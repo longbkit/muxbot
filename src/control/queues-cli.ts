@@ -4,15 +4,20 @@ import {
 import {
   createStoredQueueItem,
   type QueuedPromptStatus,
+  type StoredQueueItem,
   type StoredQueueSender,
 } from "../agents/queue-state.ts";
+import type { ResolvedAgentTarget } from "../agents/resolved-target.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../auth/defaults.ts";
 import { resolvePrincipalAuth } from "../auth/resolve.ts";
 import { resolveAgentTarget } from "../agents/resolved-target.ts";
 import { AgentSessionState } from "../agents/session-state.ts";
 import { SessionStore } from "../agents/session-store.ts";
+import type { ParsedMessageCommand } from "../channels/message-command.ts";
+import { listChannelPlugins } from "../channels/registry.ts";
 import { ensureEditableConfigFile } from "../config/config-file.ts";
 import {
+  loadConfig,
   loadConfigWithoutEnvResolution,
   resolveSessionStorePath,
 } from "../config/load-config.ts";
@@ -35,6 +40,27 @@ type QueueCliContext = LoopCliContext;
 const QUEUE_SENDER_FLAG = "--sender";
 const QUEUE_SENDER_NAME_FLAG = "--sender-name";
 const QUEUE_SENDER_HANDLE_FLAG = "--sender-handle";
+
+type QueueCreatedNotificationParams = {
+  state: QueueControlState;
+  context: QueueCliContext;
+  resolved: ResolvedAgentTarget;
+  item: StoredQueueItem;
+  positionAhead: number;
+  text: string;
+};
+
+type QueueCliDependencies = {
+  print: (text: string) => void;
+  warn: (text: string) => void;
+  sendQueueCreatedNotification: (params: QueueCreatedNotificationParams) => Promise<void>;
+};
+
+const defaultQueueCliDependencies: QueueCliDependencies = {
+  print: (text) => console.log(text),
+  warn: (text) => console.warn(text),
+  sendQueueCreatedNotification: sendQueueCreatedNotificationToSurface,
+};
 
 function getEditableConfigPath() {
   return process.env.CLISBOT_CONFIG_PATH;
@@ -241,6 +267,76 @@ function createQueueItemForContext(params: {
   });
 }
 
+export function renderQueueCreatedNotification(params: {
+  positionAhead: number;
+  promptText: string;
+}) {
+  const queueLine =
+    params.positionAhead > 0
+      ? `Queued: ${params.positionAhead} ahead.`
+      : "Queued.";
+  return `${queueLine}\n\nPrompt:\n${params.promptText.trim()}`;
+}
+
+async function getQueuePositionAhead(
+  state: QueueControlState,
+  sessionKey: string,
+  itemId: string,
+) {
+  const queues = await state.sessionState.listQueuedItems({
+    sessionKey,
+    statuses: ["pending", "running"],
+  });
+  const index = queues.findIndex((item) => item.id === itemId);
+  return index >= 0 ? index : 0;
+}
+
+function buildQueueCreatedMessageCommand(params: {
+  context: QueueCliContext;
+  text: string;
+}): ParsedMessageCommand {
+  return {
+    action: "send",
+    channel: params.context.channel,
+    account: params.context.botId,
+    target: params.context.target,
+    message: params.text,
+    threadId: params.context.threadId,
+    remove: false,
+    pollOptions: [],
+    forceDocument: false,
+    silent: false,
+    progress: false,
+    final: false,
+    json: false,
+    inputFormat: "plain",
+    renderMode: "none",
+  };
+}
+
+async function sendQueueCreatedNotificationToSurface(
+  params: QueueCreatedNotificationParams,
+) {
+  if (!params.item.surfaceBinding) {
+    return;
+  }
+  const loadedConfig = await loadConfig(params.state.configPath, {
+    materializeChannels: [params.context.channel],
+  });
+  const plugin = listChannelPlugins().find((entry) => entry.id === params.context.channel);
+  if (!plugin) {
+    throw new Error(`Unsupported queue notification channel: ${params.context.channel}`);
+  }
+  await plugin.runMessageCommand(
+    loadedConfig,
+    buildQueueCreatedMessageCommand({
+      context: params.context,
+      text: params.text,
+    }),
+  );
+  await params.state.sessionState.recordConversationReply(params.resolved);
+}
+
 function renderQueueInventory(params: {
   commandLabel: "list" | "status";
   sessionStorePath: string;
@@ -265,6 +361,7 @@ async function listQueues(
   state: QueueControlState,
   addressing: QueueCliAddressing,
   commandLabel: "list" | "status",
+  deps: QueueCliDependencies,
 ) {
   const context = addressing.channel || addressing.target
     ? resolveScopedContext(state, addressing)
@@ -274,7 +371,7 @@ async function listQueues(
     sessionKey,
     statuses: commandLabel === "list" ? ["pending"] : ["pending", "running"],
   });
-  console.log(
+  deps.print(
     renderQueueInventory({
       commandLabel,
       sessionStorePath: state.sessionStorePath,
@@ -283,7 +380,11 @@ async function listQueues(
   );
 }
 
-async function createQueue(state: QueueControlState, args: string[]) {
+async function createQueue(
+  state: QueueControlState,
+  args: string[],
+  deps: QueueCliDependencies,
+) {
   const addressing = parseQueueCliAddressing(args);
   const promptText = stripQueueArgs(args.slice(1)).join(" ").trim();
   if (!promptText) {
@@ -304,13 +405,33 @@ async function createQueue(state: QueueControlState, args: string[]) {
     sender,
   });
   await state.sessionState.setQueuedItem(resolved, item);
-  console.log(`Queued prompt \`${item.id}\` for \`${context.sessionTarget.sessionKey}\`.`);
+  const positionAhead = await getQueuePositionAhead(
+    state,
+    context.sessionTarget.sessionKey,
+    item.id,
+  );
+  const text = renderQueueCreatedNotification({ positionAhead, promptText });
+  await deps.sendQueueCreatedNotification({
+    state,
+    context,
+    resolved,
+    item,
+    positionAhead,
+    text,
+  }).catch((error) => {
+    deps.warn(`Queued prompt ${item.id}, but surface acknowledgement failed: ${String(error)}`);
+  });
+  deps.print(`Queued prompt \`${item.id}\` for \`${context.sessionTarget.sessionKey}\`.`);
 }
 
-async function clearQueues(state: QueueControlState, addressing: QueueCliAddressing) {
+async function clearQueues(
+  state: QueueControlState,
+  addressing: QueueCliAddressing,
+  deps: QueueCliDependencies,
+) {
   if (addressing.all) {
     const cleared = await state.sessionState.clearAllPendingQueuedItems();
-    console.log(
+    deps.print(
       `Cleared ${cleared.length} pending queued prompt${cleared.length === 1 ? "" : "s"} across the whole app.`,
     );
     return;
@@ -318,7 +439,7 @@ async function clearQueues(state: QueueControlState, addressing: QueueCliAddress
   const context = resolveScopedContext(state, addressing);
   const sessionKey = context.sessionTarget.sessionKey;
   const cleared = await state.sessionState.clearPendingQueuedItemsForSessionKey(sessionKey);
-  console.log(
+  deps.print(
     `Cleared ${cleared.length} pending queued prompt${cleared.length === 1 ? "" : "s"} for \`${sessionKey}\`.`,
   );
 }
@@ -342,23 +463,27 @@ export function renderQueuesHelp() {
   ].join("\n");
 }
 
-export async function runQueuesCli(args: string[]) {
+export async function runQueuesCli(
+  args: string[],
+  dependencies: Partial<QueueCliDependencies> = {},
+) {
+  const deps = { ...defaultQueueCliDependencies, ...dependencies };
   if (args[0] === "--help" || args[0] === "help" || args.length === 0) {
-    console.log(renderQueuesHelp());
+    deps.print(renderQueuesHelp());
     return;
   }
   const command = args[0];
   const state = await loadQueueControlState();
   if (command === "list" || command === "status") {
-    await listQueues(state, parseQueueCliAddressing(args.slice(1)), command);
+    await listQueues(state, parseQueueCliAddressing(args.slice(1)), command, deps);
     return;
   }
   if (command === "create") {
-    await createQueue(state, args);
+    await createQueue(state, args, deps);
     return;
   }
   if (command === "clear") {
-    await clearQueues(state, parseQueueCliAddressing(args.slice(1)));
+    await clearQueues(state, parseQueueCliAddressing(args.slice(1)), deps);
     return;
   }
   throw new Error(`Unknown queues subcommand: ${command}`);

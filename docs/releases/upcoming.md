@@ -6,7 +6,8 @@ For beta or pre-release builds, keep notes here until the public version ships. 
 
 ## Summary
 
-Durable one-shot queue control is being staged for the next release.
+Durable queue control plus loop/session truthfulness improvements are being
+staged for the next release.
 
 ## Operator Impact
 
@@ -16,7 +17,14 @@ Durable one-shot queue control is being staged for the next release.
 
 ### Channels
 
-- None yet.
+- Added Telegram native command-menu registration for `/new` with the clearer
+  description `Start new session`.
+- Changed `/whoami` and `/status` to show `sessionName` instead of
+  `sessionKey`, removed principal format/example hints, and stopped echoing
+  route `responseMode` in `/status`.
+- Added per-loop `--loop-start <none|brief|full>` overrides for recurring
+  `/loop` creation, so one loop can suppress or expand scheduled start
+  notifications without changing the route default.
 
 ### Auth
 
@@ -29,6 +37,8 @@ Durable one-shot queue control is being staged for the next release.
   now share the same queue item model.
 - Added a configurable per-session pending queue limit:
   `control.queue.maxPendingItemsPerSession`, default `20` when omitted.
+- Changed `/whoami` to show the stored `sessionId` directly in chat without
+  probing the live runner.
 
 ### Runners
 
@@ -38,6 +48,12 @@ Durable one-shot queue control is being staged for the next release.
 
 - Added `clisbot queues list|status|create|clear` for app-wide or scoped queue
   inspection, explicit routed creation, and pending-only clear.
+- Added the same per-loop `--loop-start <none|brief|full>` override to
+  recurring `clisbot loops create`, while keeping the route default behavior
+  when the flag is omitted.
+- Changed `clisbot queues create` to post a queue-created acknowledgement on
+  the target surface after persistence, including queue position and the full
+  submitted prompt, so CLI-created queued work is visible before it starts.
 
 ### Configuration
 
@@ -84,6 +100,10 @@ Durable one-shot queue control is being staged for the next release.
 - Fixed durable queue reconciliation so a persisted `running` queue item from a
   completed or stopped run is cleared once the session is idle, allowing newer
   pending queue items and follow-up routing to proceed.
+- Fixed recurring loop cancellation and lookup boundaries so current-session
+  loop commands resolve by `sessionKey + loopId` internally, preventing the
+  wrong session from being touched if two sessions ever share the same short
+  loop id.
 
 ### Security
 

@@ -64,6 +64,8 @@ Notes:
 
 - do not skip the explicit `npm login` step if auth might be stale
 - keep the login or publish process attached so the operator can complete npm approval or browser confirmation if npm asks for it
+- if a publish mistake needs cleanup, publish the corrected version or tag first, then run `npm deprecate`
+- for `npm deprecate`, start from `npm login` in an attached session; if the write command still returns `EOTP`, ask the operator for a current OTP and rerun the exact command with `--otp=<code>`
 - after publish, verify the live version with:
 
 ```bash

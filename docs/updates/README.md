@@ -2,31 +2,32 @@
 
 ## Purpose
 
-Use `docs/updates/` for narrative catch-up notes that help operators and users understand what to try, watch, or change.
+Use `docs/updates/` for user-facing update docs that help people install, catch up, and understand what changed.
 
-Updates are not the canonical release ledger. Version-bound truth lives in [`docs/releases/`](../releases/README.md), package update procedure lives in [`docs/update/`](../update/README.md), and manual migration decisions start in [`docs/migrations/index.md`](../migrations/index.md).
+Version-bound truth lives in [`docs/releases/`](../releases/README.md). Manual-action decisions start in [`docs/migrations/index.md`](../migrations/index.md).
 
 ## File Layout
 
+- [`update-guide.md`](update-guide.md): the install/update guide used by `clisbot update`.
 - `weekly/YYYY-Www.md`: optional weekly digest when enough meaningful work landed.
-- `releases/vX.Y.Z-operator-brief.md`: short operator-facing brief for large releases.
+- `releases/vX.Y.Z-release-guide.md`: short catch-up guide for notable releases.
 - `templates/weekly-update.md`: template for weekly digests.
-- `templates/operator-brief.md`: template for release operator briefs.
+- `templates/release-guide.md`: template for release guides.
 
 ## Writing Rule
 
-Updates should answer:
+Update docs here should answer:
 
 - what matters now
 - what the reader should start using
 - what changed in operating risk
 - what should be watched next
 
-Keep updates short and opinionated. Link back to the release note, migration note, feature docs, and task docs instead of repeating their details.
+Keep them short and opinionated. Link back to the release note, migration note, feature docs, and task docs instead of repeating their details.
 
 ## When To Write One
 
-Write an operator brief when a release changes:
+Write a release guide when a release changes:
 
 - config or schema
 - route, auth, or access behavior
@@ -38,4 +39,5 @@ Write a weekly digest only when there is enough meaningful work for a reader to 
 
 ## Current Updates
 
-- [v0.1.45 operator brief](releases/v0.1.45-operator-brief.md)
+- [Update guide](update-guide.md)
+- [v0.1.45 release guide](releases/v0.1.45-release-guide.md)

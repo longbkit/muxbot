@@ -121,6 +121,7 @@ const TELEGRAM_FULL_COMMANDS: TelegramRegisteredCommand[] = [
   { command: "detach", description: "Stop live updates for this thread" },
   { command: "watch", description: "Watch the active run on an interval" },
   { command: "stop", description: "Interrupt current run" },
+  { command: "new", description: "Start new session" },
   { command: "nudge", description: "Send one extra Enter to the session" },
   { command: "followup", description: "Show or change follow-up mode" },
   { command: "mention", description: "Require explicit mention for later turns" },

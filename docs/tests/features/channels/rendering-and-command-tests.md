@@ -247,6 +247,7 @@ Expected:
 - Slack replies include sender id, channel id, and thread ts when present
 - Telegram replies include sender id, chat id, and topic id when present
 - the reply includes the resolved `agentId` and `sessionKey`
+- the reply includes `storedSessionId`
 
 ## Test Case 9B: Agent Bash Commands Can Be Triggered From The Channel
 

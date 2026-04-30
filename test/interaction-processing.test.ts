@@ -298,6 +298,64 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(reconciled[reconciled.length - 1]).toContain("Recovery succeeded. Continuing the current run.");
   });
 
+  test("refuses to render runner output from another session into the current topic", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _promptText: string, params: any) => ({
+          positionAhead: 0,
+          result: Promise.resolve()
+            .then(() =>
+              params.onUpdate({
+                status: "running",
+                agentId: "default",
+                sessionKey: "agent:default:telegram:group:-1001:topic:5",
+                sessionName: "foreign-session",
+                workspacePath: "/tmp/workspace",
+                snapshot: "foreign output",
+                fullSnapshot: "foreign output",
+                initialSnapshot: "",
+              })
+            )
+            .then(() => ({
+              status: "completed",
+              agentId: "default",
+              sessionKey: "agent:default:telegram:group:-1001:topic:5",
+              sessionName: "foreign-session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "foreign output",
+              fullSnapshot: "foreign output",
+              initialSnapshot: "",
+            })),
+        }),
+        recordConversationReply: async () => undefined,
+        getConversationFollowUpState: async () => ({}),
+      } as any,
+      sessionTarget: createTelegramTopicTarget(),
+      identity: createTelegramTopicIdentity(),
+      senderId: "123",
+      text: "continue",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(posted[0]).toContain("Working");
+    expect(reconciled.join("\n")).not.toContain("foreign output");
+    expect(reconciled.join("\n")).toContain(
+      "Refusing to render runner output for sessionKey agent:default:telegram:group:-1001:topic:5 into agent:default:telegram:group:-1001:topic:4.",
+    );
+  });
+
   test("blocks transcript requests when route verbose is off", async () => {
     const posted: string[] = [];
     let transcriptCalls = 0;
@@ -586,7 +644,8 @@ describe("processChannelInteraction sensitive command gating", () => {
     await processChannelInteraction({
       agentService: {
         getSessionDiagnostics: async () => ({
-          sessionId: "11111111-1111-1111-1111-111111111111",
+          sessionName: "agent-default-slack-channel-c123-thread-1-2",
+          storedSessionId: "11111111-1111-1111-1111-111111111111",
           resumeCommand:
             "codex resume 11111111-1111-1111-1111-111111111111 --dangerously-bypass-approvals-and-sandbox --no-alt-screen",
         }),
@@ -613,13 +672,15 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("senderId: `U123`");
     expect(posted[0]).toContain("channelId: `C123`");
     expect(posted[0]).toContain("threadTs: `1.2`");
+    expect(posted[0]).toContain("sessionName: `agent-default-slack-channel-c123-thread-1-2`");
+    expect(posted[0]).not.toContain("sessionKey:");
     expect(posted[0]).toContain("storedSessionId: `11111111-1111-1111-1111-111111111111`");
     expect(posted[0]).toContain(
       "resumeCommand: `codex resume 11111111-1111-1111-1111-111111111111 --dangerously-bypass-approvals-and-sandbox --no-alt-screen`",
     );
     expect(posted[0]).toContain("principal: `slack:U123`");
-    expect(posted[0]).toContain("principalFormat: `slack:<nativeUserId>`");
-    expect(posted[0]).toContain("principalExample: `slack:U123`");
+    expect(posted[0]).not.toContain("principalFormat:");
+    expect(posted[0]).not.toContain("principalExample:");
     expect(posted[0]).toContain("appRole: `member`");
     expect(posted[0]).toContain("agentRole: `member`");
     expect(posted[0]).toContain("mayBypassSharedSenderPolicy: `false`");
@@ -633,7 +694,8 @@ describe("processChannelInteraction sensitive command gating", () => {
     await processChannelInteraction({
       agentService: {
         getSessionDiagnostics: async () => ({
-          sessionId: "22222222-2222-2222-2222-222222222222",
+          sessionName: "agent-default-telegram-group-1001-topic-4",
+          storedSessionId: "22222222-2222-2222-2222-222222222222",
           resumeCommand:
             "codex resume 22222222-2222-2222-2222-222222222222 --dangerously-bypass-approvals-and-sandbox --no-alt-screen",
         }),
@@ -666,17 +728,53 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("conversationKind: `topic`");
     expect(posted[0]).toContain("chatId: `-1001`");
     expect(posted[0]).toContain("topicId: `4`");
+    expect(posted[0]).toContain("sessionName: `agent-default-telegram-group-1001-topic-4`");
+    expect(posted[0]).not.toContain("sessionKey:");
     expect(posted[0]).toContain("storedSessionId: `22222222-2222-2222-2222-222222222222`");
     expect(posted[0]).toContain(
       "resumeCommand: `codex resume 22222222-2222-2222-2222-222222222222 --dangerously-bypass-approvals-and-sandbox --no-alt-screen`",
     );
     expect(posted[0]).toContain("principal: `telegram:123`");
-    expect(posted[0]).toContain("principalFormat: `telegram:<nativeUserId>`");
-    expect(posted[0]).toContain("principalExample: `telegram:123`");
+    expect(posted[0]).not.toContain("principalFormat:");
+    expect(posted[0]).not.toContain("principalExample:");
     expect(posted[0]).toContain("appRole: `member`");
     expect(posted[0]).toContain("agentRole: `member`");
     expect(posted[0]).toContain("mayBypassSharedSenderPolicy: `false`");
     expect(posted[0]).toContain("verbose: `minimal`");
+  });
+
+  test("renders whoami without runtime session probing", async () => {
+    const posted: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        getSessionDiagnostics: async () => ({
+          sessionName: "agent-default-slack-channel-c123-thread-1-2",
+          storedSessionId: "33333333-3333-3333-3333-333333333333",
+          resumeCommand:
+            "codex resume 33333333-3333-3333-3333-333333333333 --dangerously-bypass-approvals-and-sandbox --no-alt-screen",
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/whoami",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("sessionName: `agent-default-slack-channel-c123-thread-1-2`");
+    expect(posted[0]).not.toContain("sessionKey:");
+    expect(posted[0]).toContain("storedSessionId: `33333333-3333-3333-3333-333333333333`");
+    expect(posted[0]).not.toContain("runtimeSessionId:");
+    expect(posted[0]).not.toContain("sessionIdSync:");
   });
 
   test("renders status with resolved auth details for routed conversations", async () => {
@@ -690,7 +788,8 @@ describe("processChannelInteraction sensitive command gating", () => {
           lastBotReplyAt: Date.now(),
         }),
         getSessionDiagnostics: async () => ({
-          sessionId: "33333333-3333-3333-3333-333333333333",
+          sessionName: "agent-default-slack-channel-c123-thread-1-2",
+          storedSessionId: "33333333-3333-3333-3333-333333333333",
           resumeCommand:
             "codex resume 33333333-3333-3333-3333-333333333333 --dangerously-bypass-approvals-and-sandbox --no-alt-screen",
         }),
@@ -723,16 +822,18 @@ describe("processChannelInteraction sensitive command gating", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Status");
+    expect(posted[0]).toContain("sessionName: `agent-default-slack-channel-c123-thread-1-2`");
+    expect(posted[0]).not.toContain("sessionKey:");
     expect(posted[0]).toContain("storedSessionId: `33333333-3333-3333-3333-333333333333`");
     expect(posted[0]).toContain(
       "resumeCommand: `codex resume 33333333-3333-3333-3333-333333333333 --dangerously-bypass-approvals-and-sandbox --no-alt-screen`",
     );
-    expect(posted[0]).toContain("responseMode: `capture-pane`");
+    expect(posted[0]).not.toContain("responseMode:");
     expect(posted[0]).toContain("additionalMessageMode: `steer`");
     expect(posted[0]).toContain("verbose: `minimal`");
     expect(posted[0]).toContain("principal: `slack:U123`");
-    expect(posted[0]).toContain("principalFormat: `slack:<nativeUserId>`");
-    expect(posted[0]).toContain("principalExample: `slack:U123`");
+    expect(posted[0]).not.toContain("principalFormat:");
+    expect(posted[0]).not.toContain("principalExample:");
     expect(posted[0]).toContain("run.state: `detached`");
     expect(posted[0]).toContain("timezone.effective: `America/Los_Angeles`");
     expect(posted[0]).toContain("timezone.route: `Asia/Ho_Chi_Minh`");
@@ -753,6 +854,9 @@ describe("processChannelInteraction sensitive command gating", () => {
 
     await processChannelInteraction({
       agentService: {
+        getSessionDiagnostics: async () => ({
+          sessionName: "agent-default-slack-channel-c123-thread-1-2",
+        }),
         getConversationFollowUpState: async () => ({}),
         getSessionRuntime: async () => ({
           state: "idle",
@@ -778,9 +882,12 @@ describe("processChannelInteraction sensitive command gating", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Status");
+    expect(posted[0]).toContain("sessionName: `agent-default-slack-channel-c123-thread-1-2`");
+    expect(posted[0]).not.toContain("sessionKey:");
     expect(posted[0]).toContain("principal: `slack:U123`");
-    expect(posted[0]).toContain("principalFormat: `slack:<nativeUserId>`");
-    expect(posted[0]).toContain("principalExample: `slack:U123`");
+    expect(posted[0]).not.toContain("principalFormat:");
+    expect(posted[0]).not.toContain("principalExample:");
+    expect(posted[0]).not.toContain("responseMode:");
   });
 
   test("shows persisted response mode for the current route", async () => {
@@ -3584,6 +3691,7 @@ describe("processChannelInteraction agent prompt text", () => {
     const enqueued: string[] = [];
     let scheduledIntervalMs = 0;
     let createdMaxRuns = 0;
+    let observedLoopStart: string | undefined;
 
     await processChannelInteraction({
       agentService: {
@@ -3596,14 +3704,17 @@ describe("processChannelInteraction agent prompt text", () => {
           promptText,
           intervalMs,
           maxRuns,
+          loopStart,
         }: {
           promptText: string;
           intervalMs: number;
           maxRuns: number;
+          loopStart?: string;
         }) => {
           enqueued.push(renderCapturedPrompt(promptText));
           scheduledIntervalMs = intervalMs;
           createdMaxRuns = maxRuns;
+          observedLoopStart = loopStart;
           return {
             id: "loop123",
             agentId: "default",
@@ -3683,13 +3794,67 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(posted[0]).toContain("Started loop `loop123` every 2h.");
     expect(scheduledIntervalMs).toBe(7_200_000);
     expect(createdMaxRuns).toBe(20);
+    expect(observedLoopStart).toBeUndefined();
     expect(enqueued).toEqual(["check deploy"]);
+  });
+
+  test("loop interval mode passes a per-loop loop-start override to the scheduler", async () => {
+    let observedLoopStart: string | undefined;
+
+    await processChannelInteraction({
+      agentService: {
+        getLoopConfig: () => ({
+          maxRunsPerLoop: 20,
+          maxActiveLoops: 10,
+        }),
+        getWorkspacePath: () => "/tmp/workspace",
+        createIntervalLoop: async ({ loopStart }: { loopStart?: string }) => {
+          observedLoopStart = loopStart;
+          return {
+            id: "loop123",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            intervalMs: 7_200_000,
+            maxRuns: 20,
+            attemptedRuns: 1,
+            executedRuns: 1,
+            skippedRuns: 0,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            nextRunAt: Date.now() + 7_200_000,
+            promptText: "check deploy",
+            promptSummary: "check deploy",
+            promptSource: "custom" as const,
+            createdBy: "U123",
+            force: false,
+            remainingRuns: 19,
+          };
+        },
+        listIntervalLoops: () => [],
+        getActiveIntervalLoopCount: () => 1,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/loop check deploy every 2 hours --loop-start none",
+      agentPromptBuilder: (text) => `wrapped:${text}`,
+      route: createRoute({
+        responseMode: "message-tool",
+      }),
+      maxChars: 4000,
+      postText: async (text) => [text],
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(observedLoopStart).toBe("none");
   });
 
   test("loop calendar mode schedules the first run using route timezone", async () => {
     const posted: string[] = [];
     let observedTimezone = "";
     let observedCadence = "";
+    let observedLoopStart: string | undefined;
 
     await processChannelInteraction({
       agentService: {
@@ -3705,12 +3870,15 @@ describe("processChannelInteraction agent prompt text", () => {
         createCalendarLoop: async ({
           cadence,
           timezone,
+          loopStart,
         }: {
           cadence: string;
           timezone: string;
+          loopStart?: string;
         }) => {
           observedCadence = cadence;
           observedTimezone = timezone;
+          observedLoopStart = loopStart;
           return {
             id: "loopcal1",
             kind: "calendar" as const,
@@ -3765,7 +3933,7 @@ describe("processChannelInteraction agent prompt text", () => {
       sessionTarget: createTarget(),
       identity: createIdentity(),
       senderId: "U123",
-      text: "/loop every day at 07:00 check deploy",
+      text: "/loop every day at 07:00 --loop-start full check deploy",
       agentPromptBuilder: (text) => `wrapped:${text}`,
       route: createRoute({
         responseMode: "message-tool",
@@ -3781,6 +3949,7 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(observedCadence).toBe("daily");
     expect(observedTimezone).toBe("Asia/Ho_Chi_Minh");
+    expect(observedLoopStart).toBe("full");
     expect(posted[0]).toContain("Started loop `loopcal1` every day at 07:00.");
     expect(posted[0]).toContain("timezone: `Asia/Ho_Chi_Minh`");
     expect(posted[0]).toContain("next run: `2026-04-13 07:00 Asia/Ho_Chi_Minh` (2026-04-13T00:00:00.000Z)");
@@ -3945,6 +4114,8 @@ describe("processChannelInteraction agent prompt text", () => {
     const posted: string[] = [];
     let cancelledLoopId = "";
 
+    let cancelledSessionKey = "";
+
     await processChannelInteraction({
       agentService: {
         listIntervalLoops: () => [
@@ -3969,7 +4140,8 @@ describe("processChannelInteraction agent prompt text", () => {
           },
         ],
         getActiveIntervalLoopCount: () => 1,
-        cancelIntervalLoop: async (loopId: string) => {
+        cancelIntervalLoop: async (target: AgentSessionTarget, loopId: string) => {
+          cancelledSessionKey = target.sessionKey;
           cancelledLoopId = loopId;
           return true;
         },
@@ -4018,7 +4190,8 @@ describe("processChannelInteraction agent prompt text", () => {
           },
         ],
         getActiveIntervalLoopCount: () => 1,
-        cancelIntervalLoop: async (loopId: string) => {
+        cancelIntervalLoop: async (target: AgentSessionTarget, loopId: string) => {
+          cancelledSessionKey = target.sessionKey;
           cancelledLoopId = loopId;
           return true;
         },
@@ -4040,6 +4213,7 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(cancelledLoopId).toBe("loop123");
+    expect(cancelledSessionKey).toBe(createTarget().sessionKey);
     expect(posted[0]).toContain("Cancelled loop `loop123`.");
   });
 

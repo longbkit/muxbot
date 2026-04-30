@@ -25,7 +25,7 @@ If this page and runtime ever disagree, runtime wins.
 - `/start`: show onboarding help for the current surface
 - `/status`: show route status and suggested operator next steps
 - `/help`: show available control slash commands
-- `/whoami`: show current platform, route, and sender identity details
+- `/whoami`: show current platform, route, sender identity, and the stored session id for the current conversation
 - `/transcript`: show the current session transcript when route `verbose` policy allows it
 
 ## Run Control
@@ -34,7 +34,7 @@ If this page and runtime ever disagree, runtime wins.
 - `/detach`: stop live updates for this thread while still posting the final result here
 - `/watch every 30s [for 10m]`: post latest run state on an interval until settle or timeout
 - `/stop`: send Escape to interrupt the current conversation session, clear active-run state, and let queued prompts continue
-- `/new`: trigger a new runner conversation for the current routed session, then capture and store the new session id
+- `/new`: start a new session for the current routed conversation, then capture and store the new session id
 - `/nudge`: send one extra Enter to the current tmux session without resending prompt text
 
 ## Conversation Modes
@@ -87,6 +87,7 @@ Useful operator note:
 - encourage users to try `/queue help` and `/loop help` directly in chat when they need the live syntax summary for the current surface
 - queued prompts are stored in the session store, survive runtime restart, and are also inspectable through `clisbot queues list`
 - chat `/loop` wall-clock creation is immediate to keep the conversational path low-friction; the creation response shows the resolved timezone, next run in local time plus UTC, and the exact cancel command
+- advanced recurring loop creation also accepts `--loop-start <none|brief|full>`; check `/loop help` for the live example only when you need to override the default start notification behavior for one loop
 - if the timezone is wrong, cancel the loop from that response, set the correct timezone, then create the loop again
 
 ## Shell

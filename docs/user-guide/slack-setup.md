@@ -204,6 +204,9 @@ Good first tests:
 - `/status`
 - `/whoami`
 
+After the route is bound, `/whoami` is also a quick session check because it
+shows the persisted `storedSessionId` directly in chat.
+
 ## Step 6: Add The Bot To A Public Channel
 
 Invite the bot into the target Slack channel.
@@ -298,6 +301,9 @@ Good test prompts:
 - `@clisbot reply with exactly PONG`
 - `@clisbot /whoami`
 - plain thread follow-up after the first bot reply
+
+In a routed Slack thread, `/whoami` also helps verify session continuity
+because it reports the persisted `storedSessionId`.
 
 ## Why Thread Follow-Up Matters
 
