@@ -90,7 +90,7 @@ Recommended rule:
 
 - the originating chat surface owns reply and preview policy
 - future loop ticks should use the current resolved route contract for that surface when they execute
-- loop persistence should store scheduling intent and canonical prompt intent, not a frozen copy of transient channel delivery instructions
+- loop persistence should store scheduling intent and the persisted source prompt, not a frozen copy of transient channel delivery instructions
 
 This keeps channel policy changes meaningful after loop creation:
 
@@ -125,7 +125,7 @@ Persisted loop records should not become the de facto source of truth for:
 - whether message-tool wrapper text is still current
 - whether a surface should stream
 
-If a loop needs persisted prompt data, persist canonical prompt intent plus scheduler metadata, then apply the current channel delivery wrapper when dispatching the tick.
+If a loop needs persisted prompt data, persist the source `promptText` plus scheduler metadata, then apply the current channel delivery wrapper when dispatching the tick.
 
 Short-term compatibility is acceptable, but the patch must not deepen the current anti-pattern of persisting more prewrapped surface-specific prompt text.
 
@@ -160,7 +160,7 @@ Exact naming can differ, but the loop record must stop pretending that prewrappe
 
 Recommended direction:
 
-- persist canonical prompt text separately from a `surfaceBinding`
+- persist the source `promptText` alongside a `surfaceBinding`
 - at tick execution time, use that binding plus current config to re-resolve route policy
 - rebuild any prompt envelope from current `responseMode`, `streaming`, and reply-target contract
 
@@ -222,7 +222,7 @@ Important rule:
 
 Recommended implementation direction:
 
-- persist canonical prompt content, scheduler metadata, and enough surface binding to re-resolve the route later
+- persist source prompt content, scheduler metadata, and enough surface binding to re-resolve the route later
 - resolve the current surface delivery wrapper at tick execution time
 - pass current `streaming`, `responseMode`, and related channel contract into prompt wrapping
 
@@ -314,7 +314,7 @@ This slice now covers:
 - explicit `/queue ...` with `streaming: "off"` staying silent until final settlement
 - implicit queue-by-mode preserving the real prompt text
 - `/loop <count>` no longer posting queued placeholders when `streaming: "off"`
-- managed loop execution rebuilding prompt instructions from canonical prompt plus persisted surface binding under current route policy
+- managed loop execution rebuilding prompt instructions from persisted prompt text plus surface binding under current route policy
 
 ## Related Docs
 

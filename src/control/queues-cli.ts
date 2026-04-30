@@ -254,7 +254,6 @@ function createQueueItemForContext(params: {
 }) {
   return createStoredQueueItem({
     promptText: params.promptText,
-    canonicalPromptText: params.promptText,
     protectedControlMutationRule: resolveProtectedControlMutationRule(
       params.state,
       params.context.sessionTarget.agentId,

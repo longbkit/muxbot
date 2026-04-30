@@ -12,7 +12,6 @@ export type StoredQueueItem = {
   updatedAt: number;
   startedAt?: number;
   promptText: string;
-  canonicalPromptText?: string;
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom";
@@ -41,7 +40,6 @@ export function summarizeQueuePrompt(text: string) {
 
 export function createStoredQueueItem(params: {
   promptText: string;
-  canonicalPromptText?: string;
   protectedControlMutationRule?: string;
   promptSummary?: string;
   createdBy?: string;
@@ -55,9 +53,8 @@ export function createStoredQueueItem(params: {
     createdAt: now,
     updatedAt: now,
     promptText: params.promptText,
-    canonicalPromptText: params.canonicalPromptText,
     protectedControlMutationRule: params.protectedControlMutationRule,
-    promptSummary: params.promptSummary ?? summarizeQueuePrompt(params.canonicalPromptText ?? params.promptText),
+    promptSummary: params.promptSummary ?? summarizeQueuePrompt(params.promptText),
     promptSource: "custom",
     createdBy: params.createdBy,
     sender: params.sender,

@@ -201,7 +201,7 @@ export class SurfaceRuntime {
   }
 
   async buildManagedLoopPrompt(agentId: string, loop: StoredLoop) {
-    if (!loop.canonicalPromptText || !loop.surfaceBinding) {
+    if (!loop.surfaceBinding) {
       return loop.promptText;
     }
 
@@ -218,7 +218,7 @@ export class SurfaceRuntime {
     });
 
     return buildAgentPromptText({
-      text: loop.canonicalPromptText,
+      text: loop.promptText,
       identity,
       config: channelConfig.agentPrompt,
       cliTool: getAgentEntry(this.loadedConfig, agentId)?.cli,
@@ -233,7 +233,7 @@ export class SurfaceRuntime {
   }
 
   async buildManagedQueuePrompt(agentId: string, item: StoredQueueItem) {
-    if (!item.canonicalPromptText || !item.surfaceBinding) {
+    if (!item.surfaceBinding) {
       return item.promptText;
     }
 
@@ -249,7 +249,7 @@ export class SurfaceRuntime {
     });
 
     return buildAgentPromptText({
-      text: item.canonicalPromptText,
+      text: item.promptText,
       identity,
       config: channelConfig.agentPrompt,
       cliTool: getAgentEntry(this.loadedConfig, agentId)?.cli,

@@ -8,7 +8,7 @@ The goal is to define what the product treats as untrusted prompt content, what 
 
 ## Why This Task Exists
 
-`clisbot` accepts user text from Slack and Telegram, can prepend attachment path mentions, can replay canonical prompts for loops, and can pass operator-facing guidance into model prompts.
+`clisbot` accepts user text from Slack and Telegram, can prepend attachment path mentions, can replay persisted loop prompt text, and can pass operator-facing guidance into model prompts.
 
 That makes prompt injection a first-class security concern, not only a model-quality concern.
 

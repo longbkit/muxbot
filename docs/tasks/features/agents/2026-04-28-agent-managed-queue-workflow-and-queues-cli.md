@@ -65,7 +65,7 @@ Implemented on 2026-04-29.
 
 - Added `StoredSessionEntry.queues?: StoredQueueItem[]` in the existing
   session store.
-- Added durable queue item metadata for prompt text, canonical prompt text,
+- Added durable queue item metadata for prompt text,
   sender, surface binding, lifecycle status, and prompt summary.
 - Made `StoredSessionEntry.queues` the canonical queue inventory for `/queue`
   and `clisbot queues`; the runtime hydrates those items into one ordered drain
@@ -211,7 +211,7 @@ Queues and loops should share the same persistence boundary:
 - both live under one `StoredSessionEntry` in `session.storePath`
 - both are scoped by `sessionKey`, not by tmux pane, process id, or transient
   runner state
-- both persist canonical prompt text plus sender and surface metadata, then
+- both persist prompt text plus sender and surface metadata, then
   rebuild the prompt envelope at execution time
 - both use control CLI commands for operator inspection and mutation
 
@@ -356,7 +356,7 @@ self-continuation tool.
 - `auth` owns permission checks for cross-session or operator-created queue
   mutations.
 - `runners` only receive prompts; runners do not know queue persistence details.
-- Queue entries store canonical prompt text, not wrapped envelopes.
+- Queue entries store prompt text as the durable source prompt, not wrapped envelopes.
 - Queue execution rebuilds prompt context at start time using the same
   sender/surface contract as normal, queued, and loop messages.
 - Queue state must not use tmux panes, tmux windows, or transient runner process
@@ -387,7 +387,6 @@ self-continuation tool.
   - `createdAt`
   - `updatedAt`
   - `promptText`
-  - `canonicalPromptText` if prompt wrapping needs to preserve the raw request
   - `protectedControlMutationRule`
   - `promptSummary`
   - `createdBy`

@@ -62,7 +62,6 @@ describe("managed durable queue", () => {
       };
       const item = createStoredQueueItem({
         promptText: "queued prompt",
-        canonicalPromptText: "queued prompt",
         promptSummary: "queued prompt",
         surfaceBinding: {
           platform: "telegram",
@@ -138,7 +137,6 @@ describe("managed durable queue", () => {
       const pending = {
         ...createStoredQueueItem({
           promptText: "next prompt",
-          canonicalPromptText: "next prompt",
           promptSummary: "next prompt",
           surfaceBinding: {
             platform: "telegram",
@@ -176,7 +174,7 @@ describe("managed durable queue", () => {
         surfaceRuntime: {
           notifyManagedQueueStart: async () => undefined,
           buildManagedQueuePrompt: async (_agentId: string, item: StoredQueueItem) =>
-            item.canonicalPromptText,
+            item.promptText,
           notifyManagedQueueSettlement: async () => undefined,
           notifyManagedQueueFailure: async () => undefined,
         } as any,
@@ -212,7 +210,6 @@ describe("managed durable queue", () => {
       await sessionState.setQueuedItem(first, {
         ...createStoredQueueItem({
           promptText: "first prompt",
-          canonicalPromptText: "first prompt",
           promptSummary: "first prompt",
         }),
         id: sharedId,
@@ -220,7 +217,6 @@ describe("managed durable queue", () => {
       await sessionState.setQueuedItem(second, {
         ...createStoredQueueItem({
           promptText: "second prompt",
-          canonicalPromptText: "second prompt",
           promptSummary: "second prompt",
         }),
         id: sharedId,
@@ -248,7 +244,7 @@ describe("managed durable queue", () => {
         surfaceRuntime: {
           notifyManagedQueueStart: async () => undefined,
           buildManagedQueuePrompt: async (_agentId: string, item: StoredQueueItem) =>
-            item.canonicalPromptText ?? item.promptText,
+            item.promptText,
           notifyManagedQueueSettlement: async () => undefined,
           notifyManagedQueueFailure: async () => undefined,
         } as any,
@@ -283,7 +279,6 @@ describe("managed durable queue", () => {
       await sessionState.setQueuedItem(first, {
         ...createStoredQueueItem({
           promptText: "first prompt",
-          canonicalPromptText: "first prompt",
           promptSummary: "first prompt",
         }),
         id: sharedId,
@@ -291,7 +286,6 @@ describe("managed durable queue", () => {
       await sessionState.setQueuedItem(second, {
         ...createStoredQueueItem({
           promptText: "second prompt",
-          canonicalPromptText: "second prompt",
           promptSummary: "second prompt",
         }),
         id: sharedId,
@@ -320,7 +314,7 @@ describe("managed durable queue", () => {
         surfaceRuntime: {
           notifyManagedQueueStart: async () => undefined,
           buildManagedQueuePrompt: async (_agentId: string, item: StoredQueueItem) =>
-            item.canonicalPromptText ?? item.promptText,
+            item.promptText,
           notifyManagedQueueSettlement: async () => undefined,
           notifyManagedQueueFailure: async () => undefined,
         } as any,

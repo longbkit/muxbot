@@ -55,7 +55,6 @@ type LoopControllerDeps = {
 export type CreateIntervalLoopParams = {
   target: AgentSessionTarget;
   promptText: string;
-  canonicalPromptText?: string;
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
@@ -71,7 +70,6 @@ export type CreateIntervalLoopParams = {
 export type CreateCalendarLoopParams = {
   target: AgentSessionTarget;
   promptText: string;
-  canonicalPromptText?: string;
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";

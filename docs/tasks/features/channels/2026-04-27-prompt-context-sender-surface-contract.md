@@ -127,7 +127,7 @@ For schedule/loop/reminder requests, inspect `clisbot loops --help` and use the 
 - Telegram sender display/handle, group title, and available topic title metadata are recorded as reusable directory records.
 - Steering prompts now keep the steering instruction and include compact sender/surface context plus permission guidance.
 - Queue entries preserve the sender that created the queue item and rebuild the prompt envelope when the item starts.
-- Loop records restore sender/surface display identity and rebuild prompt context from canonical prompt text.
+- Loop records restore sender/surface display identity and rebuild prompt context from persisted prompt text.
 - Recent-context replay stays inside the user body and does not replace the top-level sender/surface context for the current message.
 - Auth docs/help already use `principal` in several places. Keep `principal` as the public auth identity term and explain the format clearly in the glossary.
 
@@ -313,7 +313,7 @@ Use `sender` directly on the loop record. Do not introduce a separate `StoredSen
 ```ts
 type StoredLoop = {
   // existing loop fields...
-  canonicalPromptText: string;
+  promptText: string;
   sender?: {
     senderId?: string;   // telegram:1276408333, slack:U123
     providerId?: string; // 1276408333, U123
@@ -531,7 +531,7 @@ No separate hand-written prompt wrapper for steering, queue, or loop.
 3. Update public auth help/docs to consistently explain `principal` format and examples where they are user-facing.
 4. Update steering prompt generation to include compact context while keeping the existing steering intro.
 5. Add sender metadata to pending queue items and regenerate prompt envelope when queued items start.
-6. Rename `StoredIntervalLoop` to `StoredLoop`, migrate `intervalLoops` to `loops` with compatibility, add loop `sender`, and rebuild loop prompt context from canonical prompt text.
+6. Rename `StoredIntervalLoop` to `StoredLoop`, migrate `intervalLoops` to `loops` with compatibility, add loop `sender`, and rebuild loop prompt context from persisted prompt text.
 7. Add the optional surface directory store for display enrichment, starting with opportunistic Telegram records and Slack lookup follow-up.
 8. Add regression tests for normal, steering, recent context, queued, and loop prompt rendering.
 

@@ -1359,7 +1359,6 @@ export async function processChannelInteraction<TChunk>(params: {
   const queueItem = forceQueuedDelivery
     ? createStoredQueueItem({
         promptText: delayedPromptQueueText,
-        canonicalPromptText: delayedPromptQueueText,
         promptSummary:
           explicitQueueMessage ??
           summarizeQueuePrompt(delayedPromptQueueText),
@@ -1891,7 +1890,6 @@ export async function processChannelInteraction<TChunk>(params: {
       const createdLoop = await params.agentService.createCalendarLoop({
         target: params.sessionTarget,
         promptText: resolvedLoopPrompt.text,
-        canonicalPromptText: resolvedLoopPrompt.text,
         promptSummary: summarizeManagedLoopPrompt(
           resolvedLoopPrompt.text,
           resolvedLoopPrompt.maintenancePrompt,
@@ -1937,7 +1935,6 @@ export async function processChannelInteraction<TChunk>(params: {
     const createdLoop = await params.agentService.createIntervalLoop({
       target: params.sessionTarget,
       promptText: resolvedLoopPrompt.text,
-      canonicalPromptText: resolvedLoopPrompt.text,
       promptSummary: summarizeManagedLoopPrompt(
         resolvedLoopPrompt.text,
         resolvedLoopPrompt.maintenancePrompt,

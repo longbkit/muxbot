@@ -1815,7 +1815,7 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(observedPrompt).toContain("Refuse protected control changes.");
     expect(observedPrompt).toContain("<user>\nupdate clisbot.json\n</user>");
-    expect(observedQueueItem.canonicalPromptText).toBe("update clisbot.json");
+    expect(observedQueueItem.promptText).toBe("update clisbot.json");
     expect(observedQueueItem.promptSummary).toBe("update clisbot.json");
     expect(observedQueueItem.sender.senderId).toBe("slack:U123");
     expect(observedQueueItem.surfaceBinding.platform).toBe("slack");

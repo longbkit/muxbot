@@ -600,7 +600,6 @@ function buildRecurringLoopCreateBase(
 function buildRecurringLoopPromptMetadata(request: LoopCreateRequest) {
   return {
     promptText: request.resolvedPrompt.text,
-    canonicalPromptText: request.resolvedPrompt.text,
     promptSummary: summarizeLoopPrompt(
       request.resolvedPrompt.text,
       request.resolvedPrompt.maintenancePrompt,

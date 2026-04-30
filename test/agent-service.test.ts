@@ -2397,8 +2397,7 @@ describe("AgentService session identity", () => {
 
     await service.createIntervalLoop({
       target,
-      promptText: "legacy wrapped prompt with progress instructions",
-      canonicalPromptText: "check deploy",
+      promptText: "check deploy",
       promptSummary: "check deploy",
       promptSource: "custom",
       surfaceBinding: {
@@ -2671,7 +2670,6 @@ describe("AgentService session identity", () => {
       resolveAgentTarget(loadedConfig, target),
       createStoredQueueItem({
         promptText: "ping",
-        canonicalPromptText: "ping",
         promptSummary: "ping",
         createdBy: "U123",
         sender: {

@@ -41,7 +41,6 @@ describe("managed loop controller", () => {
       await sessionState.setIntervalLoop(first, {
         ...createStoredIntervalLoop({
           promptText: "first loop",
-          canonicalPromptText: "first loop",
           promptSummary: "first loop",
           promptSource: "custom",
           intervalMs: 60_000,
@@ -54,7 +53,6 @@ describe("managed loop controller", () => {
       await sessionState.setIntervalLoop(second, {
         ...createStoredIntervalLoop({
           promptText: "second loop",
-          canonicalPromptText: "second loop",
           promptSummary: "second loop",
           promptSource: "custom",
           intervalMs: 60_000,

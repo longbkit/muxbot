@@ -44,7 +44,6 @@ export function buildStoredLoopSender(params: {
 function createStoredLoopBase(params: {
   nextRunAt: number;
   promptText: string;
-  canonicalPromptText?: string;
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
@@ -65,7 +64,6 @@ function createStoredLoopBase(params: {
     updatedAt: now,
     nextRunAt: params.nextRunAt,
     promptText: params.promptText,
-    canonicalPromptText: params.canonicalPromptText,
     protectedControlMutationRule: params.protectedControlMutationRule,
     promptSummary: params.promptSummary,
     promptSource: params.promptSource,
@@ -98,7 +96,6 @@ function deriveLegacyLoopSender(params: {
 
 export function createStoredIntervalLoop(params: {
   promptText: string;
-  canonicalPromptText?: string;
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
@@ -114,7 +111,6 @@ export function createStoredIntervalLoop(params: {
     ...createStoredLoopBase({
       nextRunAt: Date.now(),
       promptText: params.promptText,
-      canonicalPromptText: params.canonicalPromptText,
       protectedControlMutationRule: params.protectedControlMutationRule,
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
@@ -131,7 +127,6 @@ export function createStoredIntervalLoop(params: {
 
 export function createStoredCalendarLoop(params: {
   promptText: string;
-  canonicalPromptText?: string;
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
@@ -165,7 +160,6 @@ export function createStoredCalendarLoop(params: {
     ...createStoredLoopBase({
       nextRunAt,
       promptText: params.promptText,
-      canonicalPromptText: params.canonicalPromptText,
       protectedControlMutationRule: params.protectedControlMutationRule,
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,

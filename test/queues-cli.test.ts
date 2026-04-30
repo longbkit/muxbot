@@ -116,7 +116,7 @@ describe("queues cli", () => {
     ], noQueueNotification);
     const storeDuring = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
     const item = storeDuring["agent:default:telegram:group:-1001:topic:4335"].queues[0];
-    expect(item.canonicalPromptText).toBe("review queue state");
+    expect(item.promptText).toBe("review queue state");
     expect(item.surfaceBinding).toMatchObject({
       platform: "telegram",
       conversationKind: "topic",
