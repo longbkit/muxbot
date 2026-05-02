@@ -902,6 +902,8 @@ export class SessionService {
           sessionName: run.resolved.sessionName,
           prompt: params.prompt,
           promptSubmitDelayMs: run.resolved.runner.promptSubmitDelayMs,
+          trustWorkspace: run.resolved.runner.trustWorkspace,
+          startupDelayMs: run.resolved.runner.startupDelayMs,
           captureLines: run.resolved.stream.captureLines,
           updateIntervalMs: run.resolved.stream.updateIntervalMs,
           idleTimeoutMs: run.resolved.stream.idleTimeoutMs,

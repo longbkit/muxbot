@@ -23,6 +23,7 @@ import {
   getDefaultRuntimeCredentialsPath,
 } from "../shared/paths.ts";
 import { installRuntimeConsoleTimestamps } from "../shared/logging.ts";
+import { sleep } from "../shared/process.ts";
 import { MissingEnvVarError } from "../config/env-substitution.ts";
 import {
   renderOperatorErrorWithHelpLines,
@@ -38,8 +39,12 @@ import {
 type RestartDependencies = {
   stopDetachedRuntime: typeof stopDetachedRuntime;
   getRuntimeStatus: typeof getRuntimeStatus;
+  sleep: typeof sleep;
   warn: (message: string) => void;
 };
+
+const RESTART_STOP_STATUS_RECHECK_TIMEOUT_MS = 2_000;
+const RESTART_STOP_STATUS_RECHECK_INTERVAL_MS = 100;
 
 function getOperatorConfigPath() {
   return expandHomePath(process.env.CLISBOT_CONFIG_PATH || DEFAULT_CONFIG_PATH);
@@ -343,6 +348,7 @@ export async function restart(
   dependencies: RestartDependencies = {
     stopDetachedRuntime,
     getRuntimeStatus,
+    sleep,
     warn: (message) => console.error(message),
   },
 ) {
@@ -353,7 +359,7 @@ export async function restart(
       hard: false,
     });
   } catch (error) {
-    const status = await dependencies.getRuntimeStatus({ configPath });
+    const status = await waitForStoppedRuntimeAfterStopError(configPath, dependencies);
     if (status.running) {
       throw error;
     }
@@ -361,6 +367,20 @@ export async function restart(
     dependencies.warn(
       `warning: clisbot stop reported an error, but status now shows the service is stopped; continuing with start. Stop error: ${message}`,
     );
+  }
+}
+
+async function waitForStoppedRuntimeAfterStopError(
+  configPath: string,
+  dependencies: Pick<RestartDependencies, "getRuntimeStatus" | "sleep">,
+) {
+  const deadline = Date.now() + RESTART_STOP_STATUS_RECHECK_TIMEOUT_MS;
+  while (true) {
+    const status = await dependencies.getRuntimeStatus({ configPath });
+    if (!status.running || Date.now() >= deadline) {
+      return status;
+    }
+    await dependencies.sleep(RESTART_STOP_STATUS_RECHECK_INTERVAL_MS);
   }
 }
 

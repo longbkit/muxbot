@@ -14,7 +14,10 @@ import {
   isActiveTimerStatusLine,
 } from "../../shared/transcript.ts";
 import type { TmuxClient } from "./client.ts";
-import { submitTmuxSessionInput } from "./session-handshake.ts";
+import {
+  acceptTmuxTrustPromptIfPresent,
+  submitTmuxSessionInput,
+} from "./session-handshake.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
 
 const FIRST_OUTPUT_POLL_INTERVAL_MS = 250;
@@ -25,6 +28,8 @@ export type TmuxRunMonitorParams = {
   sessionName: string;
   prompt?: string;
   promptSubmitDelayMs: number;
+  trustWorkspace?: boolean;
+  startupDelayMs?: number;
   captureLines: number;
   updateIntervalMs: number;
   idleTimeoutMs: number;
@@ -89,6 +94,14 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
   let noOutputThresholdLogged = false;
 
   if (params.prompt) {
+    if (params.trustWorkspace) {
+      await acceptTmuxTrustPromptIfPresent({
+        tmux: params.tmux,
+        sessionName: params.sessionName,
+        captureLines: params.captureLines,
+        startupDelayMs: params.startupDelayMs ?? 0,
+      });
+    }
     logLatencyDebug("tmux-submit-start", params.timingContext, {
       sessionName: params.sessionName,
       promptSubmitDelayMs: params.promptSubmitDelayMs,

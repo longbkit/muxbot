@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
 import {
   captureTmuxSessionIdentity,
-  dismissTmuxTrustPromptIfPresent,
+  acceptTmuxTrustPromptIfPresent,
   submitTmuxSessionInput,
   TmuxBootstrapSessionLostError,
   tmuxPaneHasTrustPrompt,
@@ -467,7 +467,7 @@ describe("tmux runner latency behavior", () => {
     });
   });
 
-  test("dismissTmuxTrustPromptIfPresent tolerates transient no-current-target races", async () => {
+  test("acceptTmuxTrustPromptIfPresent tolerates transient no-current-target races", async () => {
     let captureCount = 0;
     let enterCount = 0;
     const fakeTmux = {
@@ -492,7 +492,7 @@ describe("tmux runner latency behavior", () => {
       },
     } as unknown as TmuxClient;
 
-    await dismissTmuxTrustPromptIfPresent({
+    await acceptTmuxTrustPromptIfPresent({
       tmux: fakeTmux,
       sessionName: "test-session",
       captureLines: 80,
@@ -503,7 +503,7 @@ describe("tmux runner latency behavior", () => {
     expect(captureCount).toBeGreaterThanOrEqual(3);
   });
 
-  test("dismissTmuxTrustPromptIfPresent throws when tmux server disappears", async () => {
+  test("acceptTmuxTrustPromptIfPresent throws when tmux server disappears", async () => {
     let captureCount = 0;
     const fakeTmux = {
       async capturePane() {
@@ -525,7 +525,7 @@ describe("tmux runner latency behavior", () => {
     } as unknown as TmuxClient;
 
     await expect(
-      dismissTmuxTrustPromptIfPresent({
+      acceptTmuxTrustPromptIfPresent({
         tmux: fakeTmux,
         sessionName: "test-session",
         captureLines: 80,
@@ -589,7 +589,7 @@ describe("tmux runner latency behavior", () => {
     });
   });
 
-  test("dismissTmuxTrustPromptIfPresent returns when trust text is stale history only", async () => {
+  test("acceptTmuxTrustPromptIfPresent returns when trust text is stale history only", async () => {
     let captureCount = 0;
     const snapshot = [
       "Do you trust the contents of this directory?",
@@ -613,7 +613,7 @@ describe("tmux runner latency behavior", () => {
       },
     } as unknown as TmuxClient;
 
-    await dismissTmuxTrustPromptIfPresent({
+    await acceptTmuxTrustPromptIfPresent({
       tmux: fakeTmux,
       sessionName: "test-session",
       captureLines: 80,
@@ -621,6 +621,86 @@ describe("tmux runner latency behavior", () => {
     });
 
     expect(captureCount).toBe(1);
+  });
+
+  test("monitorTmuxRun accepts a trust prompt that appears after startup but before the first prompt submit", async () => {
+    let snapshot = [
+      "Do you trust the contents of this directory?",
+      "Press enter to continue",
+    ].join("\n");
+    let trusted = false;
+    let submitted = false;
+    let state = {
+      cursorX: 0,
+      cursorY: 0,
+      historySize: 0,
+    };
+
+    const fakeTmux = {
+      async sendLiteral(_sessionName: string, text: string) {
+        if (!trusted) {
+          throw new Error("prompt pasted before trust acceptance");
+        }
+        snapshot = `${snapshot}\n› ${text}`;
+        state = {
+          cursorX: text.length,
+          cursorY: state.cursorY,
+          historySize: state.historySize,
+        };
+      },
+      async sendKey(_sessionName: string, key: string) {
+        if (key !== "Enter") {
+          return;
+        }
+        if (!trusted) {
+          trusted = true;
+          snapshot = "READY\n› ";
+          state = {
+            cursorX: 2,
+            cursorY: 1,
+            historySize: 1,
+          };
+          return;
+        }
+        submitted = true;
+        snapshot = "READY\nPONG";
+        state = {
+          cursorX: 0,
+          cursorY: 2,
+          historySize: 2,
+        };
+      },
+      async getPaneState() {
+        return state;
+      },
+      async capturePane() {
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    const completed = await monitorTmuxRun({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      prompt: "ping",
+      promptSubmitDelayMs: 1,
+      trustWorkspace: true,
+      startupDelayMs: 1,
+      captureLines: 80,
+      updateIntervalMs: 5,
+      idleTimeoutMs: 15,
+      noOutputTimeoutMs: 50,
+      maxRuntimeMs: 10_000,
+      startedAt: Date.now(),
+      initialSnapshot: "READY\n› ",
+      detachedAlready: false,
+      onRunning: async () => undefined,
+      onDetached: async () => undefined,
+      onCompleted: async () => undefined,
+    }).then(() => true);
+
+    expect(completed).toBe(true);
+    expect(trusted).toBe(true);
+    expect(submitted).toBe(true);
   });
 
   test("monitorTmuxRun polls quickly for the first visible output", async () => {

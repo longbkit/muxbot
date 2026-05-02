@@ -10,7 +10,7 @@ import { TmuxClient } from "../runners/tmux/client.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 import {
   captureTmuxSessionIdentity,
-  dismissTmuxTrustPromptIfPresent,
+  acceptTmuxTrustPromptIfPresent,
   submitTmuxSessionInput,
   TmuxBootstrapSessionLostError,
   TmuxPasteUnconfirmedError,
@@ -432,7 +432,7 @@ export class RunnerService {
       try {
         const snapshot = await this.captureSessionSnapshot(resolved);
         if (tmuxPaneHasTrustPrompt(snapshot)) {
-          await this.dismissVisibleTrustPrompt(resolved);
+          await this.acceptVisibleWorkspaceTrustPrompt(resolved);
           continue;
         }
         return;
@@ -528,6 +528,7 @@ export class RunnerService {
       });
       try {
         await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
+        await this.acceptWorkspaceTrustPromptIfPresent(resolved);
         await this.syncStoredSessionIdForResolvedTarget(resolved);
       } catch (error) {
         throw await this.mapSessionError(error, resolved.sessionName, "during startup");
@@ -643,7 +644,7 @@ export class RunnerService {
       runnerCommand: string;
     },
   ) {
-    await this.dismissTrustPrompt(resolved);
+    await this.acceptWorkspaceTrustPromptIfPresent(resolved);
     await this.verifySessionReady(resolved);
 
     // Startup may already know the runner-side sessionId from one of two
@@ -706,16 +707,16 @@ export class RunnerService {
     }
   }
 
-  private async dismissTrustPrompt(resolved: ResolvedAgentTarget) {
+  private async acceptWorkspaceTrustPromptIfPresent(resolved: ResolvedAgentTarget) {
     if (!resolved.runner.trustWorkspace) {
       return;
     }
 
-    await this.dismissVisibleTrustPrompt(resolved);
+    await this.acceptVisibleWorkspaceTrustPrompt(resolved);
   }
 
-  private async dismissVisibleTrustPrompt(resolved: ResolvedAgentTarget) {
-    await dismissTmuxTrustPromptIfPresent({
+  private async acceptVisibleWorkspaceTrustPrompt(resolved: ResolvedAgentTarget) {
+    await acceptTmuxTrustPromptIfPresent({
       tmux: this.tmux,
       sessionName: resolved.sessionName,
       captureLines: resolved.stream.captureLines,
@@ -839,6 +840,7 @@ export class RunnerService {
   private async triggerNewSessionInLiveRunner(resolved: ResolvedAgentTarget) {
     const oldSessionId = (await this.sessionMapping.get(resolved.sessionKey))?.sessionId;
     const command = this.resolveNewSessionCommand(resolved);
+    await this.acceptWorkspaceTrustPromptIfPresent(resolved);
     await this.submitNewSessionCommand(resolved, command);
     const sessionId = await this.captureNewSessionIdentityAfterTrigger(resolved, oldSessionId);
     if (!sessionId) {
@@ -1061,6 +1063,7 @@ export class RunnerService {
       throw new Error(`tmux session "${resolved.sessionName}" does not exist`);
     }
 
+    await this.acceptWorkspaceTrustPromptIfPresent(resolved);
     await submitTmuxSessionInput({
       tmux: this.tmux,
       sessionName: resolved.sessionName,

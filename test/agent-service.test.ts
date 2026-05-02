@@ -1254,6 +1254,92 @@ describe("AgentService session identity", () => {
     }
   });
 
+  test("accepts the workspace trust prompt before submitting a user prompt into a reused tmux session", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:telegram:group:-1001:topic:trust-reuse",
+      };
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            trustWorkspace: true,
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+      await Bun.write(
+        storePath,
+        JSON.stringify(
+          {
+            [target.sessionKey]: {
+              agentId: target.agentId,
+              sessionKey: target.sessionKey,
+              sessionId: RUNNER_GENERATED_ID,
+              workspacePath: join(tempDir, "default"),
+              runnerCommand: "fake-cli",
+              updatedAt: Date.now(),
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      fakeTmux.setTrustPromptOnNextSessionCapture(0);
+      const loaded = await loadConfig(configPath);
+      const resolved = resolveAgentTarget(loaded, target);
+      await fakeTmux.newSession({
+        sessionName: resolved.sessionName,
+        cwd: resolved.workspacePath,
+        command: "fake-cli -C /tmp",
+      });
+
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const run = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+
+      expect(run.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
+      expect(fakeTmux.literalInputs.filter((input) => input.text === "/status")).toHaveLength(0);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test("captures a missing stored session id before reusing an existing tmux session", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 

@@ -142,7 +142,7 @@ describe("RunnerService startup session identity handling", () => {
       warned = String(message ?? "");
     };
     try {
-      (runner as any).dismissTrustPrompt = async () => undefined;
+      (runner as any).acceptWorkspaceTrustPromptIfPresent = async () => undefined;
       (runner as any).verifySessionReady = async () => undefined;
       (runner as any).persistStoredSessionId = async () => {
         throw new Error("disk full");

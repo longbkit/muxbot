@@ -108,9 +108,14 @@ staged for the next release.
 - Changed tmux session naming from plain normalized text to a readable prefix
   plus a stable short `sessionKey` hash, so two logical sessions can no longer
   collapse onto the same exact tmux runner name after normalization.
-- Fixed `clisbot restart` recovery for the case where `stop` reports a timeout
-  but `status` already shows the service is stopped; restart now continues into
-  `start` and prints the stop warning instead of leaving the service down.
+- Fixed `clisbot restart` false failures during update/restart when `stop`
+  times out but the monitor exits moments later; restart now rechecks runtime
+  status for a short bounded window before giving up, and still continues into
+  `start` when the service has actually stopped.
+- Fixed delayed workspace-trust handling for tmux runners so clisbot now
+  accepts an active Codex or Claude or Gemini trust prompt again immediately
+  before sending the first routed prompt or later steering input, instead of
+  pasting input into the trust screen when that prompt appears after startup.
 - Fixed durable queued prompts in message-tool mode so a tool-delivered final
   reply settles the running queue item without waiting for a later pane
   settlement or posting a duplicate final.

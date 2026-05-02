@@ -29,6 +29,7 @@ describe("restart", () => {
         throw new Error("clisbot did not stop within 10000ms");
       },
       getRuntimeStatus: async () => createStatus(false),
+      sleep: async () => undefined,
       warn: (message) => warnings.push(message),
     });
 
@@ -43,10 +44,29 @@ describe("restart", () => {
         throw new Error("clisbot did not stop within 10000ms");
       },
       getRuntimeStatus: async () => createStatus(true),
+      sleep: async () => undefined,
       warn: () => undefined,
     }).catch((caught) => caught);
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain("did not stop");
+  });
+
+  test("continues when stop first still looks running but settles to stopped during bounded recheck", async () => {
+    const warnings: string[] = [];
+    let statusReadCount = 0;
+
+    await restart({
+      stopDetachedRuntime: async () => {
+        throw new Error("clisbot did not stop within 10000ms");
+      },
+      getRuntimeStatus: async () => createStatus((statusReadCount += 1) < 3),
+      sleep: async () => undefined,
+      warn: (message) => warnings.push(message),
+    });
+
+    expect(statusReadCount).toBe(3);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("status now shows the service is stopped");
   });
 });

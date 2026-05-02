@@ -203,9 +203,12 @@ Current behavior:
 - `clisbot status` shows monitor state, current runtime pid when one is active, and `next restart` when the service is in backoff
 - if the runtime worker crashes repeatedly, the monitor retries with bounded backoff instead of requiring an immediate manual restart
 - if the monitor finds a stale worker without a live monitor, `stop` and the next `start` clean that worker up before continuing
-- if an older `clisbot restart` reports a stop timeout during an update, run
-  `clisbot status`; when it shows `running: no`, recover explicitly with
+- if `clisbot restart` ever reports a stop timeout during an update, first run
+  `clisbot status`
+- when status already shows `running: no`, recover explicitly with
   `clisbot start`
+- current beta releases also retry status for a short bounded window before
+  treating that stop-timeout as fatal
 
 Current config points:
 
@@ -239,6 +242,10 @@ Codex trust prompt troubleshooting:
 
 - clisbot already keeps `trustWorkspace: true` by default for Codex
 - fresh Codex runner startup waits for the interactive `›` prompt marker before sending the first routed prompt; if a tmux pane shows the routed prompt above the Codex header, the runner likely accepted startup output too early and should be updated
+- current beta releases also re-check and accept an active trust prompt again
+  immediately before sending the first routed prompt or later steering input,
+  so a delayed trust screen does not silently absorb `/status` or the user
+  prompt after startup
 - the Codex ready pattern and Gemini startup handshake defaults are code-owned defaults; generated and updated configs omit them unless an operator intentionally adds a current-schema override
 - if Codex still shows `Do you trust the contents of this directory?`, also mark the clisbot workspace as trusted in `~/.codex/config.toml`
 

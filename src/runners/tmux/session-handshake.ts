@@ -80,8 +80,20 @@ export async function submitTmuxSessionInput(params: {
   sessionName: string;
   text: string;
   promptSubmitDelayMs: number;
+  trustPrompt?: {
+    captureLines: number;
+    startupDelayMs: number;
+  };
   timingContext?: LatencyDebugContext;
 }) {
+  if (params.trustPrompt) {
+    await acceptTmuxTrustPromptIfPresent({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      captureLines: params.trustPrompt.captureLines,
+      startupDelayMs: params.trustPrompt.startupDelayMs,
+    });
+  }
   const prePasteState = await params.tmux.getPaneState(params.sessionName);
   const captureLines = estimatePasteCaptureLines(params.text);
   const prePasteSnapshot = normalizePaneText(
@@ -155,6 +167,12 @@ export async function captureTmuxSessionIdentity(params: {
   // This function only captures the runner-side sessionId from fresh status
   // output inside the tmux pane. It does not decide whether that id should be
   // persisted as storedSessionId; that boundary stays in RunnerService.
+  await acceptTmuxTrustPromptIfPresent({
+    tmux: params.tmux,
+    sessionName: params.sessionName,
+    captureLines: params.captureLines,
+    startupDelayMs: params.timeoutMs,
+  });
   let statusSubmission = await submitTmuxSessionInput({
     tmux: params.tmux,
     sessionName: params.sessionName,
@@ -181,7 +199,7 @@ export async function captureTmuxSessionIdentity(params: {
       throw error;
     }
     if (tmuxPaneHasTrustPrompt(snapshot)) {
-      await dismissTrustPrompt({
+      await acceptTrustPrompt({
         tmux: params.tmux,
         sessionName: params.sessionName,
         captureLines: params.captureLines,
@@ -258,7 +276,7 @@ function extractSessionIdFromCaptureCandidates(candidates: string[], pattern: st
   return null;
 }
 
-export async function dismissTmuxTrustPromptIfPresent(params: {
+export async function acceptTmuxTrustPromptIfPresent(params: {
   tmux: TmuxClient;
   sessionName: string;
   captureLines: number;
@@ -291,7 +309,7 @@ export async function dismissTmuxTrustPromptIfPresent(params: {
       return;
     }
 
-    await dismissTrustPrompt({
+    await acceptTrustPrompt({
       tmux: params.tmux,
       sessionName: params.sessionName,
       captureLines: params.captureLines,
@@ -338,7 +356,7 @@ export async function waitForTmuxSessionBootstrap(params: {
     if (snapshot) {
       lastSnapshot = snapshot;
       if (params.trustWorkspace && tmuxPaneHasTrustPrompt(snapshot)) {
-        await dismissTrustPrompt({
+        await acceptTrustPrompt({
           tmux: params.tmux,
           sessionName: params.sessionName,
           captureLines: params.captureLines,
@@ -374,7 +392,7 @@ export async function waitForTmuxSessionBootstrap(params: {
   };
 }
 
-async function dismissTrustPrompt(params: {
+async function acceptTrustPrompt(params: {
   tmux: TmuxClient;
   sessionName: string;
   captureLines: number;
