@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { cpSync, existsSync, readdirSync, statSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, readdirSync, rmSync, statSync, symlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ensureDir } from "../shared/paths.ts";
 import type {
@@ -27,8 +27,8 @@ const DEFAULT_TEMPLATE_DIR = join(TEMPLATE_ROOT, "default");
 const CUSTOMIZED_TEMPLATE_DIR = join(TEMPLATE_ROOT, "customized");
 const CUSTOMIZED_DEFAULT_TEMPLATE_DIR = join(CUSTOMIZED_TEMPLATE_DIR, "default");
 
-const TOOL_BOOTSTRAP_FILE: Record<AgentCliToolId, string> = {
-  codex: "AGENTS.md",
+const CANONICAL_BOOTSTRAP_FILE = "AGENTS.md";
+const TOOL_DISCOVERY_FILE: Partial<Record<AgentCliToolId, string>> = {
   claude: "CLAUDE.md",
   gemini: "GEMINI.md",
 };
@@ -45,24 +45,29 @@ type TemplateFile = {
   customized: boolean;
 };
 
-function shouldIncludeTemplateFile(toolId: AgentCliToolId, relativePath: string) {
-  const normalized = relativePath.replaceAll("\\", "/");
-  if (normalized.endsWith("AGENTS.md")) {
-    return toolId === "codex";
+function pathExists(path: string) {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
   }
+}
 
+function shouldIncludeTemplateFile(relativePath: string) {
+  const normalized = relativePath.replaceAll("\\", "/");
   if (normalized.endsWith("CLAUDE.md")) {
-    return toolId === "claude";
+    return false;
   }
 
   if (normalized.endsWith("GEMINI.md")) {
-    return toolId === "gemini";
+    return false;
   }
 
   return true;
 }
 
-function collectTemplateFiles(rootDir: string, toolId: AgentCliToolId, prefix = ""): TemplateFile[] {
+function collectTemplateFiles(rootDir: string, prefix = ""): TemplateFile[] {
   const files: TemplateFile[] = [];
 
   for (const entry of readdirSync(rootDir)) {
@@ -71,11 +76,11 @@ function collectTemplateFiles(rootDir: string, toolId: AgentCliToolId, prefix = 
     const sourceStat = statSync(sourcePath);
 
     if (sourceStat.isDirectory()) {
-      files.push(...collectTemplateFiles(sourcePath, toolId, relativePath));
+      files.push(...collectTemplateFiles(sourcePath, relativePath));
       continue;
     }
 
-    if (!shouldIncludeTemplateFile(toolId, relativePath)) {
+    if (!shouldIncludeTemplateFile(relativePath)) {
       continue;
     }
 
@@ -91,16 +96,25 @@ function collectTemplateFiles(rootDir: string, toolId: AgentCliToolId, prefix = 
 
 function getTemplateFiles(toolId: AgentCliToolId, mode: AgentBootstrapMode) {
   return [
-    ...collectTemplateFiles(DEFAULT_TEMPLATE_DIR, toolId),
-    ...collectTemplateFiles(CUSTOMIZED_DEFAULT_TEMPLATE_DIR, toolId).map((file) => ({
+    ...collectTemplateFiles(DEFAULT_TEMPLATE_DIR),
+    ...collectTemplateFiles(CUSTOMIZED_DEFAULT_TEMPLATE_DIR).map((file) => ({
       ...file,
       customized: true,
     })),
-    ...collectTemplateFiles(join(CUSTOMIZED_TEMPLATE_DIR, mode), toolId).map((file) => ({
+    ...collectTemplateFiles(join(CUSTOMIZED_TEMPLATE_DIR, mode)).map((file) => ({
       ...file,
       customized: true,
     })),
   ];
+}
+
+function getBootstrapManagedPaths(toolId: AgentCliToolId, mode: AgentBootstrapMode) {
+  const paths = new Set(getTemplateFiles(toolId, mode).map((file) => file.relativePath));
+  const discoveryFile = TOOL_DISCOVERY_FILE[toolId];
+  if (discoveryFile) {
+    paths.add(discoveryFile);
+  }
+  return [...paths];
 }
 
 export function getBootstrapTemplateConflicts(
@@ -112,9 +126,31 @@ export function getBootstrapTemplateConflicts(
     return [];
   }
 
-  return getTemplateFiles(toolId, mode)
-    .map((file) => file.relativePath)
-    .filter((relativePath) => existsSync(join(workspacePath, relativePath)));
+  return getBootstrapManagedPaths(toolId, mode)
+    .filter((relativePath) => pathExists(join(workspacePath, relativePath)));
+}
+
+function writeToolDiscoverySymlink(
+  workspacePath: string,
+  toolId: AgentCliToolId,
+  options?: {
+    force?: boolean;
+  },
+) {
+  const discoveryFile = TOOL_DISCOVERY_FILE[toolId];
+  if (!discoveryFile) {
+    return;
+  }
+
+  const destinationPath = join(workspacePath, discoveryFile);
+  if (options?.force) {
+    rmSync(destinationPath, {
+      force: true,
+      recursive: false,
+    });
+  }
+
+  symlinkSync(CANONICAL_BOOTSTRAP_FILE, destinationPath);
 }
 
 export async function applyBootstrapTemplate(
@@ -141,6 +177,9 @@ export async function applyBootstrapTemplate(
       force: force || file.customized,
     });
   }
+  writeToolDiscoverySymlink(workspacePath, toolId, {
+    force,
+  });
 }
 
 export function getBootstrapWorkspaceState(
@@ -157,9 +196,14 @@ export function getBootstrapWorkspaceState(
   }
 
   if (
-    !existsSync(join(workspacePath, TOOL_BOOTSTRAP_FILE[toolId])) ||
+    !existsSync(join(workspacePath, CANONICAL_BOOTSTRAP_FILE)) ||
     !existsSync(join(workspacePath, "IDENTITY.md"))
   ) {
+    return "missing";
+  }
+
+  const discoveryFile = TOOL_DISCOVERY_FILE[toolId];
+  if (discoveryFile && !existsSync(join(workspacePath, discoveryFile))) {
     return "missing";
   }
 

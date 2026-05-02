@@ -14,5 +14,6 @@ Use this folder for cross-cutting work that keeps implementation aligned with th
 ## Workflow
 
 - track area state in `docs/features/feature-tables.md`
+- keep recurring audit evidence in `docs/audits/architecture-conformance/`
 - track executable work in `docs/tasks/`
 - keep this folder focused on overview, risks, constraints, and links

@@ -11,7 +11,10 @@ export function createSessionId() {
   return randomUUID();
 }
 
-export function extractSessionId(snapshot: string, pattern: string) {
+export function parseRunnerSessionId(snapshot: string, pattern: string) {
+  // Parsing is intentionally boundary-local: given candidate text plus a
+  // runner-specific pattern, return the last matching runner-side sessionId.
+  // Persistence decisions belong in the agents layer, not here.
   const regex = new RegExp(pattern, "ig");
   let lastMatch: RegExpExecArray | null = null;
 

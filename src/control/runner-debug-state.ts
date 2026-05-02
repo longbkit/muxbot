@@ -1,4 +1,5 @@
 import { resolveAgentTarget } from "../agents/resolved-target.ts";
+import { parseRunnerSessionId } from "../agents/session-identity.ts";
 import { SessionStore, type StoredSessionEntry } from "../agents/session-store.ts";
 import { type LoadedConfig, resolveSessionStorePath } from "../config/load-config.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
@@ -13,6 +14,13 @@ export type RunnerSessionSummary = {
   sessionName: string;
   live: boolean;
   entry?: StoredSessionEntry;
+  identity?: RunnerSessionIdentity;
+};
+
+export type RunnerSessionIdentity = {
+  sessionId?: string;
+  sessionIdPersistence?: "persisted" | "not-persisted-yet";
+  storedSessionId?: string;
 };
 
 export function buildRunnerSessionMetadata(
@@ -44,6 +52,41 @@ export function sortRunnerSessionMetadataNewestFirst(
   });
 }
 
+export function deriveRunnerSessionIdentity(params: {
+  entry?: StoredSessionEntry;
+  liveSessionId?: string;
+}) {
+  const storedSessionId = params.entry?.sessionId?.trim() || undefined;
+  const liveSessionId = params.liveSessionId?.trim() || undefined;
+  const sessionId = liveSessionId ?? storedSessionId;
+  return {
+    sessionId,
+    sessionIdPersistence:
+      sessionId && sessionId === storedSessionId ? "persisted" : sessionId ? "not-persisted-yet" : undefined,
+    storedSessionId,
+  } satisfies RunnerSessionIdentity;
+}
+
+export function parseRunnerSessionIdFromSnapshot(
+  loadedConfig: LoadedConfig,
+  entry: StoredSessionEntry | undefined,
+  snapshot: string,
+) {
+  if (!entry) {
+    return undefined;
+  }
+
+  const resolved = resolveAgentTarget(loadedConfig, {
+    agentId: entry.agentId,
+    sessionKey: entry.sessionKey,
+  });
+  const pattern = resolved.runner.sessionId.capture.pattern?.trim();
+  if (!pattern) {
+    return undefined;
+  }
+  return parseRunnerSessionId(snapshot, pattern) ?? undefined;
+}
+
 export async function listRunnerSessions(
   loadedConfig: LoadedConfig,
 ): Promise<RunnerSessionSummary[]> {
@@ -53,7 +96,7 @@ export async function listRunnerSessions(
   const tmux = new TmuxClient(loadedConfig.raw.tmux.socketPath);
   const liveSessionNames = new Set(await tmux.listSessions());
 
-  return [...liveSessionNames]
+  const orderedSessionNames = [...liveSessionNames]
     .sort((left, right) => {
       const leftEntry = sessionByName.get(left);
       const rightEntry = sessionByName.get(right);
@@ -68,11 +111,18 @@ export async function listRunnerSessions(
         return rightUpdatedAt - leftUpdatedAt;
       }
       return left.localeCompare(right);
-    })
-    .map((sessionName, index) => ({
+    });
+
+  return orderedSessionNames.map((sessionName, index) => {
+    const entry = sessionByName.get(sessionName);
+    return {
       index: index + 1,
       sessionName,
       live: true,
-      entry: sessionByName.get(sessionName),
-    }));
+      entry,
+      identity: deriveRunnerSessionIdentity({
+        entry,
+      }),
+    };
+  });
 }

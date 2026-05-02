@@ -48,7 +48,7 @@ For active-run observers:
 
 ## Where This Matters
 
-- `docs/architecture/runtime-architecture.md`
+- `docs/architecture/architecture.md`
 - `docs/architecture/surface-architecture.md`
 - `docs/architecture/transcript-presentation-and-streaming.md`
 - `src/agents/session-service.ts`

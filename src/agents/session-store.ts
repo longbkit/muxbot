@@ -72,35 +72,6 @@ export class SessionStore {
     });
   }
 
-  async touch(params: {
-    sessionKey: string;
-    agentId: string;
-    sessionId?: string | null;
-    workspacePath: string;
-    runnerCommand: string;
-  }) {
-    const existing = await this.get(params.sessionKey);
-    const sessionId = params.sessionId?.trim() || existing?.sessionId;
-    if (!sessionId) {
-      return null;
-    }
-
-    return this.put({
-      agentId: params.agentId,
-      sessionKey: params.sessionKey,
-      sessionId,
-      workspacePath: params.workspacePath,
-      runnerCommand: params.runnerCommand,
-      lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
-      followUp: existing?.followUp,
-      runtime: existing?.runtime,
-      loops: existing?.loops ?? existing?.intervalLoops,
-      queues: existing?.queues,
-      recentConversation: existing?.recentConversation,
-      updatedAt: Date.now(),
-    });
-  }
-
   private async withPathLock<T>(work: () => Promise<T>): Promise<T> {
     const previous = SessionStore.pathLocks.get(this.storePath) ?? Promise.resolve();
     let release!: () => void;

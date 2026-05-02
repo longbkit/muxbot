@@ -22,11 +22,47 @@ The current runtime naming should stay explicit:
 - `SessionService` is the session-owned runtime owner inside `agents`
 - `RunnerService` is the backend-owned runtime owner behind that session owner
 
+Short version:
+
+- `SessionService` decides which `sessionId` is active for one `sessionKey`
+- `RunnerService` uses that decision to start, capture, or resume the backend
+- `src/runners/tmux/*` contains lower-level tmux mechanics, not continuity decisions
+
 Ownership intent:
 
 - `AgentService` coordinates entrypoints and shared dependencies, but should not grow into a second orchestration owner
-- `SessionService` owns session continuity, admission, active-run truth, persisted run recovery, and observer-facing execution state
-- `RunnerService` owns backend readiness, backend session bootstrap or resume, input submission, snapshot capture, normalized streaming, and backend-specific recovery
+- `SessionService` owns session continuity, including the current `sessionKey -> active sessionId` mapping, admission, active-run truth, persisted run recovery, observer-facing execution state, and explicit session rebinding semantics
+- `RunnerService` owns backend readiness, backend session bootstrap or
+  resume, input submission, snapshot capture, normalized streaming,
+  backend-specific recovery, and the backend-specific logic needed to:
+  - launch with a supplied `sessionId`
+  - capture a tool-created `sessionId`
+  - resume with a stored `sessionId`
+
+Current implementation gap:
+
+- the target ownership split above is the architecture contract
+- current code is not fully converged yet
+- `src/agents/runner-service.ts` still mixes backend execution work with some
+  `SessionService`-owned responsibilities such as:
+  - minting explicit `sessionId` values for explicit-id launch paths
+  - reading current stored `sessionId` continuity directly from session state
+  - writing or clearing stored `sessionId` continuity through generic session-entry helpers
+  - deciding some continuity changes directly during retry, restart, and
+    `/new` flows
+- that means `RunnerService` is currently a mixed-owner implementation, even
+  though the target architecture keeps continuity and `sessionId` source
+  ownership in `SessionService`
+- future cleanup should move active-mapping changes and explicit-id creation
+  behind a `SessionService`-owned API while keeping tmux or backend launch or
+  capture or resume mechanics runner-owned
+
+In plain language:
+
+- `RunnerService` currently does too much
+- the architecture does not need to change
+- the code needs one more cleanup pass so `SessionService` chooses continuity
+  and runner code only executes backend mechanics
 
 The old names `ActiveRunManager` and `RunnerSessionService` are no longer part of the architecture vocabulary.
 
@@ -70,13 +106,16 @@ They own:
 
 Every runner must normalize its behavior into one internal contract for the agents layer.
 
-Runners also own backend-specific session-id mechanics:
+Runners provide the backend-specific `sessionId` mechanics used by session continuity:
 
-- create a tool-native session id when the backend requires runner-side creation
-- capture a tool-native session id from backend output when the backend creates it
-- resume or relaunch using that stored session id when supported
+- accept an explicit session id from the session owner when the backend supports caller-supplied ids
+- capture a tool-native session id from backend output when the native tool creates it
+- resume or relaunch using a stored session id when supported
+- fail truthfully when a backend cannot honor the requested session-id behavior
 
-In the current codebase, `RunnerService` is the concrete owner of that backend-specific runtime boundary.
+In the current codebase, `RunnerService` is the concrete owner of those
+backend-specific operations, while `SessionService` remains the owner of the
+stored active mapping.
 
 ## Standard Runner Contract
 
@@ -142,6 +181,33 @@ Current persisted session continuity metadata is intentionally small:
 - `queues`
 - `recentConversation`
 - `updatedAt`
+
+Current continuity invariants:
+
+- one `sessionKey` may be reused by more than one chat surface when routing policy intentionally collapses them into one conversation
+- at any moment, one `sessionKey` maps to one active `sessionId`
+- over time, that same `sessionKey` may rotate to a different `sessionId`
+  - examples:
+    - `/new`
+    - explicit resume or rebind
+    - backend reset or expiry
+- the reverse invariant from `sessionId` back to `sessionKey` is not yet a stable public contract
+
+Diagnostic read rule:
+
+- when a live run already knows the current `sessionId` in runtime memory,
+  operator and chat diagnostics should prefer that runtime value over older
+  persisted metadata
+- those surfaces should still show whether the displayed value is already
+  persisted
+- repeated reads must not turn into continuous persistence writes when the
+  value is unchanged
+
+Persistence behavior should therefore be:
+
+- write early when a new `sessionId` first becomes known
+- retry or defer when the write path is temporarily unavailable
+- avoid re-writing the same unchanged `sessionId` on every poll or status read
 
 Do not persist transient runner artifacts as canonical state in the agents layer without a documented reason.
 

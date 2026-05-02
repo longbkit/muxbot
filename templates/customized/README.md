@@ -12,10 +12,11 @@ Use them when the default single-human template is not the right fit.
 
 ## File Naming
 
-- For Claude, use `CLAUDE.md`
-- For other agentic CLI tools, use `AGENTS.md`
-
-The content is mirrored so you can copy the filename that matches the CLI you are running.
+- `AGENTS.md` is the one canonical workspace instruction file.
+- Claude and Gemini compatibility files should be symlinks:
+  - `CLAUDE.md -> AGENTS.md`
+  - `GEMINI.md -> AGENTS.md`
+- Keep one source of truth instead of maintaining mirrored copies.
 
 ## Main Difference
 

@@ -11,6 +11,7 @@ This folder should answer, quickly:
 - where the task doc lives
 - what subtasks matter
 - what related product or architecture docs should be read first
+- which feature, research note, or audit produced the work
 
 `backlog.md` is the canonical index.
 
@@ -45,6 +46,10 @@ docs/tasks/
 - `backlog.md` is the source of truth for task status and priority.
 - Every task must have one main entry doc.
 - Main entry doc filenames must use `yyyy-MM-dd-<taskname>.md`.
+- Tasks may originate from `docs/features/`, `docs/research/`, or `docs/audits/`.
+- Prefer shallow task specs.
+- Keep task docs execution-oriented and strong on implementation detail.
+- Keep the long-lived canonical `what` and `why` current in `docs/features/` instead of repeating them deeply inside task docs.
 - Small tasks should be one file.
 - Large tasks may use a folder, but the entry doc inside that folder must still use `yyyy-MM-dd-<taskname>.md`.
 - Keep docs under `500` lines when possible.

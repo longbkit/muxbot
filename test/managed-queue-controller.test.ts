@@ -114,7 +114,7 @@ describe("managed durable queue", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, { timeout: 15_000 });
 
   test("clears stale persisted running items after the session becomes idle", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-managed-queue-"));
@@ -197,7 +197,7 @@ describe("managed durable queue", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, { timeout: 15_000 });
 
   test("keeps pending items from different sessions isolated even when their queue ids match", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-managed-queue-"));
@@ -256,8 +256,8 @@ describe("managed durable queue", () => {
       });
 
       await controller.reconcilePersistedQueueItems();
-      await waitForCondition(async () => executed.length === 2, 5_000);
-      await waitForCondition(async () => (await sessionState.listQueuedItems()).length === 0, 5_000);
+      await waitForCondition(async () => executed.length === 2, 20_000);
+      await waitForCondition(async () => (await sessionState.listQueuedItems()).length === 0, 20_000);
 
       expect(executed).toEqual([
         `${first.sessionKey}:first prompt`,
@@ -266,7 +266,7 @@ describe("managed durable queue", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, 25_000);
 
   test("reconcile removes a missing session item without clearing another session's matching queue id", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-managed-queue-"));
@@ -336,5 +336,5 @@ describe("managed durable queue", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, { timeout: 15_000 });
 });

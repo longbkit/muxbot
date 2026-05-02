@@ -74,8 +74,8 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
     const config = createConfig();
     config.bots.telegram.default.groups["-1001"] = {
       enabled: true,
-      requireMention: true,
-      allowBots: false,
+      requireMention: false,
+      allowBots: true,
       allowUsers: [],
       blockUsers: [],
       streaming: "latest",
@@ -91,6 +91,8 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
     expect(config.bots.telegram.default.groups["-1001"]?.topics["4"]?.responseMode).toBe(
       "capture-pane",
     );
+    expect(config.bots.telegram.default.groups["-1001"]?.topics["4"]?.requireMention).toBe(false);
+    expect(config.bots.telegram.default.groups["-1001"]?.topics["4"]?.allowBots).toBe(true);
     expect(
       config.bots.telegram.default.groups["-1001"]?.topics["4"]?.additionalMessageMode,
     ).toBe("steer");

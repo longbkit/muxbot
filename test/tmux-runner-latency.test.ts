@@ -124,6 +124,78 @@ describe("tmux runner latency behavior", () => {
     ).resolves.toBe(currentId);
   });
 
+  test("captureTmuxSessionIdentity falls back to the full redraw when diff candidates collapse to the echoed status command", async () => {
+    const currentId = "019de81c-5978-79b3-8871-6173900a1107";
+    let snapshot = [
+      "previous assistant output",
+      "• PONG",
+      "",
+      "/status",
+      "╭──────────────────────────────────────────────────────────────────────────────╮",
+      "│  Session:              019de81c-5978-79b3-8871-6173900a1107                  │",
+      "╰──────────────────────────────────────────────────────────────────────────────╯",
+      "",
+      "› ",
+    ].join("\n");
+    let state = {
+      cursorX: 0,
+      cursorY: 8,
+      historySize: 8,
+    };
+
+    const fakeTmux = {
+      async sendLiteral(_sessionName: string, text: string) {
+        snapshot = `${snapshot}${text}`;
+        state = {
+          cursorX: text.length,
+          cursorY: state.cursorY,
+          historySize: state.historySize,
+        };
+      },
+      async sendKey(_sessionName: string, key: string) {
+        if (key !== "Enter") {
+          return;
+        }
+        snapshot = [
+          "╭──────────────────────────────────────────────────────────────────────────────╮",
+          "│  Session:              019de81c-5978-79b3-8871-6173900a1107                  │",
+          "╰──────────────────────────────────────────────────────────────────────────────╯",
+          "",
+          "/status",
+          "",
+          "› /status",
+          "",
+          "  /status      show current session configuration and token usage",
+        ].join("\n");
+        state = {
+          cursorX: 0,
+          cursorY: 8,
+          historySize: state.historySize + 1,
+        };
+      },
+      async getPaneState() {
+        return state;
+      },
+      async capturePane() {
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      captureTmuxSessionIdentity({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        promptSubmitDelayMs: 1,
+        captureLines: 120,
+        statusCommand: "/status",
+        pattern:
+          "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
+        timeoutMs: 100,
+        pollIntervalMs: 1,
+      }),
+    ).resolves.toBe(currentId);
+  });
+
   test("captureTmuxSessionIdentity falls back when raw append has no session id", async () => {
     const currentId = "33333333-3333-3333-3333-333333333333";
     let snapshot = [

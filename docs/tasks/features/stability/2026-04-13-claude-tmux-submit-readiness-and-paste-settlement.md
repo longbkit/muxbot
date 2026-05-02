@@ -93,4 +93,4 @@ The traced failures are runner-level:
 - [tmux Submit Truthfulness And Telegram Send Reliability](2026-04-12-tmux-submit-truthfulness-and-telegram-send-reliability.md)
 - [tmux Submit State Model And Input Path Separation](2026-04-13-tmux-submit-state-model-and-input-path-separation.md)
 - [Stability](../../../features/non-functionals/stability/README.md)
-- [Runtime Architecture](../../../architecture/runtime-architecture.md)
+- [Runtime Architecture](../../../architecture/architecture.md)

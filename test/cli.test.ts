@@ -213,6 +213,10 @@ describe("renderCliHelp", () => {
     expect(help).toContain("Bot types:");
     expect(help).toContain("personal  One human gets one dedicated long-lived assistant workspace and session path");
     expect(help).toContain("team      One shared channel or group routes into one shared assistant workspace and session path");
+    expect(help).toContain("Bootstrap files:");
+    expect(help).toContain("`--bot-type` seeds workspace guidance files for a fresh agent. It is optional when you already have a workspace.");
+    expect(help).toContain("Canonical workspace instructions live in `AGENTS.md`.");
+    expect(help).toContain("`CLAUDE.md` or `GEMINI.md` as symlinks to `AGENTS.md`");
     expect(help).toContain("SLACK_APP_TOKEN");
     expect(help).toContain("SLACK_BOT_TOKEN");
     expect(help).toContain("TELEGRAM_BOT_TOKEN");

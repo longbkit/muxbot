@@ -12,6 +12,8 @@ import {
   type LiveSessionRuntimeInfo,
   type ConversationReplyKind,
 } from "./session-state.ts";
+import type { StoredSessionEntry } from "./session-store.ts";
+import { SessionMapping } from "./session-mapping.ts";
 import type { SessionRuntimeInfo } from "./session-runtime.ts";
 import {
   type LoadedConfig,
@@ -69,6 +71,8 @@ const QUEUE_RECONCILE_INTERVAL_MS = 1_000;
 
 export type SessionDiagnostics = {
   sessionName?: string;
+  sessionId?: string;
+  sessionIdPersistence?: "persisted" | "not-persisted-yet";
   storedSessionId?: string;
   resumeCommand?: string;
 };
@@ -77,6 +81,7 @@ export class AgentService {
   private tmuxClient: TmuxClient;
   private readonly queue = new AgentJobQueue();
   private readonly sessionState: AgentSessionState;
+  private readonly sessionMapping: SessionMapping;
   private runnerSessions: RunnerService;
   private activeRuns: SessionService;
   private managedLoops: ManagedLoopController;
@@ -94,11 +99,13 @@ export class AgentService {
     this.tmuxClient = deps.tmux ?? new TmuxClient(this.loadedConfig.raw.tmux.socketPath);
     const sessionStore = deps.sessionStore ?? new SessionStore(resolveSessionStorePath(this.loadedConfig));
     this.sessionState = new AgentSessionState(sessionStore);
+    this.sessionMapping = new SessionMapping(this.sessionState);
     this.runnerSessions = new RunnerService(
       this.loadedConfig,
       this.tmuxClient,
       this.sessionState,
       (target) => this.resolveTarget(target),
+      this.sessionMapping,
     );
     this.activeRuns = this.createSessionService();
     this.surfaceRuntime = new SurfaceRuntime(this.loadedConfig);
@@ -117,6 +124,7 @@ export class AgentService {
       this.tmuxClient,
       this.sessionState,
       (target) => this.resolveTarget(target),
+      this.sessionMapping,
     );
     this.activeRuns = this.createSessionService();
     this.managedQueues = this.createManagedQueueController();
@@ -251,14 +259,27 @@ export class AgentService {
     return this.sessionState.getSessionRuntime(target);
   }
 
+  async getSessionEntry(target: AgentSessionTarget): Promise<StoredSessionEntry | null> {
+    return this.sessionState.getEntry(target.sessionKey);
+  }
+
+  async listSessionEntries(): Promise<StoredSessionEntry[]> {
+    return this.sessionState.listEntries();
+  }
+
   async getSessionDiagnostics(target: AgentSessionTarget): Promise<SessionDiagnostics> {
     const resolved = this.resolveTarget(target);
     const entry = await this.sessionState.getEntry(target.sessionKey);
+    const liveSessionId = this.activeRuns.getLiveSessionId(target);
     const storedSessionId = entry?.sessionId?.trim() || undefined;
+    const sessionId = liveSessionId ?? storedSessionId;
     return {
       sessionName: resolved.sessionName,
+      sessionId,
+      sessionIdPersistence:
+        sessionId && sessionId === storedSessionId ? "persisted" : sessionId ? "not-persisted-yet" : undefined,
       storedSessionId,
-      resumeCommand: buildResumeCommandPreview(resolved, storedSessionId),
+      resumeCommand: buildResumeCommandPreview(resolved, sessionId),
     };
   }
 

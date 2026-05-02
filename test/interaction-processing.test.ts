@@ -645,6 +645,8 @@ describe("processChannelInteraction sensitive command gating", () => {
       agentService: {
         getSessionDiagnostics: async () => ({
           sessionName: "agent-default-slack-channel-c123-thread-1-2",
+          sessionId: "11111111-1111-1111-1111-111111111111",
+          sessionIdPersistence: "persisted",
           storedSessionId: "11111111-1111-1111-1111-111111111111",
           resumeCommand:
             "codex resume 11111111-1111-1111-1111-111111111111 --dangerously-bypass-approvals-and-sandbox --no-alt-screen",
@@ -674,7 +676,8 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("threadTs: `1.2`");
     expect(posted[0]).toContain("sessionName: `agent-default-slack-channel-c123-thread-1-2`");
     expect(posted[0]).not.toContain("sessionKey:");
-    expect(posted[0]).toContain("storedSessionId: `11111111-1111-1111-1111-111111111111`");
+    expect(posted[0]).toContain("sessionId: `11111111-1111-1111-1111-111111111111`");
+    expect(posted[0]).toContain("sessionIdPersistence: `persisted`");
     expect(posted[0]).toContain(
       "resumeCommand: `codex resume 11111111-1111-1111-1111-111111111111 --dangerously-bypass-approvals-and-sandbox --no-alt-screen`",
     );
@@ -695,6 +698,8 @@ describe("processChannelInteraction sensitive command gating", () => {
       agentService: {
         getSessionDiagnostics: async () => ({
           sessionName: "agent-default-telegram-group-1001-topic-4",
+          sessionId: "22222222-2222-2222-2222-222222222222",
+          sessionIdPersistence: "persisted",
           storedSessionId: "22222222-2222-2222-2222-222222222222",
           resumeCommand:
             "codex resume 22222222-2222-2222-2222-222222222222 --dangerously-bypass-approvals-and-sandbox --no-alt-screen",
@@ -730,7 +735,8 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("topicId: `4`");
     expect(posted[0]).toContain("sessionName: `agent-default-telegram-group-1001-topic-4`");
     expect(posted[0]).not.toContain("sessionKey:");
-    expect(posted[0]).toContain("storedSessionId: `22222222-2222-2222-2222-222222222222`");
+    expect(posted[0]).toContain("sessionId: `22222222-2222-2222-2222-222222222222`");
+    expect(posted[0]).toContain("sessionIdPersistence: `persisted`");
     expect(posted[0]).toContain(
       "resumeCommand: `codex resume 22222222-2222-2222-2222-222222222222 --dangerously-bypass-approvals-and-sandbox --no-alt-screen`",
     );
@@ -750,6 +756,8 @@ describe("processChannelInteraction sensitive command gating", () => {
       agentService: {
         getSessionDiagnostics: async () => ({
           sessionName: "agent-default-slack-channel-c123-thread-1-2",
+          sessionId: "33333333-3333-3333-3333-333333333333",
+          sessionIdPersistence: "persisted",
           storedSessionId: "33333333-3333-3333-3333-333333333333",
           resumeCommand:
             "codex resume 33333333-3333-3333-3333-333333333333 --dangerously-bypass-approvals-and-sandbox --no-alt-screen",
@@ -772,9 +780,36 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("sessionName: `agent-default-slack-channel-c123-thread-1-2`");
     expect(posted[0]).not.toContain("sessionKey:");
-    expect(posted[0]).toContain("storedSessionId: `33333333-3333-3333-3333-333333333333`");
-    expect(posted[0]).not.toContain("runtimeSessionId:");
-    expect(posted[0]).not.toContain("sessionIdSync:");
+    expect(posted[0]).toContain("sessionId: `33333333-3333-3333-3333-333333333333`");
+    expect(posted[0]).toContain("sessionIdPersistence: `persisted`");
+  });
+
+  test("renders whoami with unstored session id wording when persistence is empty", async () => {
+    const posted: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        getSessionDiagnostics: async () => ({
+          sessionName: "agent-default-slack-channel-c123-thread-1-2",
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/whoami",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("sessionId: `(not available yet)`");
+    expect(posted[0]).toContain("sessionIdPersistence: `not stored yet`");
   });
 
   test("renders status with resolved auth details for routed conversations", async () => {
@@ -789,6 +824,8 @@ describe("processChannelInteraction sensitive command gating", () => {
         }),
         getSessionDiagnostics: async () => ({
           sessionName: "agent-default-slack-channel-c123-thread-1-2",
+          sessionId: "33333333-3333-3333-3333-333333333333",
+          sessionIdPersistence: "persisted",
           storedSessionId: "33333333-3333-3333-3333-333333333333",
           resumeCommand:
             "codex resume 33333333-3333-3333-3333-333333333333 --dangerously-bypass-approvals-and-sandbox --no-alt-screen",
@@ -824,7 +861,8 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("Status");
     expect(posted[0]).toContain("sessionName: `agent-default-slack-channel-c123-thread-1-2`");
     expect(posted[0]).not.toContain("sessionKey:");
-    expect(posted[0]).toContain("storedSessionId: `33333333-3333-3333-3333-333333333333`");
+    expect(posted[0]).toContain("sessionId: `33333333-3333-3333-3333-333333333333`");
+    expect(posted[0]).toContain("sessionIdPersistence: `persisted`");
     expect(posted[0]).toContain(
       "resumeCommand: `codex resume 33333333-3333-3333-3333-333333333333 --dangerously-bypass-approvals-and-sandbox --no-alt-screen`",
     );
@@ -847,6 +885,42 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("/attach`, `/detach`, `/watch every <duration>`");
     expect(posted[0]).toContain("/transcript` enabled on this route (`verbose: minimal`)");
     expect(posted[0]).toContain("/bash` requires `shellExecute`");
+  });
+
+  test("renders status with unstored session id wording when persistence is empty", async () => {
+    const posted: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        getConversationFollowUpState: async () => ({}),
+        getSessionDiagnostics: async () => ({
+          sessionName: "agent-default-slack-channel-c123-thread-1-2",
+        }),
+        getSessionRuntime: async () => ({
+          state: "idle",
+        }),
+        resolveEffectiveTimezone: () => ({
+          timezone: "UTC",
+          source: "agent",
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/status",
+      route: createRoute(),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("sessionId: `(not available yet)`");
+    expect(posted[0]).toContain("sessionIdPersistence: `not stored yet`");
   });
 
   test("renders start with principal details for routed conversations", async () => {
@@ -1322,7 +1396,8 @@ describe("processChannelInteraction sensitive command gating", () => {
                 ...template.bots.telegram.default,
                 groups: {
                   "-1001": {
-                    requireMention: true,
+                    requireMention: false,
+                    allowBots: true,
                     streaming: "all",
                     topics: {},
                   },
@@ -1381,7 +1456,8 @@ describe("processChannelInteraction sensitive command gating", () => {
                 ...template.bots.telegram.default,
                 groups: {
                   "-1001": {
-                    requireMention: true,
+                    requireMention: false,
+                    allowBots: true,
                     streaming: "all",
                     topics: {},
                   },
@@ -1414,6 +1490,8 @@ describe("processChannelInteraction sensitive command gating", () => {
 
       const updated = JSON.parse(readFileSync(configPath, "utf8"));
       expect(updated.bots.telegram.default.groups["-1001"].topics["4"].streaming).toBe("off");
+      expect(updated.bots.telegram.default.groups["-1001"].topics["4"].requireMention).toBe(false);
+      expect(updated.bots.telegram.default.groups["-1001"].topics["4"].allowBots).toBe(true);
     } finally {
       process.env.CLISBOT_CONFIG_PATH = originalConfigPath;
       rmSync(configDir, { recursive: true, force: true });
@@ -3418,7 +3496,7 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(rotatedTarget).toBe(createTarget().sessionKey);
     expect(posted[0]).toContain("Triggered a new runner conversation");
-    expect(posted[0]).toContain("storedSessionId: `11111111-1111-1111-1111-111111111111`");
+    expect(posted[0]).toContain("sessionId: `11111111-1111-1111-1111-111111111111`");
     expect(posted[0]).toContain("triggerCommand: `/new`");
   });
 
@@ -3451,6 +3529,46 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(rotated).toBe(false);
     expect(posted[0]).toContain("This session is busy.");
+  });
+
+  test("new reports runner rotation failures back to the chat surface", async () => {
+    const posted: string[] = [];
+    let replyCount = 0;
+
+    await processChannelInteraction({
+      agentService: {
+        isSessionBusy: async () => false,
+        triggerNewSession: async () => {
+          throw new Error(
+            "/new completed and clisbot captured session id 22222222-2222-2222-2222-222222222222, but could not persist it. The durable session mapping was left unchanged. Persist error: disk full",
+          );
+        },
+        recordConversationReply: async () => {
+          replyCount += 1;
+        },
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/new",
+      route: createRoute({
+        responseMode: "message-tool",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(replyCount).toBe(1);
+    expect(posted).toEqual([
+      [
+        "Could not finish opening a new runner conversation.",
+        "/new completed and clisbot captured session id 22222222-2222-2222-2222-222222222222, but could not persist it. The durable session mapping was left unchanged. Persist error: disk full",
+      ].join("\n"),
+    ]);
   });
 
   test("loop times mode queues all iterations immediately and wraps prompts", async () => {

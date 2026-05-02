@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ActivityStore } from "../src/control/activity-store.ts";
@@ -391,7 +399,8 @@ describe("runtime summaries", () => {
     await writeEditableConfig(configPath, config);
 
     mkdirSync(join(baseWorkspace, "claude-pending"), { recursive: true });
-    writeFileSync(join(baseWorkspace, "claude-pending", "CLAUDE.md"), "claude\n");
+    writeFileSync(join(baseWorkspace, "claude-pending", "AGENTS.md"), "agents\n");
+    symlinkSync("AGENTS.md", join(baseWorkspace, "claude-pending", "CLAUDE.md"));
     writeFileSync(join(baseWorkspace, "claude-pending", "IDENTITY.md"), "identity\n");
     writeFileSync(join(baseWorkspace, "claude-pending", "BOOTSTRAP.md"), "bootstrap\n");
 
@@ -402,7 +411,8 @@ describe("runtime summaries", () => {
     unlinkSync(join(baseWorkspace, "codex-ready", "BOOTSTRAP.md"));
 
     mkdirSync(join(baseWorkspace, "gemini-ready"), { recursive: true });
-    writeFileSync(join(baseWorkspace, "gemini-ready", "GEMINI.md"), "gemini\n");
+    writeFileSync(join(baseWorkspace, "gemini-ready", "AGENTS.md"), "agents\n");
+    symlinkSync("AGENTS.md", join(baseWorkspace, "gemini-ready", "GEMINI.md"));
     writeFileSync(join(baseWorkspace, "gemini-ready", "IDENTITY.md"), "identity\n");
 
     const summary = await getRuntimeOperatorSummary({
@@ -420,7 +430,9 @@ describe("runtime summaries", () => {
     expect(text).toContain("bootstrapped=2");
     expect(startText).toContain("Agent claude-pending still needs bootstrap completion.");
     expect(startText).toContain("next: chat with the bot or open the workspace");
-    expect(startText).toContain("follow: BOOTSTRAP.md and the team-assistant personality files");
+    expect(startText).toContain(
+      "follow: BOOTSTRAP.md, AGENTS.md, and the rest of the seeded workspace files",
+    );
     expect(startText).toContain("Next steps after bootstrap:");
     expect(startText).toContain(
       "run `clisbot bots add --channel <slack|telegram> ...` for the first provider bot you want to expose",

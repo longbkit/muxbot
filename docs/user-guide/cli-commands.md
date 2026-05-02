@@ -343,12 +343,17 @@ Important behavior:
 
 - `agents add` creates a new execution identity only
 - `agents add` fails if the agent already exists
+- `agents add` without `--bot-type` is valid and does not seed any bootstrap files
 - `disable` keeps the agent in config but stops exposing it through routing
 - `remove` deletes the agent from config
 - `agents enable` and `agents disable` are the fast toggle when you want to keep the agent but stop or resume exposing it
 - `agents remove` fails while any bot or route still references that agent
 - `agents set-default` defines the global fallback agent when a more specific bot or route choice is absent
 - `--workspace` is optional; a sensible default workspace path exists
+- `--bot-type` on `agents add` or `agents bootstrap` is the template seeding mode, not a general runtime requirement
+- bootstrap is optional and mainly for fresh workspaces where you want clisbot to seed guidance files
+- `AGENTS.md` is the canonical workspace instruction file across supported CLIs
+- Claude and Gemini bootstrap also create `CLAUDE.md` or `GEMINI.md` as symlinks to `AGENTS.md` for CLI discovery
 - `agents bootstrap` is the template refresh or update path
 - without `--force`, `agents bootstrap` shows what files would change before overwriting them
 - when practical, `agents bootstrap` shows a diff or at least a file-by-file overwrite plan
@@ -466,7 +471,7 @@ Important behavior:
 Important behavior:
 
 - main help promotes `clisbot runner list` and `clisbot watch --latest` as the fastest tmux debug entry points
-- `runner list` shows mapped `sessionId` plus a simple persisted state when available; it does not repeat `sessionKey` or `live`, and tmux-only sessions are labeled `unmanaged`
+- `runner list` shows the saved `sessionId` plus a simple persisted state when available; `sessionId: not stored` means clisbot has not saved one yet
 - `clisbot status` includes the newest five runner sessions by default; if there are more, it prints `(n) sessions more`
 - `runner list` prefixes each row with a 1-based index such as `[1]`; `inspect --index <n>` and `watch --index <n>` use that exact order
 - top-level `clisbot inspect` and `clisbot watch` are shorthand for `clisbot runner inspect` and `clisbot runner watch`

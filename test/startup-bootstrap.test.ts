@@ -69,6 +69,8 @@ describe("startup bootstrap helpers", () => {
     expect(output).toContain("clisbot init");
     expect(output).toContain("clisbot init --help");
     expect(output).toContain("literal token values on `init` require `--persist`");
+    expect(output).toContain("`--bot-type` is a workspace-template choice, not a general runtime requirement for later agents");
+    expect(output).toContain("Claude and Gemini bootstraps also create `CLAUDE.md` or `GEMINI.md` as symlinks to `AGENTS.md`");
   });
 
   test("prints focused start help without touching runtime state", async () => {
@@ -88,6 +90,7 @@ describe("startup bootstrap helpers", () => {
     expect(output).toContain("clisbot start");
     expect(output).toContain("clisbot start --help");
     expect(output).toContain("literal token values without `--persist` stay runtime-only");
+    expect(output).toContain("bootstrap seeds `AGENTS.md`, `BOOTSTRAP.md`, `IDENTITY.md`, and the rest of the workspace guidance files");
   });
 
   test("detects default channel token availability", () => {

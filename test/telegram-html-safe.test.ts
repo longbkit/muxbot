@@ -12,6 +12,26 @@ describe("renderTelegramHtmlSafeFromMarkdown", () => {
     );
   });
 
+  test("auto-links plain safe urls in normal text", () => {
+    const rendered = renderTelegramHtmlSafeFromMarkdown(
+      "Doc: http://sandbox:6419/docs/architecture/2026-05-01-session-key-and-session-id-continuity-decision.md",
+    );
+
+    expect(rendered).toBe(
+      'Doc: <a href="http://sandbox:6419/docs/architecture/2026-05-01-session-key-and-session-id-continuity-decision.md">http://sandbox:6419/docs/architecture/2026-05-01-session-key-and-session-id-continuity-decision.md</a>',
+    );
+  });
+
+  test("keeps trailing punctuation outside plain auto-linked urls", () => {
+    const rendered = renderTelegramHtmlSafeFromMarkdown(
+      "See https://example.com/test(path)).",
+    );
+
+    expect(rendered).toBe(
+      'See <a href="https://example.com/test(path)">https://example.com/test(path)</a>).',
+    );
+  });
+
   test("renders headings and lists into readable Telegram-safe html", () => {
     const rendered = renderTelegramHtmlSafeFromMarkdown([
       "## Status",
@@ -147,11 +167,11 @@ describe("renderTelegramHtmlSafeFromMarkdown", () => {
 
   test("does not apply markdown formatting inside inline code", () => {
     const rendered = renderTelegramHtmlSafeFromMarkdown(
-      "Use `**literal** _value_ <tag>` here",
+      "Use `**literal** _value_ <tag> https://example.com` here",
     );
 
     expect(rendered).toBe(
-      "Use <code>**literal** _value_ &lt;tag&gt;</code> here",
+      "Use <code>**literal** _value_ &lt;tag&gt; https://example.com</code> here",
     );
   });
 

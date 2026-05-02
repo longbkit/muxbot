@@ -22,6 +22,9 @@ staged for the next release.
 - Changed `/whoami` and `/status` to show `sessionName` instead of
   `sessionKey`, removed principal format/example hints, and stopped echoing
   route `responseMode` in `/status`.
+- Changed `/whoami` and `/status` to show `sessionId` plus persistence
+  annotation instead of presenting persisted `storedSessionId` as the only
+  visible truth.
 - Added per-loop `--loop-start <none|brief|full>` overrides for recurring
   `/loop` creation, so one loop can suppress or expand scheduled start
   notifications without changing the route default.
@@ -37,8 +40,8 @@ staged for the next release.
   now share the same queue item model.
 - Added a configurable per-session pending queue limit:
   `control.queue.maxPendingItemsPerSession`, default `20` when omitted.
-- Changed `/whoami` to show the stored `sessionId` directly in chat without
-  probing the live runner.
+- Changed `/whoami` to show `sessionId` plus whether that value is already
+  persisted, while still avoiding live runner probing from the chat surface.
 
 ### Runners
 
@@ -54,6 +57,9 @@ staged for the next release.
 - Changed `clisbot queues create` to post a queue-created acknowledgement on
   the target surface after persistence, including queue position and the full
   submitted prompt, so CLI-created queued work is visible before it starts.
+- Changed `clisbot runner list|watch` missing-session wording from `none` to
+  `not stored`, so operators do not confuse missing persistence with proof
+  that the live runner pane lacks a session id.
 
 ### Configuration
 
@@ -75,9 +81,24 @@ staged for the next release.
 - Fixed mid-run recovery for runners that use explicit session ids without a
   separate resume command; recovery now restarts with the stored id instead of
   clearing and rotating it.
+- Fixed ambiguous stale-resume startup and `/new` capture failure behavior so
+  clisbot preserves the stored session id instead of clearing it eagerly on
+  weak evidence.
+- Fixed live-runner `/new` retry behavior so clisbot now retries session-id
+  capture without blindly re-submitting `/new`, and surfaces one user-visible
+  failure reply on Slack or Telegram when capture or persistence still fails.
+- Fixed mid-run recovery fallback gating so clisbot now decides from the actual
+  stored resumable session id instead of backend session-id capability flags
+  when choosing between manual `/new` and fresh-session fallback.
+- Fixed fresh-runner startup visibility so when the runner becomes ready before
+  clisbot captures a durable session id, the active chat surface now gets a
+  clear warning that the session is running but not yet resumable.
 - Fixed status-command session-id capture fallback so full-pane rewrites can
   still read the cleaned `/status` delta when the raw append exists but does
   not contain the session id.
+- Fixed fresh-runner session-id capture so a newly created runner retries after
+  an initial null `/status` result instead of staying at `storedSessionId:
+  none` until a later operator action happens to recapture it.
 - Fixed existing tmux session reuse when the stored `sessionId` is missing:
   clisbot now captures the runner conversation id before submitting the next
   prompt instead of keeping the session entry permanently non-resumable.
@@ -110,6 +131,13 @@ staged for the next release.
   loop commands resolve by `sessionKey + loopId` internally, preventing the
   wrong session from being touched if two sessions ever share the same short
   loop id.
+- Fixed Telegram topic mode persistence so creating a topic-level streaming,
+  response-mode, or additional-message override preserves the parent route's
+  admission flags instead of silently resetting `requireMention`/`allowBots`
+  on the next config rewrite.
+- Fixed `clisbot runner list` cost regression so the command no longer captures
+  every live tmux pane just to infer session ids; it now reports only the
+  session identity already present in durable state.
 
 ### Security
 

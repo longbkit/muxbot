@@ -13,6 +13,7 @@ This folder should capture:
 
 ## Current Files
 
+- [audit-program.md](audit-program.md): operating policy for recurring audits, audit-to-task handoff, and the boundary between `features`, `research`, `audits`, and `tasks`
 - [brainstorm-and-ideas.md](brainstorm-and-ideas.md): current brainstorming notes for shortest-review-first output, review-loop checklists, and task-readiness specialization
 - [code-review-checklist.md](code-review-checklist.md): short high-leverage checklist for looping AI code review until naming, mental model, user flow, and risk issues are cleaned up
 - [working-prompts.md](working-prompts.md): reusable prompts that are showing good results in real `clisbot` workflow loops
@@ -28,6 +29,7 @@ The current workflow direction is:
 - tasks should be shaped into `Ready` quality before they are handed to autonomous execution flows
 - durable repo-work preferences should be captured in `docs/workflow/` first when they need human review before becoming hard `AGENTS.md` rules
 - repeated human corrections should be distilled into decision and struggle patterns, not treated as one-off feedback
+- recurring audits should generate evidence in `docs/audits/` and feed follow-up work into `docs/tasks/` without replacing stable feature truth in `docs/features/`
 
 ## Boundaries
 

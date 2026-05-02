@@ -82,7 +82,7 @@ The product should let authorized users recover the affected conversation or run
 
 - [Control Feature](../../../features/control/README.md)
 - [Agent Commands](../../../features/agents/commands.md)
-- [Runtime Architecture](../../../architecture/runtime-architecture.md)
+- [Runtime Architecture](../../../architecture/architecture.md)
 - [Surface Architecture](../../../architecture/surface-architecture.md)
 - [Auth-Aware CLI Mutation Enforcement And Runner Command Guardrails](2026-04-14-auth-aware-cli-mutation-enforcement-and-runner-command-guardrails.md)
 - [Operator Control Surface And Debuggability](2026-04-04-operator-control-surface-and-debuggability.md)

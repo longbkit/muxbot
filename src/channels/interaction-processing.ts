@@ -128,6 +128,17 @@ function renderStartupSteeringUnavailableMessage() {
   ].join("\n");
 }
 
+function renderNewSessionFailureMessage(error: unknown) {
+  const details =
+    error instanceof Error && error.message.trim()
+      ? error.message.trim()
+      : "Unknown error.";
+  return [
+    "Could not finish opening a new runner conversation.",
+    details,
+  ].join("\n");
+}
+
 function renderWhoAmIMessage(params: {
   identity: ChannelInteractionIdentity;
   route: ChannelInteractionRoute;
@@ -142,8 +153,16 @@ function renderWhoAmIMessage(params: {
     `conversationKind: \`${params.identity.conversationKind}\``,
     `agentId: \`${params.route.agentId}\``,
     `sessionName: \`${params.sessionDiagnostics.sessionName ?? "(not available)"}\``,
-    `storedSessionId: \`${params.sessionDiagnostics.storedSessionId ?? "(not captured yet)"}\``,
+    `sessionId: \`${params.sessionDiagnostics.sessionId ?? "(not available yet)"}\``,
+    `sessionIdPersistence: \`${params.sessionDiagnostics.sessionIdPersistence ?? "not stored yet"}\``,
   ];
+
+  if (
+    params.sessionDiagnostics.storedSessionId &&
+    params.sessionDiagnostics.storedSessionId !== params.sessionDiagnostics.sessionId
+  ) {
+    lines.push(`storedSessionId: \`${params.sessionDiagnostics.storedSessionId}\``);
+  }
 
   if (params.identity.senderId) {
     lines.push(`senderId: \`${params.identity.senderId}\``);
@@ -212,8 +231,16 @@ function renderRouteStatusMessage(params: {
     `conversationKind: \`${params.identity.conversationKind}\``,
     `agentId: \`${params.route.agentId}\``,
     `sessionName: \`${params.sessionDiagnostics.sessionName ?? "(not available)"}\``,
-    `storedSessionId: \`${params.sessionDiagnostics.storedSessionId ?? "(not captured yet)"}\``,
+    `sessionId: \`${params.sessionDiagnostics.sessionId ?? "(not available yet)"}\``,
+    `sessionIdPersistence: \`${params.sessionDiagnostics.sessionIdPersistence ?? "not stored yet"}\``,
   ];
+
+  if (
+    params.sessionDiagnostics.storedSessionId &&
+    params.sessionDiagnostics.storedSessionId !== params.sessionDiagnostics.sessionId
+  ) {
+    lines.push(`storedSessionId: \`${params.sessionDiagnostics.storedSessionId}\``);
+  }
 
   if (params.identity.senderId) {
     lines.push(`senderId: \`${params.identity.senderId}\``);
@@ -1532,17 +1559,21 @@ export async function processChannelInteraction<TChunk>(params: {
         return interactionResult;
       }
 
-      const rotated = await params.agentService.triggerNewSession(params.sessionTarget);
-      await params.postText(
-        [
-          `Triggered a new runner conversation for agent \`${rotated.agentId}\`.`,
-          `sessionName: \`${rotated.sessionName}\``,
-          `storedSessionId: \`${rotated.sessionId ?? "none"}\``,
-          rotated.restartedRunner
-            ? "No live runner existed, so clisbot opened a fresh runner session."
-            : `triggerCommand: \`${rotated.command}\``,
-        ].join("\n"),
-      );
+      try {
+        const rotated = await params.agentService.triggerNewSession(params.sessionTarget);
+        await params.postText(
+          [
+            `Triggered a new runner conversation for agent \`${rotated.agentId}\`.`,
+            `sessionName: \`${rotated.sessionName}\``,
+            `sessionId: \`${rotated.sessionId ?? "none"}\``,
+            rotated.restartedRunner
+              ? "No live runner existed, so clisbot opened a fresh runner session."
+              : `triggerCommand: \`${rotated.command}\``,
+          ].join("\n"),
+        );
+      } catch (error) {
+        await params.postText(renderNewSessionFailureMessage(error));
+      }
       await params.agentService.recordConversationReply(params.sessionTarget);
       return interactionResult;
     }

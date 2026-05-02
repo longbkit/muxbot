@@ -6,7 +6,7 @@ These rules apply to everything inside this repository.
 The stable implementation contract lives in:
 - `docs/architecture/architecture-overview.md`
 - `docs/architecture/surface-architecture.md`
-- `docs/architecture/runtime-architecture.md`
+- `docs/architecture/architecture.md`
 - `docs/architecture/model-taxonomy-and-boundaries.md`
 
 If implementation conflicts with those docs:

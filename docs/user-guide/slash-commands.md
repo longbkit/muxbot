@@ -25,7 +25,7 @@ If this page and runtime ever disagree, runtime wins.
 - `/start`: show onboarding help for the current surface
 - `/status`: show route status and suggested operator next steps
 - `/help`: show available control slash commands
-- `/whoami`: show current platform, route, sender identity, and the stored session id for the current conversation
+- `/whoami`: show current platform, route, sender identity, and the saved session id for the current conversation
 - `/transcript`: show the current session transcript when route `verbose` policy allows it
 
 ## Run Control
@@ -34,7 +34,7 @@ If this page and runtime ever disagree, runtime wins.
 - `/detach`: stop live updates for this thread while still posting the final result here
 - `/watch every 30s [for 10m]`: post latest run state on an interval until settle or timeout
 - `/stop`: send Escape to interrupt the current conversation session, clear active-run state, and let queued prompts continue
-- `/new`: start a new session for the current routed conversation, then capture and store the new session id
+- `/new`: start a new session for the current routed conversation, then save the new session id
 - `/nudge`: send one extra Enter to the current tmux session without resending prompt text
 
 ## Conversation Modes

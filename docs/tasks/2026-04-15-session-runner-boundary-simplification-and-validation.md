@@ -11,11 +11,12 @@ Define the smallest runtime refactor that clarifies ownership without inventing 
 
 ## Status
 
-Done
+Done for the naming and owner-map clarification slice.
 
 ## Implementation Status
 
-The migration is complete.
+The naming migration is complete, but the deeper continuity-boundary cleanup is
+not.
 
 Implemented:
 
@@ -25,6 +26,14 @@ Implemented:
   - `SessionService` is the session-owned runtime owner in `agents`
   - `RunnerService` is the backend-owned runtime owner behind that session owner
 - startup recovery and persisted active-run recovery now use the new names end to end across code, tests, and docs
+
+Not yet fully converged:
+
+- `RunnerService` still directly mints explicit `sessionId` values for
+  explicit-id launch paths
+- `RunnerService` still directly reads and mutates stored session continuity
+- the fully-clean split now lives in a follow-up task instead of being treated
+  as already done
 
 ## Migration Status
 
@@ -67,6 +76,14 @@ This task locks the target model:
 - `Run` stays a first-class model inside the session owner
 - queue stays a session-owned admission contract
 - do not introduce a new queue manager, recovery manager, or run manager
+
+Truthfulness note:
+
+- the owner model above is the architecture target
+- current code still keeps `RunnerService` implemented in
+  `src/agents/runner-service.ts`
+- the later continuity-boundary cleanup should finish semantic ownership first;
+  file relocation, if still wanted after that, is a separate cleanup choice
 
 ## Non-Goals
 
@@ -115,7 +132,7 @@ Must not own:
 
 - queue policy
 - session-scoped follow-up policy
-- canonical session truth
+- active `sessionKey -> sessionId` continuity truth
 
 ### `Run`
 
@@ -171,13 +188,20 @@ That research note captures:
 
 All exit criteria are now satisfied.
 
+Historical note:
+
+- these criteria were satisfied for the naming and owner-map refactor slice
+- they should not be read as claiming that session continuity leakage has been
+  fully removed from `RunnerService`
+
 ## Related Docs
 
 - [Architecture Overview](../architecture/architecture-overview.md)
-- [Runtime Architecture](../architecture/runtime-architecture.md)
+- [Runtime Architecture](../architecture/architecture.md)
 - [Model Taxonomy And Boundaries](../architecture/model-taxonomy-and-boundaries.md)
 - [Agents Feature](../features/agents/README.md)
 - [Session Identity](../features/agents/sessions.md)
 - [Runners Feature](../features/runners/README.md)
 - [Stability](../features/non-functionals/stability/README.md)
 - [Architecture Boundary Clarification For Surfaces, Auth, Agents, And Runners](2026-04-13-architecture-boundary-clarification-for-surfaces-agents-and-runners.md)
+- [Session Continuity Boundary And RunnerService Leak Cleanup](2026-05-02-session-continuity-boundary-and-runner-service-leak-cleanup.md)

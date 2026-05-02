@@ -145,7 +145,8 @@ Good first tests:
 - `/whoami`
 
 After the route is bound, `/whoami` also works as a session check because it
-shows the persisted `storedSessionId` directly in chat.
+shows `sessionId` plus whether that value is already persisted for that
+conversation.
 
 If DM pairing is already approved, the bot should answer normally after that.
 
@@ -276,7 +277,7 @@ Good group and topic test prompts:
 - `/whoami`
 
 Once the group or topic is routed, `/whoami` is also the easiest way to see
-the persisted `storedSessionId` for that conversation.
+`sessionId` plus whether that value is already persisted for that conversation.
 
 ## Privacy Mode And Group Visibility
 

@@ -40,6 +40,7 @@ type Deferred<T> = {
 type ActiveRun = {
   runId: string;
   resolved: ResolvedAgentTarget;
+  sessionId?: string;
   observers: Map<string, RunObserver>;
   observerFailures: Map<string, number>;
   initialResult: Deferred<AgentExecutionResult>;
@@ -119,6 +120,13 @@ function isRetryableObserverDeliveryError(error: unknown) {
 
   const message = error instanceof Error ? `${error.name} ${error.message}` : String(error);
   return /fetch failed|request timed out|network|socket hang up/i.test(message);
+}
+
+function buildMissingSessionIdStartupWarning() {
+  return [
+    "Runner session started, but clisbot could not capture a durable session id yet.",
+    "This session is running, but it is not resumable until a session id is captured and persisted.",
+  ].join(" ");
 }
 
 export class ActiveRunInProgressError extends Error {
@@ -275,6 +283,7 @@ export class SessionService {
       }
 
       run.resolved = resolved;
+      run.sessionId = (await this.sessionState.getEntry(resolved.sessionKey))?.sessionId?.trim() || undefined;
       run.startedAt = startedAt;
       run.latestUpdate = this.createRunUpdate({
         resolved,
@@ -287,6 +296,17 @@ export class SessionService {
         state: "running",
         startedAt,
       });
+      if (!run.sessionId) {
+        await this.notifyRunObservers(run, this.createRunUpdate({
+          resolved,
+          status: "running",
+          snapshot: "",
+          fullSnapshot: initialSnapshot,
+          initialSnapshot,
+          note: buildMissingSessionIdStartupWarning(),
+          forceVisible: true,
+        }));
+      }
       this.startRunMonitor(resolved.sessionKey, {
         runId,
         prompt,
@@ -480,6 +500,10 @@ export class SessionService {
       sessionKey: run.resolved.sessionKey,
       agentId: run.resolved.agentId,
     }));
+  }
+
+  getLiveSessionId(target: AgentSessionTarget) {
+    return this.activeRuns.get(target.sessionKey)?.sessionId;
   }
 
   private buildDetachedNote(resolved: ResolvedAgentTarget) {
@@ -763,6 +787,8 @@ export class SessionService {
         return true;
       }
       currentRun.resolved = recovered.resolved;
+      currentRun.sessionId =
+        (await this.sessionState.getEntry(recovered.resolved.sessionKey))?.sessionId?.trim() || currentRun.sessionId;
       currentRun.latestUpdate = this.createRunUpdate({
         resolved: currentRun.resolved,
         status: currentRun.latestUpdate.status === "detached" ? "detached" : "running",
@@ -803,7 +829,7 @@ export class SessionService {
       if (!currentRun) {
         return true;
       }
-      if (await this.hasStoredResumableSessionId(currentRun.resolved)) {
+      if (await this.requiresManualNewAfterFailedResume(currentRun)) {
         await this.notifyRecoveryStep(currentRun, buildRunRecoveryNote("resume-failed"));
         await this.failActiveRun(
           sessionKey,
@@ -837,15 +863,14 @@ export class SessionService {
     }
   }
 
-  private async hasStoredResumableSessionId(resolved: ResolvedAgentTarget) {
-    if (
-      resolved.runner.sessionId.resume.mode !== "command" &&
-      resolved.runner.sessionId.create.mode !== "explicit"
-    ) {
+  private async requiresManualNewAfterFailedResume(run: ActiveRun) {
+    const storedSessionId =
+      (await this.sessionState.getEntry(run.resolved.sessionKey))?.sessionId?.trim() || "";
+    if (!storedSessionId) {
       return false;
     }
-    const entry = await this.sessionState.getEntry(resolved.sessionKey);
-    return Boolean(entry?.sessionId);
+    run.sessionId = storedSessionId;
+    return true;
   }
 
   private startRunMonitor(
@@ -1067,6 +1092,7 @@ export class SessionService {
     const run: ActiveRun = {
       runId,
       resolved,
+      sessionId: (await this.sessionState.getEntry(resolved.sessionKey))?.sessionId?.trim() || undefined,
       observers: new Map(),
       observerFailures: new Map(),
       initialResult,

@@ -1,7 +1,7 @@
 import { dirname } from "node:path";
-import { createSessionId } from "./session-identity.ts";
 import type { AgentSessionState } from "./session-state.ts";
 import type { AgentSessionTarget, ResolvedAgentTarget } from "./resolved-target.ts";
+import { SessionMapping } from "./session-mapping.ts";
 import { applyTemplate, ensureDir } from "../shared/paths.ts";
 import { sleep } from "../shared/process.ts";
 import { normalizePaneText } from "../shared/transcript.ts";
@@ -51,8 +51,11 @@ const TMUX_TRANSIENT_TARGET_PATTERN =
   /(?:no current target|can't find pane|can't find window|no such pane|no such window|tmux pane state unavailable)/i;
 const SESSION_READY_CAPTURE_RETRY_COUNT = 5;
 const SESSION_READY_CAPTURE_RETRY_DELAY_MS = 100;
-const TRIGGER_NEW_SESSION_CAPTURE_RETRY_COUNT = 3;
+const STARTUP_SESSION_ID_CAPTURE_RETRY_COUNT = 2;
+const STARTUP_SESSION_ID_CAPTURE_RETRY_DELAY_MS = 500;
 const SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS = 15_000;
+const PRESERVED_SESSION_ID_RETRY_MESSAGE =
+  "The previous runner session could not be resumed. clisbot preserved the stored session id instead of opening a new conversation automatically. Use `/new` if you want to trigger a new runner conversation, then resend the prompt.";
 
 type SessionErrorAction =
   | "during startup"
@@ -126,6 +129,7 @@ export class RunnerService {
     private readonly tmux: TmuxClient,
     private readonly sessionState: AgentSessionState,
     private readonly resolveTarget: (target: AgentSessionTarget) => ResolvedAgentTarget,
+    private readonly sessionMapping: SessionMapping = new SessionMapping(sessionState),
   ) {}
 
   private async mapSessionError(
@@ -187,31 +191,27 @@ export class RunnerService {
     };
   }
 
-  async syncStoredSessionId(target: AgentSessionTarget) {
-    const resolved = this.resolveTarget(target);
-    return this.syncStoredSessionIdForResolvedTarget(resolved);
-  }
-
   private async syncStoredSessionIdForResolvedTarget(resolved: ResolvedAgentTarget) {
-    const existing = await this.sessionState.getEntry(resolved.sessionKey);
+    const existing = await this.sessionMapping.get(resolved.sessionKey);
     if (existing?.sessionId) {
-      this.sessionIdentityCaptureRetryAt.delete(resolved.sessionKey);
-      return this.sessionState.touchSessionEntry(resolved, {
-        sessionId: existing.sessionId,
-        runnerCommand: resolved.runner.command,
-      });
+      await this.persistStoredSessionIdBestEffort(
+        resolved,
+        existing.sessionId,
+        resolved.runner.command,
+      );
+      return existing;
     }
 
     const retryAt = this.sessionIdentityCaptureRetryAt.get(resolved.sessionKey) ?? 0;
     if (retryAt > Date.now()) {
-      return this.sessionState.touchSessionEntry(resolved, {
+      return this.sessionMapping.touch(resolved, {
         runnerCommand: resolved.runner.command,
       });
     }
 
     let sessionId: string | null;
     try {
-      sessionId = await this.captureSessionIdentity(resolved);
+      sessionId = await this.captureSessionIdFromRunner(resolved);
     } catch (error) {
       if (isFreshStartRetryablePromptDeliveryError(error)) {
         this.sessionIdentityCaptureRetryAt.set(
@@ -222,20 +222,56 @@ export class RunnerService {
       throw error;
     }
     if (sessionId) {
-      this.sessionIdentityCaptureRetryAt.delete(resolved.sessionKey);
-    } else {
-      this.sessionIdentityCaptureRetryAt.set(
-        resolved.sessionKey,
-        Date.now() + SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS,
+      await this.persistStoredSessionIdBestEffort(
+        resolved,
+        sessionId,
+        resolved.runner.command,
       );
+      return {
+        sessionId,
+      };
     }
-    return this.sessionState.touchSessionEntry(resolved, {
-      sessionId,
+
+    this.deferStoredSessionIdCapture(resolved.sessionKey);
+    return this.sessionMapping.touch(resolved, {
       runnerCommand: resolved.runner.command,
     });
   }
 
-  private async captureSessionIdentity(
+  private persistStoredSessionId(
+    resolved: ResolvedAgentTarget,
+    sessionId: string,
+    runnerCommand = resolved.runner.command,
+  ) {
+    this.sessionIdentityCaptureRetryAt.delete(resolved.sessionKey);
+    return this.sessionMapping.setActive(resolved, {
+      sessionId,
+      runnerCommand,
+    });
+  }
+
+  private async persistStoredSessionIdBestEffort(
+    resolved: ResolvedAgentTarget,
+    sessionId: string,
+    runnerCommand = resolved.runner.command,
+  ) {
+    try {
+      await this.persistStoredSessionId(resolved, sessionId, runnerCommand);
+      return true;
+    } catch (error) {
+      this.warnStartupSessionIdentityDegraded(resolved, error);
+      return false;
+    }
+  }
+
+  private deferStoredSessionIdCapture(sessionKey: string) {
+    this.sessionIdentityCaptureRetryAt.set(
+      sessionKey,
+      Date.now() + SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS,
+    );
+  }
+
+  private async captureSessionIdFromRunner(
     resolved: ResolvedAgentTarget,
     options: { forceStatusCommand?: boolean } = {},
   ) {
@@ -321,7 +357,7 @@ export class RunnerService {
       return null;
     }
 
-    const existing = await this.sessionState.getEntry(resolved.sessionKey);
+    const existing = await this.sessionMapping.get(resolved.sessionKey);
     if (!existing?.sessionId) {
       return null;
     }
@@ -332,14 +368,12 @@ export class RunnerService {
     }
 
     console.log(
-      `clisbot clearing stored sessionId after failed runner resume startup ${resolved.sessionName}`,
+      `clisbot preserved stored sessionId after failed runner resume startup ${resolved.sessionName}`,
     );
-    await this.sessionState.clearSessionIdEntry(resolved, {
+    await this.sessionMapping.touch(resolved, {
       runnerCommand: resolved.runner.command,
     });
-    return this.ensureSessionReady(target, {
-      remainingFreshRetries,
-    });
+    throw new Error(PRESERVED_SESSION_ID_RETRY_MESSAGE);
   }
 
   private async retryAfterStartupTimeout(
@@ -485,12 +519,12 @@ export class RunnerService {
     await ensureDir(resolved.workspacePath);
     await ensureDir(dirname(this.loadedConfig.raw.tmux.socketPath));
     await ensureRunnerExitRecordDir(this.loadedConfig.stateDir, resolved.sessionName);
-    const existing = await this.sessionState.getEntry(resolved.sessionKey);
+    const preparedMapping = await this.sessionMapping.prepareStartup(resolved);
     const serverRunning = await this.tmux.isServerRunning();
 
     if (serverRunning && (await this.tmux.hasSession(resolved.sessionName))) {
       logLatencyDebug("ensure-session-ready-existing-session", timingContext, {
-        hasStoredSessionId: Boolean(existing?.sessionId),
+        hasStoredSessionId: Boolean(preparedMapping.storedSessionId),
       });
       try {
         await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
@@ -509,11 +543,10 @@ export class RunnerService {
       throw new Error(`tmux session "${resolved.sessionName}" does not exist`);
     }
 
-    const startupSessionId =
-      existing?.sessionId || (resolved.runner.sessionId.create.mode === "explicit" ? createSessionId() : "");
-    const resumingExistingSession = Boolean(existing?.sessionId);
+    const storedOrExplicitSessionId = preparedMapping.sessionId ?? "";
+    const resumingExistingSession = preparedMapping.resume;
     const runnerLaunch = this.buildRunnerArgs(resolved, {
-      sessionId: startupSessionId || undefined,
+      sessionId: storedOrExplicitSessionId || undefined,
       resume: resumingExistingSession,
     });
     await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
@@ -543,7 +576,7 @@ export class RunnerService {
       logLatencyDebug("ensure-session-ready-new-session", timingContext, {
         startupDelayMs: resolved.runner.startupDelayMs,
         resumingExistingSession,
-        hasStoredSessionId: Boolean(existing?.sessionId),
+        hasStoredSessionId: Boolean(preparedMapping.storedSessionId),
       });
       const bootstrapResult = await waitForTmuxSessionBootstrap({
         tmux: this.tmux,
@@ -579,7 +612,7 @@ export class RunnerService {
       }
 
       await this.finalizeSessionStartup(resolved, {
-        startupSessionId,
+        storedOrExplicitSessionId,
         runnerCommand: runnerLaunch.command,
       });
     } catch (error) {
@@ -606,22 +639,71 @@ export class RunnerService {
   private async finalizeSessionStartup(
     resolved: ResolvedAgentTarget,
     params: {
-      startupSessionId: string;
+      storedOrExplicitSessionId: string;
       runnerCommand: string;
     },
   ) {
     await this.dismissTrustPrompt(resolved);
     await this.verifySessionReady(resolved);
 
-    if (params.startupSessionId) {
-      await this.sessionState.touchSessionEntry(resolved, {
-        sessionId: params.startupSessionId,
-        runnerCommand: params.runnerCommand,
-      });
+    // Startup may already know the runner-side sessionId from one of two
+    // sources: a previously storedSessionId used for continuity, or an explicit
+    // sessionId created before launch. In that branch there is nothing to
+    // capture from runner output, only to persist truthfully.
+    if (params.storedOrExplicitSessionId) {
+      await this.persistStoredSessionIdBestEffort(
+        resolved,
+        params.storedOrExplicitSessionId,
+        params.runnerCommand,
+      );
       return;
     }
 
-    await this.syncStoredSessionIdForResolvedTarget(resolved);
+    // Runner-created session ids do not exist in persistence until clisbot
+    // captures them from live runner output and stores them as storedSessionId.
+    const entry = await this.syncStoredSessionIdForResolvedTarget(resolved);
+    if (entry?.sessionId) {
+      return;
+    }
+
+    await this.retryMissingStoredSessionIdAfterStartup(resolved);
+  }
+
+  private warnStartupSessionIdentityDegraded(
+    resolved: ResolvedAgentTarget,
+    error: unknown,
+  ) {
+    console.warn(
+      `clisbot could not persist or confirm a durable sessionId after startup for ${resolved.sessionName}; continuing without resumable state`,
+      error,
+    );
+  }
+
+  private async retryMissingStoredSessionIdAfterStartup(resolved: ResolvedAgentTarget) {
+    for (let attempt = 0; attempt < STARTUP_SESSION_ID_CAPTURE_RETRY_COUNT; attempt += 1) {
+      await sleep(STARTUP_SESSION_ID_CAPTURE_RETRY_DELAY_MS);
+
+      let sessionId: string | null = null;
+      try {
+        sessionId = await this.captureSessionIdFromRunner(resolved);
+      } catch (error) {
+        if (
+          isRecoverableStartupSessionLoss(error) ||
+          isTransientTmuxTargetError(error) ||
+          isFreshStartRetryablePromptDeliveryError(error)
+        ) {
+          continue;
+        }
+        return;
+      }
+
+      if (!sessionId) {
+        continue;
+      }
+
+      await this.persistStoredSessionIdBestEffort(resolved, sessionId);
+      return;
+    }
   }
 
   private async dismissTrustPrompt(resolved: ResolvedAgentTarget) {
@@ -709,7 +791,7 @@ export class RunnerService {
 
   async reopenRunContext(target: AgentSessionTarget, timingContext?: LatencyDebugContext) {
     const resolved = this.resolveTarget(target);
-    const existing = await this.sessionState.getEntry(resolved.sessionKey);
+    const existing = await this.sessionMapping.get(resolved.sessionKey);
     if (!existing?.sessionId || !canRestartWithStoredSessionId(resolved)) {
       throw new Error(`Runner session "${resolved.sessionName}" cannot reopen the same conversation context.`);
     }
@@ -725,7 +807,9 @@ export class RunnerService {
     console.log(
       `clisbot clearing stored sessionId for explicit fresh session ${resolved.sessionName}`,
     );
-    await this.sessionState.clearSessionIdEntry(resolved, { runnerCommand: resolved.runner.command });
+    await this.sessionMapping.clearActive(resolved, {
+      runnerCommand: resolved.runner.command,
+    });
     return this.ensureRunnerReady(target, {
       allowFreshRetryBeforePrompt: false,
       timingContext,
@@ -753,26 +837,24 @@ export class RunnerService {
   }
 
   private async triggerNewSessionInLiveRunner(resolved: ResolvedAgentTarget) {
-    const oldSessionId = (await this.sessionState.getEntry(resolved.sessionKey))?.sessionId;
+    const oldSessionId = (await this.sessionMapping.get(resolved.sessionKey))?.sessionId;
     const command = this.resolveNewSessionCommand(resolved);
-    let sessionId: string | null = null;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      await this.submitNewSessionCommand(resolved, command);
-      sessionId = await this.captureNewSessionIdentityAfterTrigger(resolved, oldSessionId);
-      if (sessionId) {
-        break;
-      }
-    }
+    await this.submitNewSessionCommand(resolved, command);
+    const sessionId = await this.captureNewSessionIdentityAfterTrigger(resolved, oldSessionId);
     if (!sessionId) {
-      await this.clearSessionIdAfterNewSessionFailure(resolved, command);
+      this.throwNewSessionCaptureFailure(command, oldSessionId);
     }
-    await this.sessionState.touchSessionEntry(resolved, {
-      sessionId,
-      runnerCommand: resolved.runner.command,
-      runtime: {
-        state: "idle",
-      },
-    });
+    try {
+      await this.sessionMapping.setActive(resolved, {
+        sessionId,
+        runnerCommand: resolved.runner.command,
+        runtime: {
+          state: "idle",
+        },
+      });
+    } catch (error) {
+      this.throwNewSessionPersistFailure(command, sessionId, error);
+    }
     return {
       agentId: resolved.agentId,
       sessionKey: resolved.sessionKey,
@@ -786,7 +868,7 @@ export class RunnerService {
 
   private async restartRunnerWithFreshSessionIdForNewCommand(target: AgentSessionTarget) {
     const { resolved } = await this.restartRunnerWithFreshSessionId(target);
-    const entry = await this.sessionState.getEntry(resolved.sessionKey);
+    const entry = await this.sessionMapping.get(resolved.sessionKey);
     return {
       agentId: resolved.agentId,
       sessionKey: resolved.sessionKey,
@@ -815,38 +897,55 @@ export class RunnerService {
     resolved: ResolvedAgentTarget,
     oldSessionId?: string,
   ) {
-    for (let attempt = 0; attempt < TRIGGER_NEW_SESSION_CAPTURE_RETRY_COUNT; attempt += 1) {
-      const sessionId = await this.captureSessionIdentity(resolved, {
+    for (let attempt = 0; attempt < SESSION_READY_CAPTURE_RETRY_COUNT; attempt += 1) {
+      const sessionId = await this.captureSessionIdFromRunner(resolved, {
         forceStatusCommand: true,
       });
       if (sessionId && sessionId !== oldSessionId) {
         return sessionId;
       }
-      if (attempt < TRIGGER_NEW_SESSION_CAPTURE_RETRY_COUNT - 1) {
+      if (attempt < SESSION_READY_CAPTURE_RETRY_COUNT - 1) {
         await sleep(SESSION_READY_CAPTURE_RETRY_DELAY_MS);
       }
     }
     return null;
   }
 
-  private async clearSessionIdAfterNewSessionFailure(
-    resolved: ResolvedAgentTarget,
+  private throwNewSessionCaptureFailure(
     command: string,
-  ): Promise<never> {
+    oldSessionId?: string,
+  ): never {
     console.log(
-      `clisbot clearing stored sessionId after ${command} because status capture returned no id for ${resolved.sessionName}`,
+      `clisbot preserved the previous stored sessionId after ${command} because status capture returned no id`,
     );
-    await this.sessionState.clearSessionIdEntry(resolved, {
-      runnerCommand: resolved.runner.command,
-    });
     throw new Error(
-      `${command} completed, but clisbot could not capture a new session id from the runner status command.`,
+      oldSessionId
+        ? `${command} completed, but clisbot could not confirm the rotated session id. The previous stored session id was preserved instead of being cleared automatically.`
+        : `${command} completed, but clisbot could not capture a new session id from the runner status command.`,
+    );
+  }
+
+  private throwNewSessionPersistFailure(
+    command: string,
+    sessionId: string,
+    error: unknown,
+  ): never {
+    console.error(`clisbot failed to persist rotated sessionId after ${command}`, {
+      sessionId,
+      error,
+    });
+    const details =
+      error instanceof Error && error.message.trim()
+        ? ` Persist error: ${error.message.trim()}`
+        : "";
+    throw new Error(
+      `${command} completed and clisbot captured session id ${sessionId}, but could not persist it. The durable session mapping was left unchanged.${details}`,
     );
   }
 
   private async killRunnerAndPreserveSessionId(resolved: ResolvedAgentTarget) {
     await this.tmux.killSession(resolved.sessionName);
-    await this.sessionState.touchSessionEntry(resolved, {
+    await this.sessionMapping.touch(resolved, {
       runnerCommand: resolved.runner.command,
     });
   }
@@ -866,8 +965,6 @@ export class RunnerService {
         snapshot: "",
       };
     }
-
-    await this.sessionState.touchSessionEntry(resolved);
 
     try {
       return {
@@ -898,7 +995,7 @@ export class RunnerService {
     const resolved = this.resolveTarget(target);
     const existed = await this.tmux.hasSession(resolved.sessionName);
     if (existed) {
-      await this.sessionState.touchSessionEntry(resolved, {
+      await this.sessionMapping.touch(resolved, {
         runtime: {
           state: "idle",
         },
@@ -924,7 +1021,7 @@ export class RunnerService {
     const existed = await this.tmux.hasSession(resolved.sessionName);
     if (existed) {
       await this.tmux.sendKey(resolved.sessionName, "Enter");
-      await this.sessionState.touchSessionEntry(resolved);
+      await this.sessionMapping.touch(resolved);
     }
 
     return {
@@ -971,7 +1068,7 @@ export class RunnerService {
       promptSubmitDelayMs: resolved.runner.promptSubmitDelayMs,
       timingContext: undefined,
     });
-    await this.sessionState.touchSessionEntry(resolved);
+    await this.sessionMapping.touch(resolved);
     return {
       agentId: resolved.agentId,
       sessionKey: resolved.sessionKey,

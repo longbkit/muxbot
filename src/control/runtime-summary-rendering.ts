@@ -392,7 +392,9 @@ function appendBootstrapGuidance(lines: string[], summary: RuntimeOperatorSummar
     lines.push(`  Agent ${agent.id} still needs bootstrap completion.`);
     lines.push(`    workspace: ${agent.workspacePath}`);
     lines.push("    next: chat with the bot or open the workspace");
-    lines.push(`    follow: BOOTSTRAP.md and the ${agent.bootstrapMode} personality files`);
+    lines.push(
+      "    follow: BOOTSTRAP.md, AGENTS.md, and the rest of the seeded workspace files",
+    );
   }
 
   lines.push("");
@@ -451,7 +453,7 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
     lines.push(`  Manual setup is still available with ${renderCliCommand("agents add ...", { inline: true })}.`);
     lines.push(...renderOperatorHelpLines("  "));
     lines.push(
-      "  Bootstrap files will be seeded in the agent workspace. Review BOOTSTRAP.md, SOUL.md, USER.md, IDENTITY.md, and MEMORY.md.",
+      "  Bootstrap files are optional. If you use `--bot-type`, clisbot seeds BOOTSTRAP.md, AGENTS.md, SOUL.md, USER.md, IDENTITY.md, and related files into the agent workspace.",
     );
     return lines.join("\n");
   }

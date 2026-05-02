@@ -73,16 +73,17 @@ export class AgentSessionState {
 
   async clearSessionIdEntry(
     resolved: ResolvedAgentTarget,
-    params: { runnerCommand?: string } = {},
+    params: {
+      runnerCommand?: string;
+      preserveRuntime?: boolean;
+    } = {},
   ) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: undefined,
       lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: existing?.followUp,
       runnerCommand: params.runnerCommand ?? existing?.runnerCommand ?? resolved.runner.command,
-      runtime: {
-        state: "idle",
-      },
+      runtime: params.preserveRuntime ? existing?.runtime : { state: "idle" },
       loops: getStoredLoops(existing),
       recentConversation: existing?.recentConversation,
     }));

@@ -160,7 +160,7 @@ Use this checklist for any new interactive AI CLI.
 - identify whether the CLI exposes a status command for session-id capture
 - configure one of:
   - explicit create plus explicit resume
-  - runner-native create plus status capture plus resume command
+  - tool-created id plus status capture plus resume command
 
 ### 7. Interrupt Contract
 

@@ -76,11 +76,22 @@ It is intentionally separate from `updatedAt` because:
 - prints current tmux runner sessions
 - prefixes each entry header with `sessionName:` for faster scanning
 - sorts sessions by newest `lastAdmittedPromptAt` when known
-- shows mapped `sessionId` when stored, otherwise `sessionId: none`
+- shows the saved `sessionId` when available; otherwise `sessionId: not stored`
+- `sessionId: not stored` means clisbot has not saved one yet
 - does not repeat the logical `sessionKey` in each row
 - shows simple state from stored runtime when available, otherwise `state: unmanaged` for tmux-only sessions
 - does not print a separate `live` field; this command is already a live tmux inventory
 - still shows unnamed tmux-only sessions even if no persisted metadata row matches
+
+Follow-up target for continuity cleanup:
+
+- when runtime memory already knows a fresher `sessionId` than persistence, use
+  that runtime value first
+- show persistence state beside the value:
+  - `persisted`
+  - `not persisted yet`
+- if runtime memory and persistence disagree, `runner list` should not hide the
+  fresher runtime value behind older stored metadata
 
 ### `clisbot runner inspect <session-name>`
 
@@ -97,6 +108,13 @@ It is intentionally separate from `updatedAt` because:
 - `--interval <duration>` controls the polling cadence
 - `--timeout <duration>` bounds the watch window when desired
 - the watch header shows `session`, `agent`, `sessionId`, `lines`, and current `state`
+
+Follow-up target for continuity cleanup:
+
+- the watch header should prefer runtime-memory `sessionId` truth first
+- the header should also annotate whether that value is already persisted
+- watch polling itself must not spam persistence writes when the `sessionId`
+  stays unchanged
 
 ### `clisbot runner watch --latest`
 

@@ -156,6 +156,7 @@
 - chunk order stays stable as the live reply is edited
 - stale trailing chunks are removed if a later normalized view becomes shorter
 - progress-only blocks such as repeated search or tool activity are removed when a cleaner final answer exists
+- if a Slack reply uses Block Kit, the top-level fallback `text` remains readable in history reads and notifications instead of appearing blank
 
 ## Test Case 8: Response Policy Controls Whether Streamed Replies Remain Visible
 
@@ -246,8 +247,8 @@ Expected:
 - the command is handled by clisbot as a reserved control slash command
 - Slack replies include sender id, channel id, and thread ts when present
 - Telegram replies include sender id, chat id, and topic id when present
-- the reply includes the resolved `agentId` and `sessionKey`
-- the reply includes `storedSessionId`
+- the reply includes the resolved `agentId` and `sessionName`
+- the reply includes `sessionId` plus persistence state
 
 ## Test Case 9B: Agent Bash Commands Can Be Triggered From The Channel
 

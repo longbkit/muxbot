@@ -33,6 +33,38 @@ function sanitizeTelegramHref(rawHref: string) {
   return null;
 }
 
+function splitTrailingUrlPunctuation(rawUrl: string) {
+  let core = rawUrl;
+  let trailing = "";
+
+  while (/[.,!?;:]$/.test(core)) {
+    trailing = core.slice(-1) + trailing;
+    core = core.slice(0, -1);
+  }
+
+  while (core.endsWith(")")) {
+    const openCount = (core.match(/\(/g) ?? []).length;
+    const closeCount = (core.match(/\)/g) ?? []).length;
+    if (closeCount <= openCount) {
+      break;
+    }
+    trailing = ")" + trailing;
+    core = core.slice(0, -1);
+  }
+
+  while (core.endsWith("]")) {
+    const openCount = (core.match(/\[/g) ?? []).length;
+    const closeCount = (core.match(/]/g) ?? []).length;
+    if (closeCount <= openCount) {
+      break;
+    }
+    trailing = "]" + trailing;
+    core = core.slice(0, -1);
+  }
+
+  return { core, trailing };
+}
+
 function storeToken(tokens: string[], value: string) {
   const token = `${TOKEN_PREFIX}${tokens.length};\u0000`;
   tokens.push(value);
@@ -72,6 +104,21 @@ function renderInlineMarkdownToTelegramHtml(text: string) {
       `<a href="${safeHref}">${escapeHtml(label)}</a>`,
     );
   });
+
+  working = working.replaceAll(
+    /\b(?:https?:\/\/|tg:\/\/|mailto:)[^\s<>"`]+/g,
+    (rawUrl: string) => {
+      const { core, trailing } = splitTrailingUrlPunctuation(rawUrl);
+      const safeHref = sanitizeTelegramHref(core);
+      if (!safeHref) {
+        return rawUrl;
+      }
+      return (
+        storeToken(tokens, `<a href="${safeHref}">${escapeHtml(core)}</a>`) +
+        trailing
+      );
+    },
+  );
 
   working = escapeHtml(working);
   working = applyInlineFormatting(working);

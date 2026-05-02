@@ -56,6 +56,7 @@ Suggested structure:
 - Each feature should have one clear front door doc.
 - Use stable folder names for ongoing feature areas.
 - Keep feature docs broad and navigational.
+- Keep the current canonical `what` and `why` here.
 - Keep execution detail in `docs/tasks/`, not here.
 - Link to `docs/tests/` when a feature has ground-truth scenarios for manual and automated validation.
 - Link to task docs instead of duplicating subtasks or sprint notes.
@@ -67,6 +68,7 @@ Suggested structure:
 Use `docs/features/` for:
 
 - feature overviews
+- canonical current `what` and `why`
 - scope boundaries
 - current feature state
 - dependencies between features

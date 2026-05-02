@@ -434,10 +434,11 @@ export function resolveSlackMessageContent(params: {
       throw new Error("Slack blocks input supports only --render none or --render blocks");
     }
     const blocks = parseSlackBlocksInput(text);
+    const fallbackText = buildSlackBlocksFallbackText(blocks);
     return {
-      text: buildSlackBlocksFallbackText(blocks),
+      text: fallbackText,
       blocks,
-      apiText: "\u200B",
+      apiText: fallbackText,
     };
   }
 
@@ -447,10 +448,11 @@ export function resolveSlackMessageContent(params: {
 
   if (renderMode === "blocks") {
     const blocks = renderMarkdownToSlackBlocks(text);
+    const fallbackText = buildSlackBlocksFallbackText(blocks);
     return {
-      text: buildSlackBlocksFallbackText(blocks),
+      text: fallbackText,
       blocks,
-      apiText: "\u200B",
+      apiText: fallbackText,
     };
   }
 

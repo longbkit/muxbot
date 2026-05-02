@@ -83,9 +83,8 @@ After your first successful `clisbot start`:
    Telegram groups or topics can use `/whoami` even before routing, while DMs with `pairing` policy need pairing first.
    `/whoami` and routed `/start` show:
    - `principal`
-   - `principalFormat`
-   - `principalExample`
-   Routed `/whoami` also shows `storedSessionId` so you can inspect the persisted session continuity directly from chat.
+   Routed `/whoami` also shows `sessionId` plus whether that value is already
+   persisted for the conversation.
    Typical values look like `telegram:1276408333` or `slack:U123ABC456`.
 2. Grant the first app owner with `clisbot auth add-user app --role owner --user <principal>`, for example `clisbot auth add-user app --role owner --user telegram:1276408333`.
 3. Inspect and tune role permissions with `clisbot auth --help`.
@@ -205,10 +204,12 @@ Important rules:
 
 Bootstrap behavior:
 
-- `personal-assistant` and `team-assistant` copy the matching bootstrap templates
+- bootstrap is optional; agents can run without it when you already have a workspace and do not need clisbot to seed guidance files
+- `personal-assistant` and `team-assistant` copy the matching bootstrap templates when you pass `--bot-type`
+- `AGENTS.md` is the one canonical workspace instruction file across supported CLIs
 - codex bootstrap requires `AGENTS.md` and `IDENTITY.md`
-- claude bootstrap requires `CLAUDE.md` and `IDENTITY.md`
-- gemini bootstrap requires `GEMINI.md` and `IDENTITY.md`
+- claude bootstrap requires `AGENTS.md`, `IDENTITY.md`, and a `CLAUDE.md -> AGENTS.md` symlink for Claude discovery
+- gemini bootstrap requires `AGENTS.md`, `IDENTITY.md`, and a `GEMINI.md -> AGENTS.md` symlink for Gemini discovery
 - bootstrap state is `missing`, `not-bootstrapped`, or `bootstrapped`
 - Gemini still needs its own direct auth or headless auth path before routed prompts can succeed
 

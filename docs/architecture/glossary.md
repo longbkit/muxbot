@@ -17,10 +17,10 @@ Use this file before introducing a new concept name. If an existing term fits, r
 | `sender` | The human or system identity that submitted, queued, steered, or created the message. Permissions are checked against sender. | Channels capture it; auth consumes it; agents may persist it for queue/loop continuity. |
 | `surface` | The place where a message arrives and replies render, such as Slack channel/thread, Telegram group/topic, DM, or future API conversation. | Channels own surface presentation and reply targeting. |
 | `message` | One submitted user input or generated scheduled input. | Channels receive messages; agents queue or run them. |
-| `session` | One durable conversation owned by clisbot. | Agents own session continuity. |
-| `sessionKey` | Stable clisbot-side session identity. | Agents persistence. |
-| `sessionId` | Current runner-side conversation identity. | Runners provide it; agents store it for continuity. |
-| `storedSessionId` | Persisted copy of the current runner-side `sessionId` for continuity, resume, and operator inspection. | Agents persistence and operator/status surfaces. |
+| `session` | One clisbot conversation continuity bucket. Users normally just keep chatting; they only need to care about native tool ids when they intentionally rotate or resume a session. | Agents own session continuity. |
+| `sessionKey` | Stable clisbot-side conversation key. By default one routed surface maps to one `sessionKey`, but routing policy may intentionally let multiple surfaces continue the same conversation. | Agents/session continuity. |
+| `sessionId` | Current native tool conversation id attached to a `sessionKey` at this time. One `sessionKey` has one active `sessionId` at a time, but the same `sessionKey` may point to a different `sessionId` later after `/new`, explicit resume/rebind, or backend rotation. | `SessionService` owns the mapping. The native tool may create the id, `SessionService` may supply one explicitly, and runners only pass, capture, or resume it. |
+| `storedSessionId` | Persisted copy of the current active `sessionId` for one `sessionKey`. Used for continuity, resume, and operator inspection. | Agents persistence and operator/status surfaces. |
 | `run` | One active execution for one session. | Agents/run lifecycle. |
 | `runtime projection` | Persisted session-runtime record such as `idle`, `running`, or `detached`. It helps recovery, but it is not live run truth by itself. | Agents persistence only. |
 | `runner` | Backend executor boundary, such as tmux running Codex, Claude, or Gemini. | Runners. |
@@ -28,6 +28,10 @@ Use this file before introducing a new concept name. If an existing term fits, r
 | `queue item` | One queued prompt entry in a session queue. Pending/running queue items are durable; completed/failed items are removed after settlement instead of retained as history. | Agents persistence and runtime queue reconciliation. |
 | `loop` | Scheduled or repeated message tied to a session/surface. | Agents own schedule state; channels supply surface context for delivery. |
 | `steering` | A new user message injected while a run is still active. | Channels detect it; agents/runners submit it to the active run. |
+
+Current note:
+
+- the reverse invariant from `sessionId` back to `sessionKey` is not yet a stable public contract
 
 ## Update Terms
 

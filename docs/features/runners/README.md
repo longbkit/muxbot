@@ -6,6 +6,21 @@ Runners are the execution backends behind the agents layer.
 
 They standardize how the system talks to a concrete backend and how backend output becomes one consistent internal contract.
 
+Short boundary rule:
+
+- `SessionService` owns conversation continuity and the active
+  `sessionKey -> sessionId` mapping
+- runners do not own that mapping
+- runners only know how to launch, capture, resume, and normalize one concrete backend
+
+Common confusion to avoid:
+
+- `src/agents/runner-service.ts` is the runner-facing adapter that
+  `SessionService` calls today
+- `src/runners/tmux/*` is lower-level backend code used by that adapter
+- neither of those should decide whether the active mapping is set, cleared, or
+  rotated
+
 ## State
 
 Active
@@ -32,6 +47,7 @@ That only stays coherent if backend-specific behavior is isolated behind a stand
 - channel-specific transcript rendering
 - canonical agent, memory, or tool ownership
 - operator workflows
+- continuity mutation semantics such as bind, clear, or rotate of the active `sessionId`
 
 ## Related Task Folder
 

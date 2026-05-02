@@ -119,9 +119,9 @@ They cover config bootstrap, env substitution, and how the system wiring is reso
 
 - `session.storePath` resolves to an expanded absolute path
 - the default config expresses a valid Codex-style session-id strategy
-- Codex runner-native create does not include an unused explicit `--session-id` arg
+- Codex tool-created-id mode does not include an unused explicit `--session-id` arg
 - the runtime can switch to an explicit-session-id strategy without code changes
-- session-id acquisition remains a runner concern rather than leaking into channel config
+- session-id bootstrap mechanics remain outside channel config and stay at the session/runner boundary
 
 ## Test Case 7: Follow-Up Policy Defaults Resolve Predictably
 

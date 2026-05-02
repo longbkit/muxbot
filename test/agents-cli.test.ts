@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAgentsCli } from "../src/control/agents-cli.ts";
@@ -85,6 +94,8 @@ describe("agents cli", () => {
     expect(text).toContain("clisbot agents help");
     expect(text).toContain("clisbot agents add <id> --cli <codex|claude|gemini>");
     expect(text).toContain("`agents add` is the lower-level manual surface");
+    expect(text).toContain("`agents add` without `--bot-type` is valid and does not seed any bootstrap files");
+    expect(text).toContain("canonical workspace instructions live in `AGENTS.md`");
   });
 
   test("team-assistant bootstrap overrides base USER.md with the team template", async () => {
@@ -173,7 +184,34 @@ describe("agents cli", () => {
 
     expect(rawConfig.agents.list[0]?.cli).toBe("gemini");
     expect(rawConfig.agents.list[0]?.runner).toBeUndefined();
-    expect(existsSync(join(tempDir, "workspaces", "gem", "GEMINI.md"))).toBe(true);
+    const geminiBootstrapPath = join(tempDir, "workspaces", "gem", "GEMINI.md");
+    expect(existsSync(geminiBootstrapPath)).toBe(true);
+    expect(lstatSync(geminiBootstrapPath).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(geminiBootstrapPath)).toBe("AGENTS.md");
+  });
+
+  test("adds a claude agent with AGENTS.md plus a CLAUDE.md symlink", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-agents-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+
+    await runAgentsCli([
+      "add",
+      "claude-work",
+      "--cli",
+      "claude",
+      "--workspace",
+      join(tempDir, "workspaces", "claude-work"),
+      "--bot-type",
+      "team",
+    ]);
+
+    const workspacePath = join(tempDir, "workspaces", "claude-work");
+    const claudeBootstrapPath = join(workspacePath, "CLAUDE.md");
+    expect(existsSync(join(workspacePath, "AGENTS.md"))).toBe(true);
+    expect(existsSync(claudeBootstrapPath)).toBe(true);
+    expect(lstatSync(claudeBootstrapPath).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(claudeBootstrapPath)).toBe("AGENTS.md");
   });
 
   test("keeps startup option and runner overrides when startup options differ from tool defaults", async () => {
@@ -374,8 +412,11 @@ describe("agents cli", () => {
 
     await runAgentsCli(["bootstrap", "work", "--bot-type", "team", "--force"]);
 
-    expect(existsSync(join(workspacePath, "CLAUDE.md"))).toBe(true);
-    expect(existsSync(join(workspacePath, "AGENTS.md"))).toBe(false);
+    const claudeBootstrapPath = join(workspacePath, "CLAUDE.md");
+    expect(existsSync(claudeBootstrapPath)).toBe(true);
+    expect(lstatSync(claudeBootstrapPath).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(claudeBootstrapPath)).toBe("AGENTS.md");
+    expect(existsSync(join(workspacePath, "AGENTS.md"))).toBe(true);
     expect(existsSync(join(workspacePath, "LOOP.md"))).toBe(true);
     expect(readFileSync(join(workspacePath, "IDENTITY.md"), "utf8")).not.toBe("custom identity\n");
     expect(output.join("\n")).toContain("Rebootstrapped agent work with claude/team-assistant");

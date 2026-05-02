@@ -27,7 +27,7 @@ The tmux runner owns:
 - capturing pane output
 - normalizing tmux-derived output into the runner contract
 - tmux-specific failure handling
-- backend-specific session-id bootstrap behavior
+- backend-specific launch or capture or resume behavior
 
 The tmux runner does not own:
 
@@ -53,8 +53,21 @@ For AI CLI-backed runners, tmux is the host process boundary, not the canonical 
 Current continuity split:
 
 - the agents layer owns `sessionKey`
-- the agents layer persists the current `sessionId`
-- the tmux runner owns how that `sessionId` is created, captured, and reused for a concrete backend
+- `SessionService` persists the current `sessionId`
+- `SessionService` decides whether the active mapping should stay the same,
+  rotate, or later rebind
+- the tmux runner owns how an explicit `sessionId` is passed through, how a
+  tool-created `sessionId` is captured, and how a stored `sessionId` is reused
+  for a concrete backend
+
+File-level split:
+
+- `src/agents/runner-service.ts`
+  - higher-level runner adapter called by `SessionService`
+  - should decide backend actions, not continuity rules
+- `src/runners/tmux/*`
+  - raw tmux implementation details
+  - session creation, pane IO, capture, monitoring, tmux-specific recovery
 
 ## tmux Mechanics
 
@@ -123,15 +136,24 @@ The runner should not assume that "new tmux session" means "new conversation."
 
 Current implemented bootstrap paths are:
 
-- runner-generated session id
+- tool-created session id
   - start the tool normally
   - issue a status command such as `/status`
   - parse the returned session id
   - persist it for later resume
 - explicit session id
-  - generate a UUID before launch
+  - `SessionService` generates or chooses the id before launch
   - inject it into runner args such as `--session-id {sessionId}`
   - reuse that same id on later restart
+
+Current implementation note:
+
+- the document above now matches the shipped session-id boundary more closely
+- tmux-specific launch, capture, resume, and prompt-submission mechanics stay
+  in runner code
+- continuity writes, clears, and explicit-id creation now flow through the
+  session-owned `SessionMapping` seam instead of being performed directly by
+  `RunnerService`
 
 ## Input Submission
 
@@ -214,7 +236,8 @@ If that resume path fails, the system should surface that truthfully rather than
 Current clisbot behavior is narrower than the full ideal:
 
 - if a stored `sessionId` exists and `resume.mode` is configured, the runner uses that resume command
-- if `create.mode` is `explicit`, the runner relaunches with the same explicit session id
+- if `create.mode` is `explicit`, `SessionService` keeps the same explicit
+  session id and the runner relaunches with it
 - if a stored `sessionId` cannot be brought back for the current `sessionKey`, clisbot preserves the continuity entry and fails truthfully; operators can use `/new` to intentionally trigger a new runner conversation
 - if session-id capture never completes, the session can still run, but restart falls back to a fresh tool conversation
 - if the first routed prompt right after status-command capture never lands truthfully, clisbot retries paste in place first, then restarts the runner while preserving the stored session id before surfacing failure
@@ -276,6 +299,6 @@ That rendering decision belongs to `channels` and `control` and is defined by [t
 ## Related Docs
 
 - [Runners Feature](README.md)
-- [Runtime Architecture](../../architecture/runtime-architecture.md)
+- [Runtime Architecture](../../architecture/architecture.md)
 - [Transcript Presentation And Streaming](../../architecture/transcript-presentation-and-streaming.md)
 - [Runner Tests](../../tests/features/runners/README.md)

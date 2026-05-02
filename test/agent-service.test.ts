@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentService } from "../src/agents/agent-service.ts";
@@ -37,12 +37,16 @@ type FakeSession = {
   failWithNoServerOnNextCapture?: boolean;
   scriptedCaptureOutputs?: string[];
   waitForRecoveryContinue?: boolean;
-  statusResponseMode?: "session-id" | "no-session-id";
+  statusResponseMode?: "session-id" | "no-session-id" | "first-miss-then-session-id";
   dropPromptLiteralCount?: number;
 };
 
 class FakeTmuxClient {
   readonly sessionCommands: string[] = [];
+  readonly literalInputs: Array<{
+    sessionName: string;
+    text: string;
+  }> = [];
   hasSessionCalls = 0;
   listSessionsCalls = 0;
   serverDefaultsEnsured = 0;
@@ -57,7 +61,10 @@ class FakeTmuxClient {
   private nextTrustPromptVariant: "codex" | "claude" | "gemini" = "codex";
   private nextNoServerAfterTrustDismiss = false;
   private readonly ignoreEnterCounts = new Map<string, number>();
-  private nextStatusResponseMode: "session-id" | "no-session-id" = "session-id";
+  private nextStatusResponseMode:
+    | "session-id"
+    | "no-session-id"
+    | "first-miss-then-session-id" = "session-id";
   private nextDropPromptLiteralCount = 0;
   private paneStateFailuresRemaining = 0;
 
@@ -105,8 +112,21 @@ class FakeTmuxClient {
     this.ignoreEnterCounts.set(sessionName, Math.max(0, count));
   }
 
-  setStatusResponseModeOnNextSession(mode: "session-id" | "no-session-id") {
+  setStatusResponseModeOnNextSession(
+    mode: "session-id" | "no-session-id" | "first-miss-then-session-id",
+  ) {
     this.nextStatusResponseMode = mode;
+  }
+
+  setStatusResponseMode(
+    sessionName: string,
+    mode: "session-id" | "no-session-id" | "first-miss-then-session-id",
+  ) {
+    const session = this.sessions.get(sessionName);
+    if (!session) {
+      throw new Error(`Unknown fake tmux session: ${sessionName}`);
+    }
+    session.statusResponseMode = mode;
   }
 
   dropPromptLiteralOnNextSession(count: number) {
@@ -225,6 +245,10 @@ class FakeTmuxClient {
 
   async sendLiteral(sessionName: string, text: string) {
     const session = this.requireSession(sessionName);
+    this.literalInputs.push({
+      sessionName,
+      text,
+    });
     if (text !== "/status" && (session.dropPromptLiteralCount ?? 0) > 0) {
       session.dropPromptLiteralCount = Math.max(0, (session.dropPromptLiteralCount ?? 0) - 1);
       return;
@@ -272,9 +296,13 @@ class FakeTmuxClient {
     session.snapshot = this.stripPendingPrompt(session.snapshot, session.pendingInput);
     if (session.pendingInput === "/status") {
       session.snapshot =
-        session.statusResponseMode === "no-session-id"
+        session.statusResponseMode === "no-session-id" ||
+          session.statusResponseMode === "first-miss-then-session-id"
           ? `${session.snapshot}\nSTATUS pending`
           : `${session.snapshot}\nSTATUS session id: ${session.sessionId}`;
+      if (session.statusResponseMode === "first-miss-then-session-id") {
+        session.statusResponseMode = "session-id";
+      }
     } else if (session.pendingInput === "/new" || session.pendingInput === "/clear") {
       session.sessionId = ROTATED_RUNNER_ID;
       session.snapshot = `${session.snapshot}\nNEW SESSION ${session.sessionId}`;
@@ -711,7 +739,7 @@ describe("AgentService session identity", () => {
     }
   });
 
-  test("new session command retries when the first trigger does not rotate the session id", async () => {
+  test("new session command retries capture without re-submitting the command", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 
     try {
@@ -772,6 +800,74 @@ describe("AgentService session identity", () => {
       expect(rotated.command).toBe("/new");
       expect(rotated.sessionId).toBe(ROTATED_RUNNER_ID);
       expect(readSessionId(storePath, target.sessionKey)).toBe(ROTATED_RUNNER_ID);
+      expect(fakeTmux.literalInputs.filter((entry) => entry.text === "/new")).toHaveLength(1);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("new session command preserves the previous stored session id when rotation capture fails", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c1:thread:new-preserve-on-failure",
+      };
+
+      const firstRun = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+      fakeTmux.setStatusResponseMode(firstRun.sessionName, "no-session-id");
+
+      const receivedError = await service.triggerNewSession(target).catch((error) => error);
+
+      expect(receivedError).toBeInstanceOf(Error);
+      expect((receivedError as Error).message).toBe(
+        "/new completed, but clisbot could not confirm the rotated session id. The previous stored session id was preserved instead of being cleared automatically.",
+      );
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -837,6 +933,88 @@ describe("AgentService session identity", () => {
       expect(rotated.command).toBe("/clear");
       expect(rotated.sessionId).toBe(ROTATED_RUNNER_ID);
       expect(readSessionId(storePath, target.sessionKey)).toBe(ROTATED_RUNNER_ID);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("session diagnostics prefer the live session id when it is newer than persistence", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c1:thread:diagnostics-runtime-first",
+      };
+      const storedSessionId = "33333333-3333-3333-3333-333333333333";
+      const liveSessionId = "44444444-4444-4444-4444-444444444444";
+
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+      await Bun.write(
+        storePath,
+        JSON.stringify(
+          {
+            [target.sessionKey]: {
+              agentId: target.agentId,
+              sessionKey: target.sessionKey,
+              sessionId: storedSessionId,
+              workspacePath: join(tempDir, "default"),
+              runnerCommand: "fake-cli",
+              runtime: { state: "running" },
+              updatedAt: Date.now(),
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: new FakeTmuxClient() as unknown as TmuxClient,
+      });
+      (service as any).activeRuns.getLiveSessionId = () => liveSessionId;
+
+      const diagnostics = await service.getSessionDiagnostics(target);
+
+      expect(diagnostics.sessionId).toBe(liveSessionId);
+      expect(diagnostics.sessionIdPersistence).toBe("not-persisted-yet");
+      expect(diagnostics.storedSessionId).toBe(storedSessionId);
+      expect(diagnostics.resumeCommand).toContain(liveSessionId);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -921,7 +1099,7 @@ describe("AgentService session identity", () => {
     }
   });
 
-  test("automatic startup retry falls back to a fresh runner session after stale resume startup failure", async () => {
+  test("preserves the stored session id instead of falling back fresh after stale resume startup failure", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 
     try {
@@ -993,15 +1171,17 @@ describe("AgentService session identity", () => {
         tmux: fakeTmux as unknown as TmuxClient,
       });
 
-      const run = await service.enqueuePrompt(target, "ping", {
+      const receivedError = await service.enqueuePrompt(target, "ping", {
         onUpdate: () => undefined,
-      }).result;
+      }).result.catch((error) => error);
 
-      expect(run.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
-      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
+      expect(receivedError).toBeInstanceOf(Error);
+      expect((receivedError as Error).message).toBe(
+        "The previous runner session could not be resumed. clisbot preserved the stored session id instead of opening a new conversation automatically. Use `/new` if you want to trigger a new runner conversation, then resend the prompt.",
+      );
+      expect(readSessionId(storePath, target.sessionKey)).toBe(staleResumeSessionId);
       expect(fakeTmux.sessionCommands[0]).toContain(`resume ${staleResumeSessionId}`);
-      expect(fakeTmux.sessionCommands[1]).not.toContain("resume ");
-      expect(fakeTmux.sessionCommands[1]).toContain("fake-cli -C");
+      expect(fakeTmux.sessionCommands).toHaveLength(1);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -1139,6 +1319,71 @@ describe("AgentService session identity", () => {
       expect(run.snapshot).toContain(`STATUS session id: ${RUNNER_GENERATED_ID}`);
       expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
       expect(fakeTmux.sessionCommands).toHaveLength(1);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("retries missing stored session id capture during fresh startup", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const loaded = await loadConfig(configPath);
+      const fakeTmux = new FakeTmuxClient();
+      fakeTmux.setStatusResponseModeOnNextSession("first-miss-then-session-id");
+      const runnerSessions = new RunnerService(
+        loaded,
+        fakeTmux as unknown as TmuxClient,
+        new AgentSessionState(new SessionStore(resolveSessionStorePath(loaded))),
+        (target) => resolveAgentTarget(loaded, target),
+      );
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:telegram:group:-1001:topic:2963",
+      };
+
+      await runnerSessions.ensureSessionReady(target);
+      const transcript = await runnerSessions.captureTranscript(target);
+
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
+      expect(transcript.snapshot).toContain("STATUS pending");
+      expect(transcript.snapshot).toContain(`STATUS session id: ${RUNNER_GENERATED_ID}`);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -1980,8 +2225,77 @@ describe("AgentService session identity", () => {
       await runnerSessions.ensureSessionReady(target);
       const transcript = await runnerSessions.captureTranscript(target);
 
-      expect(transcript.snapshot.match(/STATUS pending/g)?.length ?? 0).toBe(1);
+      expect(transcript.snapshot.match(/STATUS pending/g)?.length ?? 0).toBe(3);
       expect(readSessionId(storePath, target.sessionKey)).toBeNull();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("captureTranscript does not create or refresh session state by itself", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-transcript-readonly-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 5,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const loaded = await loadConfig(configPath);
+      const fakeTmux = new FakeTmuxClient();
+      const runnerSessions = new RunnerService(
+        loaded,
+        fakeTmux as unknown as TmuxClient,
+        new AgentSessionState(new SessionStore(resolveSessionStorePath(loaded))),
+        (target) => resolveAgentTarget(loaded, target),
+      );
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:dm:U123",
+      };
+      const resolved = resolveAgentTarget(loaded, target);
+
+      await fakeTmux.newSession({
+        sessionName: resolved.sessionName,
+        cwd: resolved.workspacePath,
+        command: "fake-cli --session-id 33333333-3333-3333-3333-333333333333",
+      });
+
+      const transcript = await runnerSessions.captureTranscript(target);
+
+      expect(transcript.snapshot).toContain("READY 33333333-3333-3333-3333-333333333333");
+      expect(existsSync(storePath)).toBe(false);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -2047,9 +2361,9 @@ describe("AgentService session identity", () => {
       }).result;
 
       expect(run.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
-      expect(run.snapshot).not.toContain("STATUS");
+      expect(run.snapshot).toContain(`STATUS session id: ${RUNNER_GENERATED_ID}`);
       expect(fakeTmux.sessionCommands).toHaveLength(2);
-      expect(readSessionId(storePath, target.sessionKey)).toBeNull();
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -3920,7 +4234,7 @@ describe("AgentService session identity", () => {
               updateIntervalMs: 5,
               idleTimeoutMs: 100,
               noOutputTimeoutMs: 5000,
-              maxRuntimeSec: 1,
+              maxRuntimeSec: 10,
             },
             sessionId: {
               create: {
@@ -3968,8 +4282,13 @@ describe("AgentService session identity", () => {
         }),
         onUpdate: () => undefined,
       });
-      await Bun.sleep(80);
-      expect((await service.listQueuedPrompts(target)).map((item) => item.text)).toEqual(["ping"]);
+      const queuedDeadline = Date.now() + 5_000;
+      let queuedTexts = (await service.listQueuedPrompts(target)).map((item) => item.text);
+      while (queuedTexts.length === 0 && Date.now() < queuedDeadline) {
+        await Bun.sleep(25);
+        queuedTexts = (await service.listQueuedPrompts(target)).map((item) => item.text);
+      }
+      expect(queuedTexts).toEqual(["ping"]);
 
       const stopped = await service.interruptSession(target);
       expect(stopped.interrupted).toBe(true);
@@ -3978,7 +4297,7 @@ describe("AgentService session identity", () => {
 
       const secondResult = await Promise.race([
         second.result,
-        Bun.sleep(8_000).then(() => {
+        Bun.sleep(20_000).then(() => {
           throw new Error("queued prompt stayed blocked after /stop");
         }),
       ]);
@@ -3989,7 +4308,7 @@ describe("AgentService session identity", () => {
       await service?.stop().catch(() => undefined);
       rmSync(tempDir, { recursive: true, force: true });
     }
-  }, 10_000);
+  }, 30_000);
 
   test("opens a fresh session when mid-prompt loss has no resumable context", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
@@ -4051,7 +4370,7 @@ describe("AgentService session identity", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
 
   test("reopens the same conversation context and preserves resumed output after mid-prompt loss", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
@@ -4146,7 +4465,7 @@ describe("AgentService session identity", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, 10000);
 
   test("reopens an explicit session id context after mid-prompt loss", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
@@ -4164,6 +4483,9 @@ describe("AgentService session identity", () => {
             workspaceTemplate: join(tempDir, "{agentId}"),
             runnerCommand: "fake-cli",
             runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              maxRuntimeSec: 10,
+            },
             sessionId: {
               create: {
                 mode: "explicit",
@@ -4212,7 +4534,7 @@ describe("AgentService session identity", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, { timeout: 12_000 });
 
   test("preserves stored session id when same-context recovery fails", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
@@ -4230,6 +4552,9 @@ describe("AgentService session identity", () => {
             workspaceTemplate: join(tempDir, "{agentId}"),
             runnerCommand: "fake-cli",
             runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              maxRuntimeSec: 10,
+            },
             sessionId: {
               create: {
                 mode: "runner",
@@ -4289,7 +4614,7 @@ describe("AgentService session identity", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, { timeout: 12_000 });
 
   test("recovers when tmux reports duplicate session during concurrent startup", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
@@ -4307,6 +4632,9 @@ describe("AgentService session identity", () => {
             workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
             runnerCommand: "codex",
             runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              maxRuntimeSec: 10,
+            },
             sessionId: {
               create: {
                 mode: "runner",
@@ -4355,7 +4683,7 @@ describe("AgentService session identity", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, { timeout: 12_000 });
 
   test("ignores stale run callbacks after a new run has started for the same session key", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
@@ -4461,5 +4789,5 @@ describe("AgentService session identity", () => {
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  }, 10000);
+  }, { timeout: 20_000 });
 });

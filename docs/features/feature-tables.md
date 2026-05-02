@@ -40,7 +40,7 @@ Execution detail belongs in `docs/tasks/`.
 
 | State | Area | Feature | Main Doc | Tasks Folder | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Active | non-functional | architecture conformance | [architecture-conformance](non-functionals/architecture-conformance/README.md) | [docs/tasks](../tasks) | 2026-04-04 | Use this area to keep implementation aligned with the architecture documents. |
+| Active | non-functional | architecture conformance | [architecture-conformance](non-functionals/architecture-conformance/README.md) | [docs/tasks](../tasks) | 2026-05-01 | Use this area to keep implementation aligned with the architecture documents, with recurring evidence now living under `docs/audits/architecture-conformance/`. |
 | Planned | non-functional | security | [security](non-functionals/security/README.md) | [security tasks](../tasks/features/security) | 2026-04-17 | Security now needs a first-class front door for shared-surface trust boundaries, abuse resistance, and bot-to-bot loop containment. |
 | Active | non-functional | stability | [stability](non-functionals/stability/README.md) | [stability tasks](../tasks/features/stability) | 2026-04-11 | Stability is a first-class quality area for delay, runtime truthfulness, session drift, cross-layer recovery behavior, and channel-failure containment. |
 | Planned | non-functional | runtime benchmarks | [runtime-benchmarks](non-functionals/runtime-benchmarks/README.md) | [runtime-benchmark tasks](../tasks/features/runtime-benchmarks) | 2026-04-04 | Compare Bun, Go, and Rust only after the Bun MVP contract is grounded by shared tests. |

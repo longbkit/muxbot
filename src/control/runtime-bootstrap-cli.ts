@@ -74,7 +74,10 @@ function renderBootstrapCommandHelp(commandName: "init" | "start") {
     "Behavior:",
     `  - ${behavior}`,
     "  - first-run agent bootstrap needs both `--cli` and `--bot-type`",
+    "  - `--bot-type` is a workspace-template choice, not a general runtime requirement for later agents",
     "  - `--bot-type personal` maps to `personal-assistant`; `--bot-type team` maps to `team-assistant`",
+    "  - bootstrap seeds `AGENTS.md`, `BOOTSTRAP.md`, `IDENTITY.md`, and the rest of the workspace guidance files",
+    "  - Claude and Gemini bootstraps also create `CLAUDE.md` or `GEMINI.md` as symlinks to `AGENTS.md`",
     "  - explicit credential flags only enable the channels and bots you named in this command",
     "  - env-style values such as `SLACK_APP_TOKEN` or `${SLACK_APP_TOKEN}` stay env-backed in config",
     commandName === "start"

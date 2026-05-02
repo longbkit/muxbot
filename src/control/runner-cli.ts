@@ -7,7 +7,9 @@ import { CliCommandError } from "./runtime-cli-shared.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 import {
   buildRunnerSessionMetadata,
+  deriveRunnerSessionIdentity,
   listRunnerSessions,
+  parseRunnerSessionIdFromSnapshot,
   sortRunnerSessionMetadataNewestFirst,
   type RunnerSessionMetadata,
   type RunnerSessionSummary,
@@ -22,6 +24,7 @@ const SMOKE_SCENARIOS = [
   "recover_after_runner_loss",
 ] as const;
 const SMOKE_SUITES = ["launch-trio"] as const;
+const MISSING_STORED_SESSION_ID_TEXT = "not stored";
 
 type SmokeBackend = (typeof SMOKE_BACKENDS)[number];
 type SmokeScenario = (typeof SMOKE_SCENARIOS)[number];
@@ -190,7 +193,7 @@ export function renderRunnerHelp() {
     `  ${renderCliCommand("runner smoke --backend all --suite launch-trio [--workspace <path>] [--agent <id>] [--artifact-dir <path>] [--timeout-ms <n>] [--keep-session] [--json]")}`,
     "",
     "Operator session debugging:",
-    "  - `list` shows current tmux runner sessions, newest admitted turn first when known, plus stored sessionId/state when available",
+    "  - `list` shows current tmux runner sessions, newest admitted turn first when known, plus sessionId and persistence state when available",
     "  - `inspect` captures one snapshot; default tail is 100 lines",
     "  - `--index <n>` selects the 1-based order printed by `runner list`",
     "  - `watch --latest` follows the session that most recently admitted a new prompt",
@@ -390,6 +393,8 @@ function renderWatchFrame(params: {
   sessionName: string;
   lines: number;
   sessionId?: string;
+  sessionIdPersistence?: "persisted" | "not-persisted-yet";
+  storedSessionId?: string;
   agentId?: string;
   state: string;
   snapshot: string;
@@ -399,7 +404,11 @@ function renderWatchFrame(params: {
     "",
     `session: ${params.sessionName}`,
     params.agentId ? `agent: ${params.agentId}` : null,
-    `sessionId: ${params.sessionId?.trim() || "none"}`,
+    `sessionId: ${params.sessionId?.trim() || MISSING_STORED_SESSION_ID_TEXT}`,
+    `sessionIdPersistence: ${params.sessionIdPersistence ?? "not stored yet"}`,
+    params.storedSessionId && params.storedSessionId !== params.sessionId
+      ? `storedSessionId: ${params.storedSessionId}`
+      : null,
     `lines: ${params.lines}`,
     `state: ${params.state}`,
     "",
@@ -440,7 +449,7 @@ function renderRunnerListSession(session: RunnerSessionSummary) {
   if (!session.entry) {
     return [
       prefix,
-      "  sessionId: none",
+      `  sessionId: ${MISSING_STORED_SESSION_ID_TEXT}`,
       "  state: unmanaged",
     ].join("\n");
   }
@@ -448,10 +457,14 @@ function renderRunnerListSession(session: RunnerSessionSummary) {
   return [
     prefix,
     `  agent: ${session.entry.agentId}`,
-    `  sessionId: ${session.entry.sessionId?.trim() || "none"}`,
+    `  sessionId: ${session.identity?.sessionId?.trim() || MISSING_STORED_SESSION_ID_TEXT}`,
+    `  sessionIdPersistence: ${session.identity?.sessionIdPersistence ?? "not stored yet"}`,
+    session.identity?.storedSessionId && session.identity.storedSessionId !== session.identity.sessionId
+      ? `  storedSessionId: ${session.identity.storedSessionId}`
+      : null,
     `  state: ${session.entry.runtime?.state ?? "no-runtime"}`,
     `  lastAdmittedPromptAt: ${formatTimestamp(session.entry.lastAdmittedPromptAt)}`,
-  ].join("\n");
+  ].filter((line): line is string => Boolean(line)).join("\n");
 }
 
 function resolveIndexedSession(sessions: RunnerSessionSummary[], index: number) {
@@ -505,6 +518,7 @@ async function resolveWatchSelection(options: RunnerWatchOptions) {
 
   if (options.sessionName) {
     return {
+      loadedConfig: context.loadedConfig,
       sessionName: options.sessionName,
       metadata: sessionMetadata.find((item) => item.sessionName === options.sessionName) ?? null,
       tmux: context.tmux,
@@ -514,6 +528,7 @@ async function resolveWatchSelection(options: RunnerWatchOptions) {
   if (options.index != null) {
     const selected = resolveIndexedSession(await listRunnerSessions(context.loadedConfig), options.index);
     return {
+      loadedConfig: context.loadedConfig,
       sessionName: selected.sessionName,
       metadata: sessionMetadata.find((item) => item.sessionName === selected.sessionName) ?? null,
       tmux: context.tmux,
@@ -529,6 +544,7 @@ async function resolveWatchSelection(options: RunnerWatchOptions) {
       );
     }
     return {
+      loadedConfig: context.loadedConfig,
       sessionName: latest.sessionName,
       metadata: latest,
       tmux: context.tmux,
@@ -558,6 +574,7 @@ async function resolveWatchSelection(options: RunnerWatchOptions) {
       });
     if (admittedAfterBaseline[0]) {
       return {
+        loadedConfig: context.loadedConfig,
         sessionName: admittedAfterBaseline[0].sessionName,
         metadata: admittedAfterBaseline[0],
         tmux: context.tmux,
@@ -600,9 +617,19 @@ async function runWatchCli(args: string[]) {
       }
     }
 
+    const identity = deriveRunnerSessionIdentity({
+      entry: selection.metadata?.entry,
+      liveSessionId: parseRunnerSessionIdFromSnapshot(
+        selection.loadedConfig,
+        selection.metadata?.entry,
+        snapshot,
+      ),
+    });
     const frame = renderWatchFrame({
       sessionName: selection.sessionName,
-      sessionId: selection.metadata?.entry.sessionId,
+      sessionId: identity.sessionId,
+      sessionIdPersistence: identity.sessionIdPersistence,
+      storedSessionId: identity.storedSessionId,
       agentId: selection.metadata?.entry.agentId,
       lines: options.lines,
       state: status,

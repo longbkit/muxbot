@@ -15,6 +15,13 @@ They are the ground truth for validating how concrete backends expose input, out
 - stale tmux cleanup is implemented without losing resumable state
 - reset policy is not implemented yet
 
+Boundary reminder for readers:
+
+- these tests validate runner behavior
+- they do not change continuity ownership
+- if a case says the runner "uses" or "captures" a `sessionId`, read that as
+  backend behavior under a session-owned mapping model
+
 ## Test Case 1: tmux Runner Creates A Dedicated Server And Session
 
 ### Preconditions
@@ -191,7 +198,7 @@ Implemented
 - the runner uses the stored tool `sessionId` to resume the prior conversation instead of starting from scratch
 - if the backend rejects or loses that stored `sessionId`, clisbot preserves the mapping and fails truthfully instead of silently creating a new conversation; operators can use `/new` to trigger a new runner conversation intentionally
 
-## Test Case 7A: tmux Runner Can Capture A Runner-Generated Session Id
+## Test Case 7A: tmux Runner Can Capture A Tool-Created Session Id
 
 ### Status
 
@@ -284,7 +291,7 @@ Implemented As Process Rule
 ### Expected Results
 
 - new CLI onboarding does not assume Codex-specific terminal behavior
-- session-id create, capture, and resume strategy is chosen explicitly for that CLI
+- session-id source, capture, and resume strategy is chosen explicitly for that CLI
 - static chrome and footer behavior is tested before Slack routing is considered stable
 
 ## Test Case 8: tmux Runner Supports Idle Sunset Without Losing Resumable State

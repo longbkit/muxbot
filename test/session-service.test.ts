@@ -4,6 +4,7 @@ import {
   SessionService,
 } from "../src/agents/session-service.ts";
 import {
+  buildRunRecoveryNote,
   MID_RUN_RECOVERY_CONTINUE_PROMPT,
   MID_RUN_RECOVERY_MAX_ATTEMPTS,
 } from "../src/agents/run-recovery.ts";
@@ -82,7 +83,9 @@ function createManager(resolved: ResolvedAgentTarget) {
     {
       hasSession: async () => true,
     } as unknown as TmuxClient,
-    {} as AgentSessionState,
+    {
+      getEntry: async () => null,
+    } as unknown as AgentSessionState,
     {} as RunnerService,
     () => resolved,
   );
@@ -248,6 +251,7 @@ describe("SessionService observer delivery", () => {
     const manager = new SessionService(
       {} as TmuxClient,
       {
+        getEntry: async () => null,
         setSessionRuntime,
       } as unknown as AgentSessionState,
       {} as RunnerService,
@@ -334,7 +338,9 @@ describe("SessionService observer delivery", () => {
     }));
     const manager = new SessionService(
       {} as TmuxClient,
-      {} as AgentSessionState,
+      {
+        getEntry: async () => null,
+      } as unknown as AgentSessionState,
       {
         canRecoverMidRun: () => true,
         reopenRunContext,
@@ -384,7 +390,9 @@ describe("SessionService observer delivery", () => {
     });
     const manager = new SessionService(
       {} as TmuxClient,
-      {} as AgentSessionState,
+      {
+        getEntry: async () => null,
+      } as unknown as AgentSessionState,
       {
         canRecoverMidRun: () => true,
         reopenRunContext,
@@ -417,6 +425,118 @@ describe("SessionService observer delivery", () => {
     expect(restartParams.prompt).toBe(MID_RUN_RECOVERY_CONTINUE_PROMPT);
     expect(restartParams.recoveryAttempt).toBe(2);
     expect(MID_RUN_RECOVERY_MAX_ATTEMPTS).toBe(2);
+  });
+
+  test("mid-run recovery opens a fresh session when failed resume has no stored resumable id", async () => {
+    const resolved = createResolvedTarget();
+    const setSessionRuntime = mock(async () => undefined);
+    const reopenRunContext = mock(async () => {
+      throw new Error(`Runner session "${resolved.sessionName}" disappeared during startup.`);
+    });
+    const restartRunnerWithFreshSessionId = mock(async () => undefined);
+    const manager = new SessionService(
+      {} as TmuxClient,
+      {
+        getEntry: async () => null,
+        setSessionRuntime,
+      } as unknown as AgentSessionState,
+      {
+        canRecoverMidRun: (error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          return /can't find session/i.test(message);
+        },
+        reopenRunContext,
+        restartRunnerWithFreshSessionId,
+      } as unknown as RunnerService,
+      () => resolved,
+    ) as any;
+    const run = createRun(resolved, new Map());
+    let rejectedError: unknown;
+    run.runId = "run-1";
+    run.initialResult = {
+      promise: new Promise(() => undefined),
+      resolve: () => undefined,
+      reject: (error: unknown) => {
+        rejectedError = error;
+        run.initialResult.settled = true;
+      },
+      settled: false,
+    };
+    manager.activeRuns.set(resolved.sessionKey, run);
+
+    await expect(
+      manager.recoverLostMidRun(
+        resolved.sessionKey,
+        { runId: "run-1", timingContext: undefined },
+        new Error("can't find session"),
+      ),
+    ).resolves.toBe(true);
+
+    expect(reopenRunContext).toHaveBeenCalledTimes(1);
+    expect(restartRunnerWithFreshSessionId).toHaveBeenCalledTimes(1);
+    expect(setSessionRuntime).toHaveBeenCalledWith(resolved, {
+      state: "idle",
+    });
+    expect((rejectedError as Error).message).toBe(
+      buildRunRecoveryNote("fresh-required"),
+    );
+  });
+
+  test("mid-run recovery fails closed after failed resume when a stored resumable id exists", async () => {
+    const resolved = createResolvedTarget();
+    const setSessionRuntime = mock(async () => undefined);
+    const reopenRunContext = mock(async () => {
+      throw new Error(`Runner session "${resolved.sessionName}" disappeared during startup.`);
+    });
+    const restartRunnerWithFreshSessionId = mock(async () => undefined);
+    const manager = new SessionService(
+      {} as TmuxClient,
+      {
+        getEntry: async () => ({
+          sessionId: "11111111-1111-1111-1111-111111111111",
+        }),
+        setSessionRuntime,
+      } as unknown as AgentSessionState,
+      {
+        canRecoverMidRun: (error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          return /can't find session/i.test(message);
+        },
+        reopenRunContext,
+        restartRunnerWithFreshSessionId,
+      } as unknown as RunnerService,
+      () => resolved,
+    ) as any;
+    const run = createRun(resolved, new Map());
+    let rejectedError: unknown;
+    run.runId = "run-1";
+    run.initialResult = {
+      promise: new Promise(() => undefined),
+      resolve: () => undefined,
+      reject: (error: unknown) => {
+        rejectedError = error;
+        run.initialResult.settled = true;
+      },
+      settled: false,
+    };
+    manager.activeRuns.set(resolved.sessionKey, run);
+
+    await expect(
+      manager.recoverLostMidRun(
+        resolved.sessionKey,
+        { runId: "run-1", timingContext: undefined },
+        new Error("can't find session"),
+      ),
+    ).resolves.toBe(true);
+
+    expect(reopenRunContext).toHaveBeenCalledTimes(1);
+    expect(restartRunnerWithFreshSessionId).not.toHaveBeenCalled();
+    expect(setSessionRuntime).toHaveBeenCalledWith(resolved, {
+      state: "idle",
+    });
+    expect((rejectedError as Error).message).toBe(
+      buildRunRecoveryNote("manual-new-required"),
+    );
   });
 
   test("submitSessionInput resets the detach window for an active run", async () => {
@@ -480,6 +600,7 @@ describe("SessionService observer delivery", () => {
     const manager = new SessionService(
       {} as TmuxClient,
       {
+        getEntry: async () => null,
         setSessionRuntime: async () => undefined,
       } as unknown as AgentSessionState,
       {
@@ -794,5 +915,60 @@ describe("SessionService observer delivery", () => {
     expect(ensureRunnerReady).not.toHaveBeenCalled();
     expect(setSessionRuntime).not.toHaveBeenCalled();
     expect(manager.activeRuns.get(resolved.sessionKey)).toBe(staleRun);
+  });
+
+  test("executePrompt warns the chat surface when startup succeeds without a resumable session id", async () => {
+    const resolved = createResolvedTarget();
+    const updates: RunUpdate[] = [];
+    const setSessionRuntime = mock(async () => undefined);
+    const manager = new SessionService(
+      {} as TmuxClient,
+      {
+        getEntry: async () => null,
+        markPromptAdmitted: async () => undefined,
+        setSessionRuntime,
+      } as unknown as AgentSessionState,
+      {
+        ensureRunnerReady: async () => ({
+          resolved,
+          initialSnapshot: "READY",
+        }),
+      } as unknown as RunnerService,
+      () => resolved,
+    ) as any;
+    manager.startRunMonitor = () => undefined;
+
+    const execution = manager.executePrompt(
+      {
+        agentId: resolved.agentId,
+        sessionKey: resolved.sessionKey,
+      },
+      "ping",
+      {
+        id: "surface",
+        mode: "live",
+        onUpdate: async (update: RunUpdate) => {
+          updates.push(update);
+        },
+      },
+    );
+    await Bun.sleep(0);
+
+    expect(
+      updates.some((update) =>
+        update.note?.includes("could not capture a durable session id yet"),
+      ),
+    ).toBe(true);
+    expect(updates.some((update) => update.forceVisible === true)).toBe(true);
+
+    await manager.interruptActiveRun({
+      agentId: resolved.agentId,
+      sessionKey: resolved.sessionKey,
+    });
+    await expect(execution).rejects.toThrow("Run interrupted by /stop.");
+    expect(setSessionRuntime).toHaveBeenCalledWith(resolved, {
+      state: "running",
+      startedAt: expect.any(Number),
+    });
   });
 });

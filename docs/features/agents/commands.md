@@ -41,10 +41,11 @@ When a message starts with a configured bash shortcut such as `!`:
 - `/start`: show onboarding help for the current surface
 - `/help`: show the available control slash commands
 - `/status`: show the current route status and operator setup hints
-- `/whoami`: return the current platform sender and route identity plus the stored `sessionId` for the active conversation
+- `/whoami`: return the current platform sender and route identity plus the
+  current session id view for the active conversation
 - `/transcript`: return the current full conversation session transcript
 - `/stop`: send `Escape` to interrupt current processing in the current conversation session, clear clisbot's active-run state, and let queued prompts continue
-- `/new`: start a new session for the current routed conversation and store the new `sessionId`
+- `/new`: start a new session for the current routed conversation and save the new `sessionId`
 - `/nudge`: send one extra `Enter` to the current tmux session without resending the prompt body
 - `/queue <message>` or `\q <message>`: create one durable queued prompt for the current session
 - `/queue list`: show pending queued prompts for the current session
@@ -67,6 +68,16 @@ Current meaning:
 - `mention-only all`: persist mention-only as the default for all routed conversations on the current bot; shorthand: `/mention all`
 - `pause`: stop passive follow-up until explicitly resumed or re-activated; shorthand: `/pause`
 - `resume`: restore the default follow-up policy for that conversation; shorthand: `/resume`
+
+Follow-up target for continuity cleanup:
+
+- `/whoami` and `/status` should prefer runtime-memory `sessionId` truth when a
+  live run already knows it
+- they should still show whether that value is:
+  - persisted
+  - not persisted yet
+- if runtime memory captured a new `sessionId` and persistence is still behind,
+  the response should not pretend the old stored value is the freshest truth
 
 These commands should stay agent-scoped.
 

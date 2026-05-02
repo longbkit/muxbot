@@ -22,7 +22,7 @@ describe("resolveSlackMessageContent", () => {
     });
 
     expect(resolved.text).toBe("Title");
-    expect(resolved.apiText).toBe("\u200B");
+    expect(resolved.apiText).toBe("Title");
     expect(resolved.blocks).toEqual([
       {
         type: "header",
@@ -247,7 +247,7 @@ describe("resolveSlackMessageContent", () => {
 
     expect(resolved).toEqual({
       text: "Ship It",
-      apiText: "\u200B",
+      apiText: "Ship It",
       blocks: [
         {
           type: "header",

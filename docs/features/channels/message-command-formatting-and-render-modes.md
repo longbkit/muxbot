@@ -118,6 +118,7 @@ Current product stance:
 
 - Markdown input is converted into Telegram-safe HTML
 - common inline formatting, headings, lists, blockquotes, and fenced code blocks are supported
+- plain safe URLs such as `http://...`, `https://...`, `tg://...`, and `mailto:...` are auto-linked under native rendering
 - unsafe links or unsupported constructs degrade into readable escaped text
 - if Telegram rejects the HTML payload, transport retries with plain text instead of silently failing
 
@@ -132,7 +133,7 @@ Current product stance:
   - `H4+` flatten into paragraph flow as bold lines
   - lists and fenced code blocks stay readable
 - raw Block Kit passes through as-is when `--input blocks --render none`
-- Block Kit sends use minimal API fallback text so Slack accessibility requirements are met without duplicating the visible body
+- Block Kit sends use readable API fallback text so Slack accessibility, notifications, history reads, and degraded clients do not see a blank reply while the visible body still comes from the blocks
 
 ## Rules That Must Stay Truthful
 

@@ -36,7 +36,7 @@ Validated against:
 
 - `docs/features/agents/README.md`
 - `docs/features/agents/sessions.md`
-- `docs/architecture/runtime-architecture.md`
+- `docs/architecture/architecture.md`
 - `src/agents/session-state.ts`
 - `src/agents/session-store.ts`
 - `src/agents/resolved-target.ts`
@@ -58,7 +58,7 @@ Implication:
 Validated against:
 
 - `docs/features/runners/README.md`
-- `docs/architecture/runtime-architecture.md`
+- `docs/architecture/architecture.md`
 - `src/agents/runner-service.ts`
 - `src/runners/tmux/client.ts`
 - `src/runners/tmux/session-handshake.ts`
@@ -77,7 +77,7 @@ Implication:
 
 Validated against:
 
-- `docs/architecture/runtime-architecture.md`
+- `docs/architecture/architecture.md`
 - `docs/features/agents/README.md`
 - `src/agents/session-service.ts`
 - `src/agents/run-observation.ts`
@@ -203,7 +203,7 @@ Implication:
 
 Validated against:
 
-- `docs/architecture/runtime-architecture.md`
+- `docs/architecture/architecture.md`
 - `docs/features/agents/README.md`
 - `docs/features/agents/sessions.md`
 - `docs/features/runners/README.md`
@@ -226,7 +226,7 @@ Validated against:
 - `src/agents/loop-state.ts`
 - `src/agents/run-observation.ts`
 - `docs/features/agents/sessions.md`
-- `docs/architecture/runtime-architecture.md`
+- `docs/architecture/architecture.md`
 - `docs/architecture/architecture-overview.md`
 
 Current truth:

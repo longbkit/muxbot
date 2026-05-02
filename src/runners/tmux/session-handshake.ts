@@ -1,4 +1,4 @@
-import { extractSessionId } from "../../agents/session-identity.ts";
+import { parseRunnerSessionId } from "../../agents/session-identity.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
 import { sleep } from "../../shared/process.ts";
 import {
@@ -152,6 +152,9 @@ export async function captureTmuxSessionIdentity(params: {
   timeoutMs: number;
   pollIntervalMs: number;
 }) {
+  // This function only captures the runner-side sessionId from fresh status
+  // output inside the tmux pane. It does not decide whether that id should be
+  // persisted as storedSessionId; that boundary stays in RunnerService.
   let statusSubmission = await submitTmuxSessionInput({
     tmux: params.tmux,
     sessionName: params.sessionName,
@@ -194,8 +197,12 @@ export async function captureTmuxSessionIdentity(params: {
       continue;
     }
 
-    const sessionId = extractSessionIdFromCandidates(
-      deriveSessionIdentityTexts(statusSubmission.submittedSnapshot, snapshot),
+    const sessionId = extractSessionIdFromCaptureCandidates(
+      deriveSessionIdCaptureCandidates(
+        statusSubmission.submittedSnapshot,
+        snapshot,
+        params.statusCommand,
+      ),
       params.pattern,
     );
     if (sessionId) {
@@ -214,21 +221,35 @@ export async function captureTmuxSessionIdentity(params: {
   return null;
 }
 
-function deriveSessionIdentityTexts(submittedSnapshot: string, snapshot: string) {
+function deriveSessionIdCaptureCandidates(
+  submittedSnapshot: string,
+  snapshot: string,
+  statusCommand: string,
+) {
   const rawSubmitted = normalizePaneText(submittedSnapshot);
   const rawSnapshot = normalizePaneText(snapshot);
   return [
     extractScrolledAppend(rawSubmitted, rawSnapshot),
     deriveInteractionText(submittedSnapshot, snapshot),
     deriveInteractionDiffText(submittedSnapshot, snapshot),
+    rawSnapshot,
+    extractStatusCommandTail(rawSnapshot, statusCommand),
   ].filter((candidate, index, candidates) =>
     candidate && candidates.indexOf(candidate) === index
   );
 }
 
-function extractSessionIdFromCandidates(candidates: string[], pattern: string) {
+function extractStatusCommandTail(snapshot: string, statusCommand: string) {
+  const lastStatusIndex = snapshot.lastIndexOf(statusCommand);
+  if (lastStatusIndex < 0) {
+    return "";
+  }
+  return snapshot.slice(lastStatusIndex);
+}
+
+function extractSessionIdFromCaptureCandidates(candidates: string[], pattern: string) {
   for (const candidate of candidates) {
-    const sessionId = extractSessionId(candidate, pattern);
+    const sessionId = parseRunnerSessionId(candidate, pattern);
     if (sessionId) {
       return sessionId;
     }

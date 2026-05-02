@@ -184,10 +184,12 @@ describe("runner cli integration", () => {
     );
     expect(result.stdout).not.toContain("sessionKey:");
     expect(result.stdout).toContain("sessionId: session-beta");
-    expect(result.stdout).toContain("sessionId: none");
+    expect(result.stdout).toContain("sessionIdPersistence: persisted");
+    expect(result.stdout).toContain("sessionId: not stored");
+    expect(result.stdout).toContain("sessionIdPersistence: not stored yet");
     expect(result.stdout).toContain("state: running");
     expect(result.stdout).toContain("state: idle");
-    expect(result.stdout).toContain("sessionName: gamma\n  sessionId: none\n  state: unmanaged");
+    expect(result.stdout).toContain("sessionName: gamma\n  sessionId: not stored\n  state: unmanaged");
     expect(result.stdout).not.toContain("live:");
     expect(result.stdout).toContain("lastAdmittedPromptAt");
   }, 15000);
@@ -320,7 +322,8 @@ describe("runner cli integration", () => {
     ]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain(`session: ${betaSessionName}`);
-    expect(result.stdout).toContain("sessionId: none");
+    expect(result.stdout).toContain("sessionId: not stored");
+    expect(result.stdout).toContain("sessionIdPersistence: not stored yet");
     expect(result.stdout).toContain("state: watching");
     expect(result.stdout).not.toContain("sessionKey:");
     expect(result.stdout).not.toContain("intervalMs:");
@@ -370,7 +373,8 @@ describe("runner cli integration", () => {
     ]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain(`session: ${alphaSessionName}`);
-    expect(result.stdout).toContain("sessionId: none");
+    expect(result.stdout).toContain("sessionId: not stored");
+    expect(result.stdout).toContain("sessionIdPersistence: not stored yet");
     expect(result.stdout).toContain("state: watching");
     expect(result.stdout).not.toContain("sessionKey:");
     expect(result.stdout).not.toContain("intervalMs:");

@@ -1,4 +1,4 @@
-import type { ClisbotConfig } from "../config/schema.ts";
+import type { BotRouteConfig, ClisbotConfig } from "../config/schema.ts";
 import {
   createDirectMessageBehaviorOverride,
   resolveDirectMessageExactRoute,
@@ -41,9 +41,13 @@ type SurfaceModeTargetBinding<TField extends SurfaceModeField> = {
   label: string;
 };
 
-function createTelegramRouteOverride() {
+function createTelegramRouteOverride(
+  base?: Pick<BotRouteConfig, "enabled" | "requireMention" | "allowBots">,
+) {
   return {
-    enabled: true,
+    enabled: base?.enabled ?? true,
+    requireMention: base?.requireMention ?? true,
+    allowBots: base?.allowBots ?? false,
     allowUsers: [] as string[],
     blockUsers: [] as string[],
   };
@@ -75,7 +79,7 @@ function getOrCreateTelegramTopicRoute(
   if (existingTopic) {
     return existingTopic;
   }
-  const createdTopic = createTelegramRouteOverride();
+  const createdTopic = createTelegramRouteOverride(group);
   (group.topics as Record<string, ReturnType<typeof createTelegramRouteOverride>>)[topicId] =
     createdTopic;
   return createdTopic;

@@ -78,7 +78,11 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
   let previousRenderedRunningSnapshot = "";
   let lastPaneChangeAt = params.startedAt;
   let sawActivity = false;
-  let sawPaneChange = !params.prompt;
+  // Rehydrated runs may start without a prompt, but only a non-empty initial
+  // pane should count as prior visible activity. An empty initial pane must
+  // stay pending so timer-driven output can still appear before idle
+  // completion settles the run.
+  let sawPaneChange = Boolean(normalizePaneText(params.initialSnapshot));
   let sawPromptSubmission = Boolean(params.prompt);
   let detachedNotified = params.detachedAlready;
   let firstMeaningfulDeltaLogged = false;

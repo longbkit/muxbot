@@ -444,7 +444,7 @@ tmux is still the current stability boundary. One agent maps to one durable runn
 
 This repo also serves as a small example of an AI-native engineering workflow:
 
-- simple `AGENTS.md` and `CLAUDE.md`-style operating rules
+- simple `AGENTS.md`-style operating rules, with Claude and Gemini compatibility files able to symlink back to the same source
 - lessons-learned docs to capture repeated feedback and pitfalls
 - architecture docs used as a stable implementation contract
 - end-to-end validation expectations to close the feedback loop for AI agents
