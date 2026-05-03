@@ -47,6 +47,7 @@ function createStoredLoopBase(params: {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  progressMessages?: number;
   loopStart?: LoopStartNotificationMode;
   createdBy?: string;
   sender?: StoredLoopSender;
@@ -67,6 +68,7 @@ function createStoredLoopBase(params: {
     protectedControlMutationRule: params.protectedControlMutationRule,
     promptSummary: params.promptSummary,
     promptSource: params.promptSource,
+    progressMessages: params.progressMessages,
     loopStart: params.loopStart,
     createdBy: params.createdBy,
     sender: params.sender ?? deriveLegacyLoopSender({
@@ -99,6 +101,7 @@ export function createStoredIntervalLoop(params: {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  progressMessages?: number;
   loopStart?: LoopStartNotificationMode;
   surfaceBinding?: StoredLoopSurfaceBinding;
   intervalMs: number;
@@ -114,6 +117,7 @@ export function createStoredIntervalLoop(params: {
       protectedControlMutationRule: params.protectedControlMutationRule,
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
+      progressMessages: params.progressMessages,
       loopStart: params.loopStart,
       createdBy: params.createdBy,
       sender: params.sender,
@@ -130,6 +134,7 @@ export function createStoredCalendarLoop(params: {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  progressMessages?: number;
   loopStart?: LoopStartNotificationMode;
   surfaceBinding?: StoredLoopSurfaceBinding;
   cadence: LoopCalendarCadence;
@@ -163,6 +168,7 @@ export function createStoredCalendarLoop(params: {
       protectedControlMutationRule: params.protectedControlMutationRule,
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
+      progressMessages: params.progressMessages,
       loopStart: params.loopStart,
       createdBy: params.createdBy,
       sender: params.sender,

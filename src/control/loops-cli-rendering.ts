@@ -59,6 +59,8 @@ export function renderLoopsHelp() {
     "  - `--sender <principal>` is required when creating loops, using `slack:<user-id>` or `telegram:<user-id>`",
     "  - optional creator display fields: `--sender-name <name>` and `--sender-handle <handle>`",
     "  - `--timezone <iana>` is a one-off wall-clock loop override and is frozen on the created loop record",
+    `  - \`${LOOP_START_FLAG} <none|brief|full>\` controls scheduled loop-start notifications only; it does not control injected agent progress messages`,
+    "  - `--progress <count>` overrides loop progress-message injection for agent replies; `0` disables progress messages, and omitting the flag inherits the normal clisbot prompt config",
     "  - in Telegram forum groups, omitting `--topic-id` targets the parent chat surface; sends then follow Telegram's normal no-`message_thread_id` behavior, which is the General topic when that forum has one",
     "",
     "Expressions:",
@@ -80,6 +82,7 @@ export function renderLoopsHelp() {
     "  - CLI loop creation fails without `--sender` so scheduled prompts can preserve creator identity",
     "  - the first wall-clock loop returns `confirmation_required` and does not persist until rerun with `--confirm`",
     "  - recurring interval loops and confirmed wall-clock loops are persisted immediately and picked up by the runtime when it is running",
+    "  - loop-created agent prompts inherit the normal clisbot prompt config unless `--progress <count>` overrides that loop",
     "  - if runtime is stopped, recurring loops activate on the next `clisbot start`",
     "  - global `cancel --all` clears the whole app; scoped `cancel --all` clears one routed session",
     "  - `cancel --all --app` is accepted only with a scoped session target, matching `/loop cancel --all --app`",
@@ -110,6 +113,7 @@ export function renderLoopsCreateHelp() {
     "  - `--timezone <iana>` freezes a one-off wall-clock timezone on the loop record",
     "  - `--confirm` persists the first wall-clock loop after reviewing the confirmation output",
     `  - advanced: \`${LOOP_START_FLAG} <none|brief|full>\` overrides the default scheduled loop-start notification behavior for that recurring loop`,
+    "  - advanced: `--progress <count>` overrides loop agent progress-message injection; `0` disables progress messages, and omitting the flag inherits the normal clisbot prompt config",
     "",
     "Examples:",
     `  ${renderCliCommand("loops create --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI")}`,
@@ -120,6 +124,7 @@ export function renderLoopsCreateHelp() {
     "  - create without `--sender` fails by design",
     "  - the `--sender` platform must match `--channel`",
     "  - recurring CLI-created loops persist creator metadata into the session store",
+    "  - CLI-created loop prompts inherit the normal clisbot prompt config unless `--progress <count>` is provided",
   ].join("\n");
 }
 

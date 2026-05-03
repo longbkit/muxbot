@@ -901,7 +901,7 @@ export class TelegramPollingService {
             message.from?.id != null ? String(message.from.id).trim() : undefined,
           text,
           agentPromptText,
-          agentPromptBuilder: (nextText) =>
+          agentPromptBuilder: (nextText, options) =>
             buildAgentPromptText({
               text: enrichPromptText(nextText),
               identity,
@@ -921,6 +921,7 @@ export class TelegramPollingService {
                 routeTimezone: route.timezone,
                 botTimezone: route.botTimezone,
               }).timezone,
+              maxProgressMessagesOverride: options?.maxProgressMessagesOverride,
             }),
           promptContext,
           protectedControlMutationRule,

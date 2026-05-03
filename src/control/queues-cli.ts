@@ -267,14 +267,15 @@ function createQueueItemForContext(params: {
 }
 
 export function renderQueueCreatedNotification(params: {
+  queueId: string;
   positionAhead: number;
   promptText: string;
 }) {
   const queueLine =
     params.positionAhead > 0
-      ? `Queued: ${params.positionAhead} ahead.`
-      : "Queued.";
-  return `${queueLine}\n\nPrompt:\n${params.promptText.trim()}`;
+      ? `Queued \`${params.queueId}\`: ${params.positionAhead} ahead.`
+      : `Queued \`${params.queueId}\`.`;
+  return `${queueLine}\n\n${params.promptText.trim()}`;
 }
 
 async function getQueuePositionAhead(
@@ -409,7 +410,7 @@ async function createQueue(
     context.sessionTarget.sessionKey,
     item.id,
   );
-  const text = renderQueueCreatedNotification({ positionAhead, promptText });
+  const text = renderQueueCreatedNotification({ queueId: item.id, positionAhead, promptText });
   await deps.sendQueueCreatedNotification({
     state,
     context,

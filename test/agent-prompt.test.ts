@@ -180,6 +180,36 @@ describe("agent prompt envelope", () => {
     expect(prompt).toBe("plain text");
   });
 
+  test("can disable progress-capable reply instructions while keeping final reply instructions", () => {
+    const prompt = buildAgentPromptText({
+      text: "ship it",
+      identity: {
+        platform: "telegram",
+        conversationKind: "topic",
+        senderId: "123",
+        chatId: "-1001",
+        topicId: "4",
+      },
+      config: {
+        enabled: true,
+        maxProgressMessages: 3,
+        requireFinalResponse: true,
+      },
+      responseMode: "message-tool",
+      streaming: "all",
+      maxProgressMessagesOverride: 0,
+    });
+
+    expect(prompt).toContain("To send a user-visible final reply, use the following CLI command:");
+    expect(prompt).toContain("  --final \\");
+    expect(prompt).not.toContain("--final|progress");
+    expect(prompt).not.toContain("use that command to send progress updates and the final reply back to the conversation");
+    expect(prompt).not.toContain("send at most 3 short, meaningful progress updates");
+    expect(prompt).toContain(
+      "- send a single final user-facing message by default; split only when channel limits require it or clarity would otherwise suffer",
+    );
+  });
+
   test("omits message-tool instructions when responseMode is capture-pane", () => {
     previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
     previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;

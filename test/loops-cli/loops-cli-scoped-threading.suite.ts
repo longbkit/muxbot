@@ -188,6 +188,8 @@ describe("loops cli", () => {
       "The Longbkit",
       "--sender-handle",
       "longbkit",
+      "--progress",
+      "2",
       "every",
       "day",
       "at",
@@ -211,6 +213,7 @@ describe("loops cli", () => {
           id: string;
           kind?: string;
           loopStart?: string;
+          progressMessages?: number;
           promptSummary?: string;
           createdBy?: string;
           sender?: { senderId?: string; providerId?: string; displayName?: string; handle?: string };
@@ -221,6 +224,7 @@ describe("loops cli", () => {
     expect(sessionEntry?.loops).toHaveLength(1);
     expect(sessionEntry?.loops?.[0]?.kind).toBe("calendar");
     expect(sessionEntry?.loops?.[0]?.loopStart).toBe("full");
+    expect(sessionEntry?.loops?.[0]?.progressMessages).toBe(2);
     expect(sessionEntry?.loops?.[0]?.promptSummary).toBe("check CI");
     expect(sessionEntry?.loops?.[0]?.createdBy).toBe("U123");
     expect(sessionEntry?.loops?.[0]?.sender).toEqual({

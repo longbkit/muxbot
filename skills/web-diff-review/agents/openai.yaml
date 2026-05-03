@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Web Diff Review'
+  short_description: 'Open diffs in difit for user review, with optional inline findings preloaded.'
+  default_prompt: 'Use $web-diff-review when difit is the right review surface: either launch a diff for user review after code changes, or review a specific diff or PR first and open difit with concrete --comment findings preloaded.'

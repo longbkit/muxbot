@@ -846,7 +846,7 @@ export class SlackSocketService {
         senderId: slackSenderId,
         text,
         agentPromptText,
-        agentPromptBuilder: (nextText) =>
+        agentPromptBuilder: (nextText, options) =>
           buildAgentPromptText({
             text: enrichPromptText(nextText),
             identity,
@@ -866,6 +866,7 @@ export class SlackSocketService {
               routeTimezone: params.route.timezone,
               botTimezone: params.route.botTimezone,
             }).timezone,
+            maxProgressMessagesOverride: options?.maxProgressMessagesOverride,
           }),
         promptContext,
         protectedControlMutationRule,

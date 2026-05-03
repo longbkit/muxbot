@@ -205,6 +205,107 @@ describe("AgentService loops and queue", () => {
     await service.stop();
   });
 
+  test("managed loop execution lets a stored loop progress override disable progress instructions", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-loop-progress-"));
+    const storePath = join(tempDir, "sessions.json");
+    const socketPath = join(tempDir, "clisbot.sock");
+    const workspaceTemplate = join(tempDir, "workspaces", "{agentId}");
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify(
+        buildConfig({
+          socketPath,
+          storePath,
+          workspaceTemplate,
+          runnerCommand: "codex",
+          runnerArgs: ["-C", "{workspace}"],
+          sessionId: {
+            create: { mode: "runner", args: [] },
+            capture: {
+              mode: "status-command",
+              statusCommand: "/status",
+              pattern: RUNNER_GENERATED_ID,
+              timeoutMs: 10,
+              pollIntervalMs: 1,
+            },
+            resume: { mode: "command", args: ["resume", "{sessionId}"] },
+          },
+          cleanupEnabled: false,
+        }),
+        null,
+        2,
+      ),
+    );
+
+    const loadedConfig = await loadConfig(configPath);
+    loadedConfig.raw.bots.slack.defaults.agentPrompt.enabled = true;
+    loadedConfig.raw.bots.slack.default.groups.c4 = {
+      enabled: true,
+      requireMention: true,
+      allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
+      responseMode: "message-tool",
+      streaming: "off",
+    };
+
+    const tmux = new FakeTmuxClient() as unknown as TmuxClient;
+    const service = new AgentService(loadedConfig, { tmux });
+    const target = {
+      agentId: "default",
+      sessionKey: "agent:default:slack:channel:c4:thread:loop-progress",
+    };
+    await recordSurfaceDirectoryIdentity({
+      stateDir: loadedConfig.stateDir,
+      identity: {
+        platform: "slack",
+        conversationKind: "channel",
+        senderId: "U123",
+        senderName: "Alice Smith",
+        senderHandle: "alice",
+        channelId: "c4",
+        channelName: "release-ops",
+        threadTs: "loop-progress",
+      },
+    });
+
+    await service.createIntervalLoop({
+      target,
+      promptText: "check deploy",
+      promptSummary: "check deploy",
+      promptSource: "custom",
+      surfaceBinding: {
+        platform: "slack",
+        conversationKind: "channel",
+        channelId: "c4",
+        threadTs: "loop-progress",
+      },
+      intervalMs: 60_000,
+      maxRuns: 1,
+      createdBy: "U123",
+      force: true,
+      progressMessages: 0,
+    });
+
+    let transcript = await service.captureTranscript(target);
+    for (let attempt = 0; attempt < 10 && !transcript.snapshot.includes("check deploy"); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      transcript = await service.captureTranscript(target);
+    }
+
+    expect(transcript.snapshot).toContain("check deploy");
+    expect(transcript.snapshot).toContain("To send a user-visible final reply, use the following CLI command:");
+    expect(transcript.snapshot).toContain("  --final \\");
+    expect(transcript.snapshot).not.toContain("--final|progress");
+    expect(transcript.snapshot).not.toContain("use that command to send progress updates and the final reply back to the conversation");
+    expect(transcript.snapshot).not.toContain(
+      "send at most 3 short, meaningful progress updates; skip trivial internal steps",
+    );
+
+    await service.stop();
+  });
+
   test("managed interval loops post loop-start notifications for scheduled ticks", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-loop-notify-"));
     const storePath = join(tempDir, "sessions.json");

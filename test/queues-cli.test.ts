@@ -195,21 +195,19 @@ describe("queues cli", () => {
       },
     });
 
-    expect(notifications).toEqual([
-      {
-        positionAhead: 1,
-        text: "Queued: 1 ahead.\n\nPrompt:\nreview queue state",
-      },
-    ]);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.positionAhead).toBe(1);
+    expect(notifications[0]?.text).toMatch(/^Queued `[^`]+`: 1 ahead\.\n\nreview queue state$/);
+    expect(notifications[0]?.text).not.toContain("Prompt:");
   });
 
   test("renders queue created notifications without truncating the prompt", () => {
     const prompt = "line one\nline two with `code` and enough detail";
 
-    expect(renderQueueCreatedNotification({ positionAhead: 0, promptText: prompt }))
-      .toBe("Queued.\n\nPrompt:\nline one\nline two with `code` and enough detail");
-    expect(renderQueueCreatedNotification({ positionAhead: 2, promptText: prompt }))
-      .toBe("Queued: 2 ahead.\n\nPrompt:\nline one\nline two with `code` and enough detail");
+    expect(renderQueueCreatedNotification({ queueId: "queue-1", positionAhead: 0, promptText: prompt }))
+      .toBe("Queued `queue-1`.\n\nline one\nline two with `code` and enough detail");
+    expect(renderQueueCreatedNotification({ queueId: "queue-2", positionAhead: 2, promptText: prompt }))
+      .toBe("Queued `queue-2`: 2 ahead.\n\nline one\nline two with `code` and enough detail");
   });
 
   test("create without --sender fails before persisting", async () => {

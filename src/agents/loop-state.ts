@@ -37,6 +37,7 @@ type StoredLoopBase = {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  progressMessages?: number;
   loopStart?: LoopStartNotificationMode;
   createdBy?: string;
   sender?: StoredLoopSender;

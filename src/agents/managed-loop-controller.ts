@@ -58,6 +58,7 @@ export type CreateIntervalLoopParams = {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  progressMessages?: number;
   loopStart?: LoopStartNotificationMode;
   surfaceBinding?: StoredLoopSurfaceBinding;
   intervalMs: number;
@@ -73,6 +74,7 @@ export type CreateCalendarLoopParams = {
   protectedControlMutationRule?: string;
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
+  progressMessages?: number;
   loopStart?: LoopStartNotificationMode;
   surfaceBinding?: StoredLoopSurfaceBinding;
   cadence: LoopCalendarCadence;

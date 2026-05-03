@@ -52,6 +52,7 @@ describe("loops cli", () => {
     expect(help).toContain("times: `3 check CI` or `check CI 3 times`");
     expect(help).toContain("omit the prompt to load `LOOP.md` from the target workspace");
     expect(help).toContain("`--sender <principal>` is required when creating loops");
+    expect(help).toContain("`--progress <count>` overrides loop progress-message injection");
     expect(help).toContain("first wall-clock loop returns `confirmation_required`");
   });
 
@@ -67,6 +68,7 @@ describe("loops cli", () => {
     expect(help).toContain("clisbot loops create");
     expect(help).toContain("--sender <principal>");
     expect(help).toContain("--loop-start <none|brief|full>");
+    expect(help).toContain("--progress <count>");
     expect(help).toContain("create without `--sender` fails by design");
   });
 
@@ -232,6 +234,50 @@ describe("loops cli", () => {
     expect(statusOutput).toContain("activeLoops.global: `1`");
     expect(statusOutput).toContain("loop123");
     expect(statusOutput).toContain("interval: `5m`");
+  });
+
+  test("create persists a loop progress override", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-loops-cli-progress-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        enableSlackChannelRoute(
+          buildConfig({
+            socketPath: join(tempDir, "clisbot.sock"),
+            storePath,
+            workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+          }),
+          "C1",
+        ),
+        null,
+        2,
+      ),
+    );
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+
+    await runLoopsCli([
+      "create",
+      "--channel",
+      "slack",
+      "--target",
+      "group:C1",
+      "--sender",
+      "slack:U123",
+      "--progress",
+      "3",
+      "5m",
+      "check",
+      "CI",
+    ]);
+
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<
+      string,
+      { loops?: Array<{ progressMessages?: number }> }
+    >;
+    expect(store["agent:default:slack:channel:c1"]?.loops?.[0]?.progressMessages).toBe(3);
   });
 
   test("cancel <id> removes a single persisted loop", async () => {

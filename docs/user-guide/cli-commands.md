@@ -533,6 +533,7 @@ Examples:
 - use scoped `clisbot loops list --channel ... --target ...` when you want one routed session
 - CLI creation accepts the same expression families as `/loop`: interval, forced interval, times/count, and calendar schedules
 - advanced recurring loop creation also accepts `--loop-start <none|brief|full>` to override the default scheduled start notification behavior for that one loop; omit it to keep the route default
+- loop creation also accepts `--progress <count>` to override injected agent progress-message instructions for that loop only; omit it to keep the normal `clisbot.json` prompt policy, use `0` to disable progress updates, or use a positive count to cap them
 - omit the prompt body to load `LOOP.md` from the target workspace for maintenance loops
 - count/times loops run synchronously in the CLI process today; recurring loops are persisted for the runtime scheduler
 - the first wall-clock loop create attempt returns confirmation-required output and does not persist a loop until rerun with `--confirm`

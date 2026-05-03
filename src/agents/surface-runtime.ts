@@ -229,6 +229,7 @@ export class SurfaceRuntime {
       time: promptTime,
       promptContext,
       scheduledLoopId: loop.id,
+      maxProgressMessagesOverride: loop.progressMessages,
     });
   }
 

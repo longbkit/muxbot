@@ -117,6 +117,7 @@ export function buildAgentPromptText(params: {
   time?: number | string | Date;
   promptContext?: SurfacePromptContext;
   scheduledLoopId?: string;
+  maxProgressMessagesOverride?: number;
 }) {
   return buildChannelPromptText({
     ...params,
@@ -155,6 +156,7 @@ function buildChannelPromptText(params: {
   time?: number | string | Date;
   promptContext?: SurfacePromptContext;
   scheduledLoopId?: string;
+  maxProgressMessagesOverride?: number;
   mode: ChannelPromptMode;
 }) {
   if (params.mode === "message" && !params.config?.enabled) {
@@ -178,6 +180,7 @@ function buildChannelPromptText(params: {
     config: params.config!,
     responseMode: params.responseMode,
     streaming: params.streaming,
+    maxProgressMessagesOverride: params.maxProgressMessagesOverride,
   });
   const context = resolvePromptContext(params);
 
@@ -228,6 +231,7 @@ function renderMessagePromptParts(params: {
   config: ChannelAgentPromptConfig;
   responseMode?: "capture-pane" | "message-tool";
   streaming?: "off" | "latest" | "all";
+  maxProgressMessagesOverride?: number;
 }) {
   const messageToolMode = (params.responseMode ?? "message-tool") === "message-tool";
   if (!messageToolMode) {
@@ -239,9 +243,14 @@ function renderMessagePromptParts(params: {
     };
   }
 
-  const progressPhrase = PROGRESS_PHRASE;
-  const progressFlagSuffix = PROGRESS_FLAG_SUFFIX;
-  const progressRulesBlock = PROGRESS_RULES_BLOCK;
+  const maxProgressMessages = Math.max(
+    0,
+    params.maxProgressMessagesOverride ?? params.config.maxProgressMessages,
+  );
+  const progressEnabled = maxProgressMessages > 0;
+  const progressPhrase = progressEnabled ? PROGRESS_PHRASE : EMPTY_PROGRESS_PHRASE;
+  const progressFlagSuffix = progressEnabled ? PROGRESS_FLAG_SUFFIX : EMPTY_PROGRESS_FLAG_SUFFIX;
+  const progressRulesBlock = progressEnabled ? PROGRESS_RULES_BLOCK : "";
   const finalRuleLine = params.config.requireFinalResponse
     ? FINAL_RULE_REQUIRED
     : FINAL_RULE_OPTIONAL;
@@ -259,7 +268,7 @@ function renderMessagePromptParts(params: {
     }),
     replyRules: renderTemplate(REPLY_RULES, {
       progress_rules_block: renderTemplate(progressRulesBlock, {
-        max_progress_messages: String(params.config.maxProgressMessages),
+        max_progress_messages: String(maxProgressMessages),
       }),
       final_rule_line: finalRuleLine,
     }),

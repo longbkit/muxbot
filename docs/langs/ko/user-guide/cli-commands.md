@@ -236,6 +236,7 @@ clisbot loops cancel --all
 
 - recurring loop는 runtime scheduler를 위해 persist됨
 - `--sender`는 loop 생성 시 필수
+- `--progress <count>`는 그 loop 하나만 progress-message 안내를 override함. 생략하면 일반 `clisbot.json` prompt policy를 그대로 쓰고, `0`은 progress update를 끄며, 양수는 최대 횟수를 제한함
 - Telegram topic은 `--topic-id`
 - Slack fresh thread는 `--new-thread`
 

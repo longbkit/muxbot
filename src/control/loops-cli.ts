@@ -62,6 +62,7 @@ export { renderLoopsHelp } from "./loops-cli-rendering.ts";
 
 const LOOP_BUSY_RETRY_MS = 250;
 const LOOP_CONFIRM_FLAG = "--confirm";
+const LOOP_PROGRESS_FLAG = "--progress";
 const LOOP_SENDER_FLAG = "--sender";
 const LOOP_SENDER_NAME_FLAG = "--sender-name";
 const LOOP_SENDER_HANDLE_FLAG = "--sender-handle";
@@ -83,6 +84,7 @@ type LoopCreateRequest = {
   expression: string;
   confirm: boolean;
   loopTimezone?: string;
+  progressMessages?: number;
 };
 type LoopCounts = {
   sessionLoopCount: number;
@@ -328,9 +330,17 @@ async function executeCountLoop(params: {
   promptText: string;
   count: number;
   maintenancePrompt: boolean;
+  progressMessages?: number;
 }) {
   const agentService = new AgentService(params.state.loadedConfig);
-  const builtPrompt = params.context.buildLoopPromptText(params.promptText);
+  const builtPrompt = params.context.buildLoopPromptText(
+    params.promptText,
+    params.progressMessages == null
+      ? undefined
+      : {
+          maxProgressMessagesOverride: params.progressMessages,
+        },
+  );
   console.log(
     renderLoopStartedMessage({
       mode: "times",
@@ -389,10 +399,41 @@ function stripLoopCreatorArgs(args: string[]) {
   return remaining;
 }
 
+function parseLoopProgress(args: string[]) {
+  const raw = parseOptionValue(args, LOOP_PROGRESS_FLAG);
+  if (raw == null) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || String(parsed) !== raw.trim() || parsed < 0) {
+    throw new Error(`${LOOP_PROGRESS_FLAG} must be a non-negative integer.`);
+  }
+  return parsed;
+}
+
+function stripLoopProgressArgs(args: string[]) {
+  const remaining: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const current = args[index];
+    if (current === "--") {
+      remaining.push(...args.slice(index));
+      break;
+    }
+    if (current === LOOP_PROGRESS_FLAG) {
+      index += 1;
+      continue;
+    }
+    remaining.push(current);
+  }
+  return remaining;
+}
+
 function parseCreateExpression(rawArgs: string[], explicitCreateSubcommand: boolean) {
   const expressionArgs = stripLoopContextArgs(
     stripLoopCreatorArgs(
-      stripConfirmFlag(explicitCreateSubcommand ? rawArgs.slice(1) : rawArgs),
+      stripLoopProgressArgs(
+        stripConfirmFlag(explicitCreateSubcommand ? rawArgs.slice(1) : rawArgs),
+      ),
     ),
   );
   const expression = expressionArgs.join(" ").trim();
@@ -499,6 +540,7 @@ async function resolveLoopCreateRequest(
 ): Promise<LoopCreateRequest> {
   const confirm = hasFlag(rawArgs, LOOP_CONFIRM_FLAG);
   const loopTimezone = parseLoopTimezone(rawArgs);
+  const progressMessages = parseLoopProgress(rawArgs);
   const expression = parseCreateExpression(rawArgs, explicitCreateSubcommand);
   const parsed = parseCreateCommand(expression);
   let addressing = parseAddressing(rawArgs);
@@ -532,6 +574,7 @@ async function resolveLoopCreateRequest(
       expression,
       confirm,
       loopTimezone,
+      progressMessages,
     };
   }
   addressing = await prepareLoopCreateAddressing({
@@ -566,6 +609,7 @@ async function resolveLoopCreateRequest(
     expression,
     confirm,
     loopTimezone,
+    progressMessages,
   };
 }
 
@@ -607,6 +651,7 @@ function buildRecurringLoopPromptMetadata(request: LoopCreateRequest) {
     promptSource: request.resolvedPrompt.maintenancePrompt
       ? ("LOOP.md" as const)
       : ("custom" as const),
+    progressMessages: request.progressMessages,
     loopStart: request.parsed.mode === "times" ? undefined : request.parsed.loopStart,
     maintenancePrompt: request.resolvedPrompt.maintenancePrompt,
     createdBy: request.creator.providerId,
@@ -776,6 +821,7 @@ async function createLoop(
       promptText: request.resolvedPrompt.text,
       count: request.parsed.count,
       maintenancePrompt: request.resolvedPrompt.maintenancePrompt,
+      progressMessages: request.progressMessages,
     });
     return;
   }

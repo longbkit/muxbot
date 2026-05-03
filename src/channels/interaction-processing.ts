@@ -1266,7 +1266,12 @@ export async function processChannelInteraction<TChunk>(params: {
   senderId?: string;
   text: string;
   agentPromptText?: string;
-  agentPromptBuilder?: (text: string) => string;
+  agentPromptBuilder?: (
+    text: string,
+    options?: {
+      maxProgressMessagesOverride?: number;
+    },
+  ) => string;
   promptContext?: SurfacePromptContext;
   protectedControlMutationRule?: string;
   route: ChannelInteractionRoute;

@@ -27,7 +27,12 @@ export type LoopCliContext = {
   sessionTarget: AgentSessionTarget;
   identity: ChannelIdentity;
   route: SurfaceRoute;
-  buildLoopPromptText: (text: string) => string;
+  buildLoopPromptText: (
+    text: string,
+    options?: {
+      maxProgressMessagesOverride?: number;
+    },
+  ) => string;
 };
 
 type LoopCliContextParams = {
@@ -102,7 +107,7 @@ function resolveSlackLoopCliContext(params: LoopCliContextParams): LoopCliContex
     sessionTarget,
     identity,
     route,
-    buildLoopPromptText: (text) =>
+    buildLoopPromptText: (text, options) =>
       buildAgentPromptText({
         text,
         identity,
@@ -118,6 +123,7 @@ function resolveSlackLoopCliContext(params: LoopCliContextParams): LoopCliContex
           routeTimezone: route.timezone,
           botTimezone: route.botTimezone,
         }).timezone,
+        maxProgressMessagesOverride: options?.maxProgressMessagesOverride,
       }),
   };
 }
@@ -183,7 +189,7 @@ function resolveTelegramLoopCliContext(params: LoopCliContextParams): LoopCliCon
     sessionTarget,
     identity,
     route,
-    buildLoopPromptText: (text) =>
+    buildLoopPromptText: (text, options) =>
       buildAgentPromptText({
         text,
         identity,
@@ -199,6 +205,7 @@ function resolveTelegramLoopCliContext(params: LoopCliContextParams): LoopCliCon
           routeTimezone: route.timezone,
           botTimezone: route.botTimezone,
         }).timezone,
+        maxProgressMessagesOverride: options?.maxProgressMessagesOverride,
       }),
   };
 }
