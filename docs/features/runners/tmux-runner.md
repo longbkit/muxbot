@@ -308,6 +308,6 @@ That rendering decision belongs to `channels` and `control` and is defined by [t
 ## Related Docs
 
 - [Runners Feature](README.md)
-- [Runtime Architecture](../../architecture/architecture.md)
+- [Runtime Architecture](../../architecture/runtime-architecture.md)
 - [Transcript Presentation And Streaming](../../architecture/transcript-presentation-and-streaming.md)
 - [Runner Tests](../../tests/features/runners/README.md)

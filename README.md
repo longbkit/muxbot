@@ -20,22 +20,24 @@ It is not just a tmux bridge with chat glued on top. `clisbot` treats Slack and 
 - start with the [Quick Start](#quick-start)
 - best fit when you want Codex, Claude, or Gemini available from chat without
   giving up a real workspace
-- current release value: `/queue`, stronger long-run continuity, and better
-  trust or restart recovery
+- current release value: a much more AI-native control path, where the bot can
+  increasingly set up `/queue`, loops, schedules, and other recurring work for
+  you from normal chat instead of forcing you to memorize command syntax first
 
 ### I Want A Shared Team Bot
 
 - start with [Quick Start](#quick-start), then read [Surface Access Model](#surface-access-model)
 - best fit when you need one bot in a real Slack channel, Telegram group, or
   Telegram topic with explicit route and sender control
-- current release value: safer shared-surface policy, stricter topic or thread
-  isolation, and direct upgrade from older installs
+- current release value: safer shared-surface policy, tighter topic or thread
+  isolation, per-group sender control, and permission boundaries that let one
+  bot live in a team group without opening it to everyone there
 
 ### I Need Operator Control And Debugging
 
 - start with [Common CLI commands](#common-cli-commands)
 - most useful surfaces: `clisbot status`, `clisbot logs`,
-  `clisbot runner list|watch`, and `clisbot queues`
+  `clisbot watch --latest`, `clisbot inspect --latest`, and `clisbot queues`
 - current release value: more truthful `sessionId`, lighter runner inventory,
   and less confusing restart behavior during updates
 
@@ -60,30 +62,20 @@ The challenge is not whether AI is useful. It is how to make it work at enterpri
 - Learns from and integrates the two biggest strengths that made OpenClaw popular: memory and native channel integration with deep, channel-specific conversation and presentation capabilities.
 - Not just a tmux bridge. Slack and Telegram are treated as real channel surfaces with routing, thread or topic continuity, pairing, follow-up control, and attachment-aware interaction instead of plain text passthrough so you can work from your laptop or on the go without giving up a real coding workspace.
 - Team-first by design, with `AGENTS`, `USER`, and `MEMORY` context bootstrapping shaped for shared team reality instead of only personal solo-assistant flows.
-- Useful for coding, operations, teamwork, and general assistant work, with fast chat controls such as `!<command>` and `/bash <command>` for terminal-like control, `/loop` to bring loop-style automation beyond Claude, `/queue` to add follow-up prompts in the same session without interrupting the current run, `/streaming on` to view real-time processing progress for coding tasks, and `/mention`, `/mention channel`, or `/mention all` to tighten follow-up policy at conversation, route, or bot scope.
+- Shared-surface permission control is a first-class feature: a bot can be in a team group but still answer only the specific people you allow there, while sensitive control actions stay behind explicit auth roles and permissions.
+- Useful for coding, operations, teamwork, and general assistant work, with fast chat controls such as `!<command>`, `/bash <command>`, `/queue`, `/loop`, `/streaming`, and `/mention`.
+- New in `v0.1.45`: the AI-native control experience is much better. You can increasingly ask the bot in normal chat to update itself and explain what changed, help with onboarding, add or configure bots and agents, or create recurring schedules and loops for you instead of relying only on slash commands.
 
 ## Who This Fits Best
 
+- Anyone who wants a high-agency personal assistant with OpenClaw-style memory,
+  workspace context, and a skill-oriented operating model that can do far more
+  than a thin chat wrapper.
 - Solo builders who want a real coding assistant in Telegram or Slack, backed
   by Codex, Claude, or Gemini, without rebuilding their workflow around a new
   web product.
 - Team leads who want one shared bot with explicit group or topic safety,
   durable context, and attachment-aware chat workflows.
-- Operators who need tmux-backed runtime truth, restart controls, queue
-  inspection, and debug surfaces instead of opaque "the bot seems stuck"
-  guessing.
-- People who care about getting real work done from chat, not just chatting
-  with a thin terminal proxy.
-
-## What to expect
-
-- You can get the first Telegram bot or Slack bot running in one command.
-- The first-run path creates one default agent and only enables the channels you explicitly name.
-- DMs start with pairing so access stays explicit.
-- `--persist` lets later restarts use plain `clisbot start`.
-- Streaming is disabled by default. If you want real-time coding progress in chat, turn it on from the chat surface with `/streaming on`, and turn it off any time with `/streaming off`.
-- Slack and Telegram are not treated as plain-text sinks: routed conversations can carry thread or topic identity, pairing, and file-aware workflows.
-- Advanced multi-agent setup is available later, but it is not required for day one.
 
 ## Surface Access Model
 
@@ -159,23 +151,44 @@ clisbot start \
 ```
 
 If you want to try first without persisting the token yet, just remove `--persist`.
+Day-to-day rescue commands are `clisbot stop`, `clisbot restart`,
+`clisbot status`, and `clisbot logs`.
 
 Next steps:
 
 - For security, DMs default to pairing.
+- `clisbot` also has a smart autopairing path to reduce first-run friction. If
+  you send the bot a DM within the first 30 minutes, you can usually claim the
+  owner role immediately and start using it without a separate pairing round.
+- New from `v0.1.45`: the AI-native operator experience is much stronger. You
+  can increasingly ask the bot through chat to explain how to use it, update
+  itself and summarize what's new, help onboard you, create or add a new bot or
+  agent, or set up loops and schedules for recurring work instead of relying
+  only on slash commands.
 - Existing configs from any version before `0.1.45` update directly to `0.1.45` automatically on first run. clisbot writes a backup first under `~/.clisbot/backups/`, then rewrites the config to the current shape.
 - Shared Slack channels, Slack groups, Telegram groups, and Telegram topics are a separate gate: normal users need an explicit route such as `group:<id>` or `topic:<chatId>:<topicId>` before the bot will talk there. Legacy Slack `channel:<id>` input still works for compatibility.
 - After a shared surface is admitted, per-surface sender control comes from the bot's default shared rule `groups["*"]` plus any route-local `allowUsers` or `blockUsers`.
+- With that permission model, a bot can be added to a team group but still be
+  allowed to answer only some people in that group.
 - If the effective shared policy is `disabled`, the bot stays silent there for everyone, including owner/admin.
 - If the effective shared policy is `allowlist` and a sender is not allowed, the bot denies before the runner:
   - `You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to \`allowUsers\` for this surface.`
-- However, `clisbot` has smart autopairing feature to help you get started frictionless. Just send direct message to your bot (through telegram or slack) within 30 minutes so you can claim owner role automatically, and use the bot right away without pairing. After this 30 minutes window you need to approve pairing following instructions by the bot in direct message.
 - To chat with the bot in a group:
-  - telegram: Add bot to group, then use slash command in that group /start, you will be guided with command to add a group. Run that command directly or copy that command and chat directly with the bot in DM to ask it do for you (since you are the owner, you are authorized to run that command). After completed, come back to the group and start talk with the bot. 
-  - Notice that group has require mention (or tag the bot) enabled by default to avoid abuse. But it also has smart follow up within 5 minutes by default so you dont need to tag it again. You could change the mode by asking the bot to do for you.
+  - telegram: Add the bot to the group, then use `/start` there. It will guide
+    you toward the route you need to add. You can run that command directly or
+    copy it into a DM with the bot and ask it to do the setup for you if you
+    are already authorized.
+  - slack: similar flow, but Slack-native slash command handling is awkward.
+    Use a leading space such as ` /start`, or use the alias `\start`. The same
+    workaround applies to other slash commands such as ` /streaming on` or
+    `\mention`.
+  - group conversations require a mention by default to avoid abuse, but smart
+    follow-up stays open for a short window so you do not need to tag the bot
+    again on every reply. You can also ask the bot to change that mode for you.
   - If you want stricter mention behavior, use `/mention` for this conversation only, `/mention channel` for the current channel or group default, or `/mention all` for the current bot default.
-  - For long running task such as coding, you might want to toggle streaming mode on with slash command inside the chat "/streaming on", check streaming status anytime with "/streaming status". In slack, native slash command is unconventional so you can get around to use slash command with a space prefix such as " /streaming on", or use alias "\streaming on". This is also true for any other slash command supported by `clisbot`. 
-  - slack: 
+  - For long running tasks such as coding, turn streaming on with `/streaming on`
+    and check it with `/streaming status`. In Slack, use a leading space such
+    as ` /streaming on` or the alias `\streaming on`.
 - If you want to add more owner or app admin, grant that principal explicitly with the platform prefix plus the channel-native user id, for example `clisbot auth add-user app --role owner --user telegram:1276408333` or `clisbot auth add-user app --role admin --user slack:U123ABC456`.
 - `clisbot auth --help` now covers role scopes, permission sets, and add/remove flows for users and permissions.
 - App-level auth and owner-claim semantics in [Authorization And Roles](docs/user-guide/auth-and-roles.md) describe both the current runtime reality and the remaining target-model gaps.
@@ -199,22 +212,32 @@ What happens next:
 
 ## Recent Release Highlights
 
-- `v0.1.45`: safer personal and team bots in real Slack and Telegram groups, automatic direct updates from older installs, durable queue control, clearer session continuity truth, more reliable scheduled loops, stronger trust/restart behavior, and stricter streaming/session isolation.
+- `v0.1.45`: a much more AI-native operator experience, where you can
+  increasingly talk to the bot to manage itself; plus safer personal and team
+  bots in real Slack and Telegram groups, automatic direct updates from older
+  installs, durable queue control, clearer session continuity truth, more
+  reliable scheduled loops, stronger trust/restart behavior, and stricter
+  streaming/session isolation.
 - `v0.1.43`: more durable runtime recovery, clearer routed follow-up controls, more truthful tmux prompt submission checks, better queued-start notifications, and safer Slack thread attachment behavior.
-- `v0.1.39`: the first large release of the current bot-first shape, with native Slack and Telegram rendering, cleaner first-run setup, stronger pairing/auth defaults, better long-running run visibility, and recurring `/loop` automation.
 
 What `v0.1.45` most likely means for you:
 
+- The headline is AI-native control: ask the bot in chat to queue work,
+  schedule recurring briefs, help update itself, explain release changes, or
+  guide setup and routing instead of dropping to the shell for every action.
 - personal user: fewer fragile long-run failures, better `/queue`, better media
   handling on Telegram
-- shared bot owner: clearer route safety and easier direct upgrade from older
-  installs
+- shared bot owner: clearer route safety, easier direct upgrade from older
+  installs, and more interesting team use cases where one bot lives in the
+  group but only responds to selected people there
 - operator: better queue visibility, better session continuity truth, and
-  restart behavior that is less misleading during updates
+  restart behavior that is less misleading during updates, plus faster
+  `watch` and `inspect` shortcuts when something goes wrong
 
 There are many more useful fixes and operator improvements in the full release
 notes, including config update safety, CLI help, setup docs, runner debugging,
-route policy behavior, and channel-specific polish.
+route policy behavior, channel-specific polish, and the broader AI-native
+workflow direction behind this release.
 
 Read the full notes here:
 
@@ -251,14 +274,19 @@ Repo-local `bun run start|stop|restart|status|logs|init|pairing` is pinned by `.
 
 Update note for existing installs:
 
-- `v0.1.39` includes breaking changes in config shape and in the main CLI command surface.
-- If you already run an older install, ask Codex or Claude in this repo to update your current config before updating the package.
-- The package update itself is still simple:
+- Older installs before `v0.1.45` now update directly on first run with a
+  backup written first, so most people can update and restart without a manual
+  migration pass.
+- After you are on `v0.1.45`, future upgrades should feel much more AI-native:
+  in many cases you can simply ask the bot to update `clisbot` to the latest
+  version, and it can follow the update guide, perform the upgrade flow, then
+  brief you on what changed.
+- If you still want an agent to inspect your current config before updating,
+  ask Codex or Claude in this repo to review it first.
+- The manual package upgrade path is now simpler:
 
 ```bash
-clisbot stop
-npm install -g clisbot
-clisbot start
+npm install -g clisbot && clisbot restart
 clisbot --version
 ```
 
@@ -320,6 +348,12 @@ If you want the repo-guided setup path:
 3. Ask it to help you set up `clisbot`.
 
 The docs in this repo are kept current, including the [User Guide](docs/user-guide/README.md), so the agent should have enough context to walk you through setup, configuration, and troubleshooting directly inside the repo.
+If anything goes wrong, the fastest rescue loop is usually `clisbot logs`,
+`clisbot status`, `clisbot restart`, or if needed `clisbot stop --hard`
+followed by `clisbot start`.
+Also open the coding CLI directly inside the bot workspace, usually
+`~/.clisbot/workspaces/default`, and make sure that CLI already works there.
+That is one of the strongest end-to-end checks for bot health.
 
 If you prefer to configure everything yourself:
 
@@ -363,24 +397,25 @@ clisbot start \
 If the quick start does not work, check these in order:
 
 - If setup feels unclear, open Claude Code, Codex, or Gemini CLI in this repo and ask it to help using the local docs.
+- If anything looks wrong, start with `clisbot logs`, `clisbot status`,
+  `clisbot restart`, or if needed `clisbot stop --hard` followed by
+  `clisbot start`.
 - If config behavior is confusing, inspect [config/clisbot.json.template](config/clisbot.json.template) first, then compare it with [docs/user-guide/README.md](docs/user-guide/README.md).
 - If `clisbot start` says no agents are configured, prefer `clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>`.
-- If you want later runs to work with plain `clisbot start`, rerun your successful first-run command with `--persist`.
 - If `clisbot start` prints token refs as `missing`, either pass the token explicitly on the command line or switch to env-backed setup described in [docs/user-guide/bots-and-credentials.md](docs/user-guide/bots-and-credentials.md).
-- If you use custom env names, pass them explicitly with `--slack-app-token`, `--slack-bot-token`, or `--telegram-bot-token`.
 - If `clisbot status` shows `bootstrap=...:missing` or `bootstrap=...:not-bootstrapped`, follow the advanced agent bootstrap steps in [docs/user-guide/README.md](docs/user-guide/README.md).
-- If Codex shows `Do you trust the contents of this directory?`, keep `trustWorkspace: true` in clisbot config and also mark the workspace as trusted in `~/.codex/config.toml`, for example:
-
-```toml
-[projects."/home/node/.clisbot/workspaces/default"]
-trust_level = "trusted"
-```
-
-- If that trust screen appears only after startup, current releases should still accept it again before the first routed prompt or later steering input. If it still blocks after one real prompt attempt, inspect the live session name with `clisbot runner list`, then attach directly with `tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>`.
+- Trust is usually handled automatically by the bot, but if trust or startup
+  behavior still looks wrong, go to the workspace and launch the underlying CLI
+  there directly, for example `cd ~/.clisbot/workspaces/default` and start
+  `codex`, `claude`, or `gemini` yourself. If the CLI cannot start cleanly in
+  that workspace, the bot will not be healthy either.
 - If Gemini startup says it is waiting for manual authorization, authenticate Gemini directly first or provide a headless auth path such as `GEMINI_API_KEY` or Vertex AI credentials; `clisbot` now treats that screen as a startup blocker instead of a healthy ready session.
 - If Codex warns that `bubblewrap` is missing on Linux, install `bubblewrap` in the runtime environment.
 - If the bot does not answer, check `clisbot status` first. Healthy channels should show `connection=active`; if a channel stays `starting`, inspect `clisbot logs`.
-- If a routed message was accepted but no reply arrives, send one test message and immediately run `clisbot runner watch --latest --lines 100` in a terminal. This shows the live tmux runner pane and usually reveals missing CLI auth, trust prompts, stuck startup, or model/provider errors.
+- If a routed message was accepted but no reply arrives, send one test message
+  and immediately run `clisbot watch --latest --lines 100` in a terminal. This
+  shows the live tmux runner pane and usually reveals missing CLI auth, trust
+  prompts, stuck startup, or model/provider errors.
 - If Codex works in your normal terminal but the routed runner shows `Missing environment variable: CODEX_CLIPROXYAPI_KEY`, remember that `clisbot` runs Codex from a detached background process and tmux session. Start or restart `clisbot` from a shell where `echo $CODEX_CLIPROXYAPI_KEY` prints a value, or export the key in the environment used by your service manager. Existing tmux runner sessions keep their old environment, so recycle them after fixing env.
 - If runtime startup still fails, run `clisbot logs` and inspect the recent log tail that `clisbot` now prints automatically on startup failure.
 - If `clisbot restart` warns that stop timed out during an update, run `clisbot status` once. Current releases should continue cleanly when status already shows the worker exited; only treat it as a real bug if restart leaves the runtime down.
@@ -401,8 +436,12 @@ Most users only need a small set of commands at first:
 - `clisbot status`: check whether the runtime, channels, and active sessions look healthy.
 - `clisbot logs`: inspect recent runtime logs when startup, routing, or replies look wrong.
 - `clisbot runner list`: list the live tmux-backed runner sessions and see what is active.
-- `clisbot runner watch <session-name>`: live-watch one specific session when debugging a real run.
-- `clisbot runner watch --latest --lines 100`: jump straight into the most recently active session with enough context to debug a just-submitted message.
+- `clisbot inspect --latest`: capture the current pane state of the newest
+  admitted session once.
+- `clisbot watch --latest --lines 100`: jump straight into the newest admitted
+  live session with enough context to debug a just-submitted message.
+- `clisbot watch --index 2`: follow the second most recent admitted session
+  without needing to copy a tmux session name first.
 - `clisbot queues list`: inspect pending durable queued prompts across the app.
 - `clisbot queues create --channel telegram --target group:-1001234567890 --topic-id 4335 --sender telegram:1276408333 <prompt>`: create one durable same-session queued prompt, capped by `control.queue.maxPendingItemsPerSession` (default `20`).
 
@@ -486,6 +525,8 @@ Detailed slash-command guide:
 - more communication channels beyond Slack and Telegram
 - simple workflow building blocks such as cron jobs, heartbeat jobs, and loops
 - durable agent sessions, workspaces, follow-up policy, commands, attachments, and operator controls that stay reusable across all those surfaces
+- stability and security stay at the top of the project focus; if you find an
+  issue in either area, please report it
 
 tmux is still the current stability boundary. One agent maps to one durable runner session in one workspace, and every CLI, channel, or workflow layer should route onto that durable runtime instead of recreating the agent from scratch.
 

@@ -59,5 +59,5 @@ One plausible failure mode is that a progress message or message-tool reply is b
 
 ## Validation
 
-- `bun test test/slack-processing-decoration.test.ts test/slack-assistant-status.test.ts test/message-cli.test.ts`
+- `bun test test/slack-processing-decoration.test.ts test/slack-assistant-status.test.ts test/message-cli/message-cli.test.ts`
 - `bunx tsc --noEmit`

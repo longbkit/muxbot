@@ -48,7 +48,7 @@ So after a normal stop, the control surface read old active-run records from the
 ## Validation Notes
 
 - targeted regression:
-  - `bun test test/agent-service.test.ts test/runtime-summary.test.ts`
+  - `bun test test/agent-service/agent-service.test.ts test/runtime-summary.test.ts`
 - repository typecheck:
   - `bun x tsc --noEmit`
 - full suite:

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AgentSessionState } from "../src/agents/session-state.ts";
 import { RunnerService } from "../src/agents/runner-service.ts";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
+import { TmuxSubmitUnconfirmedError } from "../src/runners/tmux/session-handshake.ts";
 
 describe("RunnerService recovery classification", () => {
   test("treats lost tmux targets as recoverable mid-run faults", () => {
@@ -115,6 +116,93 @@ describe("RunnerService new session handling", () => {
     expect((error as Error).message).toBe(
       "/new completed and clisbot captured session id 22222222-2222-2222-2222-222222222222, but could not persist it. The durable session mapping was left unchanged. Persist error: disk full",
     );
+  });
+
+  test("recovers a new-session submit-unconfirmed error when status capture proves rotation", async () => {
+    const resolved = {
+      agentId: "default",
+      sessionKey: "agent:default:slack:channel:c1:thread:new-submit-recovered",
+      sessionName: "session",
+      workspacePath: "/tmp/workspace",
+      runner: {
+        command: "codex",
+      },
+    } as any;
+    const runner = new RunnerService(
+      {} as any,
+      {
+        hasSession: async () => true,
+      } as unknown as TmuxClient,
+      {} as AgentSessionState,
+      (() => resolved) as any,
+    );
+    let persistedSessionId = "";
+
+    (runner as any).sessionMapping = {
+      get: async () => ({
+        sessionId: "11111111-1111-1111-1111-111111111111",
+      }),
+      setActive: async (
+        _resolved: unknown,
+        params: {
+          sessionId: string;
+        },
+      ) => {
+        persistedSessionId = params.sessionId;
+      },
+    };
+    (runner as any).submitNewSessionCommand = async () => {
+      throw new TmuxSubmitUnconfirmedError();
+    };
+    (runner as any).captureNewSessionIdentityAfterTrigger = async () =>
+      "22222222-2222-2222-2222-222222222222";
+
+    const rotated = await runner.triggerNewSession({
+      agentId: "default",
+      sessionKey: resolved.sessionKey,
+    });
+
+    expect(rotated.sessionId).toBe("22222222-2222-2222-2222-222222222222");
+    expect(persistedSessionId).toBe("22222222-2222-2222-2222-222222222222");
+  });
+
+  test("preserves the submit-unconfirmed error when status capture cannot prove rotation", async () => {
+    const resolved = {
+      agentId: "default",
+      sessionKey: "agent:default:slack:channel:c1:thread:new-submit-unconfirmed",
+      sessionName: "session",
+      workspacePath: "/tmp/workspace",
+      runner: {
+        command: "codex",
+      },
+    } as any;
+    const runner = new RunnerService(
+      {} as any,
+      {
+        hasSession: async () => true,
+      } as unknown as TmuxClient,
+      {} as AgentSessionState,
+      (() => resolved) as any,
+    );
+
+    (runner as any).sessionMapping = {
+      get: async () => ({
+        sessionId: "11111111-1111-1111-1111-111111111111",
+      }),
+      setActive: async () => undefined,
+    };
+    (runner as any).submitNewSessionCommand = async () => {
+      throw new TmuxSubmitUnconfirmedError();
+    };
+    (runner as any).captureNewSessionIdentityAfterTrigger = async () => null;
+
+    const error = await runner.triggerNewSession({
+      agentId: "default",
+      sessionKey: resolved.sessionKey,
+    }).catch((received) => received);
+
+    expect(error).toBeInstanceOf(TmuxSubmitUnconfirmedError);
+    expect((error as Error).message).toContain("tmux submit was not confirmed after Enter");
   });
 });
 

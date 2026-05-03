@@ -23,7 +23,7 @@ Typical topics:
 - stable contract:
   [docs/architecture/surface-architecture.md](../../architecture/surface-architecture.md)
 - stable contract:
-  [docs/architecture/architecture.md](../../architecture/architecture.md)
+  [docs/architecture/runtime-architecture.md](../../architecture/runtime-architecture.md)
 
 ## Workflow
 

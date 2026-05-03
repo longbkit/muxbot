@@ -9,7 +9,7 @@ related:
   - src/channels/agent-prompt.ts
   - src/channels/interaction-processing.ts
   - test/agent-prompt.test.ts
-  - test/interaction-processing.test.ts
+  - test/interaction-processing/interaction-processing.test.ts
 ---
 
 ## Context

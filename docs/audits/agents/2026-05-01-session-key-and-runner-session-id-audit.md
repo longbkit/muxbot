@@ -420,8 +420,8 @@ code call into it, instead of moving more policy into runners.
 | `src/channels/interaction-processing.ts` | `/new` exists, but no explicit resume-by-id surface exists. | User-controlled remap is not actually shipped yet. |
 | `src/agents/commands.ts` | Help and parser do not model session-management commands beyond `/new`. | Public contract is incomplete versus the intended mental model. |
 | `src/control/runner-cli.ts` | Diagnostic only; no mapping-oriented inspect or resume flow. | Operators lack a truthful mapping-focused surface for future debugging or admin intervention. |
-| `test/agent-service.test.ts` | Strong coverage for `/new`, startup capture, resume retry, and fresh/fallback paths. Missing explicit rebind tests. | The hardest future feature has no test harness yet. |
-| `test/interaction-processing.test.ts` | Covers `/new`, `/status`, `/whoami`. Missing end-to-end user-control tests for session remap. | Public continuity contract is not yet guarded. |
+| `test/agent-service/agent-service.test.ts` | Strong coverage for `/new`, startup capture, resume retry, and fresh/fallback paths. Missing explicit rebind tests. | The hardest future feature has no test harness yet. |
+| `test/interaction-processing/interaction-processing.test.ts` | Covers `/new`, `/status`, `/whoami`. Missing end-to-end user-control tests for session remap. | Public continuity contract is not yet guarded. |
 
 ## Naming Convention Overlay
 
@@ -1916,7 +1916,7 @@ Optional later:
 | --- | --- | --- |
 | `docs/features/agents/sessions.md` | Canonical session model and runner input contract. | Keep aligned with the accepted decision record. |
 | `docs/architecture/model-taxonomy-and-boundaries.md` | Canonical owner and boundary guidance for cross-layer models. | Check that the mapping move still preserves the repo boundary rules. |
-| `docs/architecture/architecture.md` | Runtime owner map between channels, agents, and runners. | Keep broad session continuity in agents and describe runner mechanics as capability, not mapping owner. |
+| `docs/architecture/runtime-architecture.md` | Runtime owner map between channels, agents, and runners. | Keep broad session continuity in agents and describe runner mechanics as capability, not mapping owner. |
 | `docs/architecture/glossary.md` | Shared meaning of `sessionKey` and `sessionId`. | Keep terms stable. |
 | `src/channels/slack/session-routing.ts` | Slack `sessionKey` resolution. | Keep `sessionKey`-only default. |
 | `src/channels/telegram/session-routing.ts` | Telegram `sessionKey` resolution. | Keep `sessionKey`-only default. |

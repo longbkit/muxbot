@@ -9,7 +9,7 @@ related:
   - src/shared/transcript-normalization.ts
   - src/shared/transcript-rendering.ts
   - src/channels/slack/service.ts
-  - test/text.test.ts
+  - test/text/text.test.ts
 ---
 
 ## Context
@@ -54,5 +54,5 @@ When debugging live Slack or Telegram rendering:
 This lesson was applied by:
 
 - fixing transcript normalization for soft-wrapped tmux fragments
-- adding a regression test in `test/text.test.ts`
+- adding a regression test in `test/text/text.test.ts`
 - avoiding unnecessary rendering changes based only on `slack-cli` CSV flattening

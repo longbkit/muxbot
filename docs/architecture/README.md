@@ -9,7 +9,7 @@ This section is the stable entry point for repository-level architecture rules.
 
 - [Architecture Overview](architecture-overview.md)
 - [Surface Architecture](surface-architecture.md)
-- [Runtime Architecture](architecture.md)
+- [Runtime Architecture](runtime-architecture.md)
 - [Transcript Presentation And Streaming](transcript-presentation-and-streaming.md)
 - [Glossary](glossary.md)
 - [Model Taxonomy And Boundaries](model-taxonomy-and-boundaries.md)

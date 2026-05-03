@@ -62,15 +62,15 @@ North star:
 - bot-aware runtime route resolution is already in place for the migrated Slack and Telegram slices
 - the previously stale regression sweep is now migrated across:
   - `test/fast-start.e2e.test.ts`
-  - `test/runtime-supervisor.test.ts`
+  - `test/runtime-supervisor/runtime-supervisor.test.ts`
   - `test/runner-cli.integration.test.ts`
   - `test/runtime-monitor.test.ts`
-  - `test/loops-cli.test.ts`
+  - `test/loops-cli/loops-cli.test.ts`
   - `test/auth-resolve.test.ts`
   - `test/agents-cli.test.ts`
-  - `test/interaction-processing.test.ts`
+  - `test/interaction-processing/interaction-processing.test.ts`
   - `test/owner-claim.test.ts`
-  - `test/message-cli.test.ts`
+  - `test/message-cli/message-cli.test.ts`
 - migrated regression batch is green for:
   - `test/config-template.test.ts`
   - `test/config.test.ts`
@@ -84,7 +84,7 @@ North star:
   - `test/telegram-service.test.ts`
   - `test/slack-feedback.test.ts`
   - `test/slack-session-routing.test.ts`
-  - `test/agent-service.test.ts`
+  - `test/agent-service/agent-service.test.ts`
   - `test/agent-prompt.test.ts`
   - `test/cli.test.ts`
   - `test/startup-bootstrap.test.ts`
@@ -330,10 +330,10 @@ Likely impacted by downstream route resolution:
 
 - `test/slack-feedback.test.ts`
 - `test/telegram-service.test.ts`
-- `test/interaction-processing.test.ts`
-- `test/agent-service.test.ts`
+- `test/interaction-processing/interaction-processing.test.ts`
+- `test/agent-service/agent-service.test.ts`
 - `test/session-key.test.ts`
-- `test/message-cli.test.ts`
+- `test/message-cli/message-cli.test.ts`
 
 # Migration Strategy
 

@@ -197,7 +197,7 @@ Historical note:
 ## Related Docs
 
 - [Architecture Overview](../architecture/architecture-overview.md)
-- [Runtime Architecture](../architecture/architecture.md)
+- [Runtime Architecture](../architecture/runtime-architecture.md)
 - [Model Taxonomy And Boundaries](../architecture/model-taxonomy-and-boundaries.md)
 - [Agents Feature](../features/agents/README.md)
 - [Session Identity](../features/agents/sessions.md)

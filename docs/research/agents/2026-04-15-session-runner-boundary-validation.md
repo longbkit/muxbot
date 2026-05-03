@@ -36,7 +36,7 @@ Validated against:
 
 - `docs/features/agents/README.md`
 - `docs/features/agents/sessions.md`
-- `docs/architecture/architecture.md`
+- `docs/architecture/runtime-architecture.md`
 - `src/agents/session-state.ts`
 - `src/agents/session-store.ts`
 - `src/agents/resolved-target.ts`
@@ -58,7 +58,7 @@ Implication:
 Validated against:
 
 - `docs/features/runners/README.md`
-- `docs/architecture/architecture.md`
+- `docs/architecture/runtime-architecture.md`
 - `src/agents/runner-service.ts`
 - `src/runners/tmux/client.ts`
 - `src/runners/tmux/session-handshake.ts`
@@ -77,7 +77,7 @@ Implication:
 
 Validated against:
 
-- `docs/architecture/architecture.md`
+- `docs/architecture/runtime-architecture.md`
 - `docs/features/agents/README.md`
 - `src/agents/session-service.ts`
 - `src/agents/run-observation.ts`
@@ -203,7 +203,7 @@ Implication:
 
 Validated against:
 
-- `docs/architecture/architecture.md`
+- `docs/architecture/runtime-architecture.md`
 - `docs/features/agents/README.md`
 - `docs/features/agents/sessions.md`
 - `docs/features/runners/README.md`
@@ -226,7 +226,7 @@ Validated against:
 - `src/agents/loop-state.ts`
 - `src/agents/run-observation.ts`
 - `docs/features/agents/sessions.md`
-- `docs/architecture/architecture.md`
+- `docs/architecture/runtime-architecture.md`
 - `docs/architecture/architecture-overview.md`
 
 Current truth:
@@ -264,7 +264,7 @@ Validated against:
 
 - `src/channels/interaction-processing.ts`
 - `src/control/runtime-summary.ts`
-- `test/interaction-processing.test.ts`
+- `test/interaction-processing/interaction-processing.test.ts`
 - `test/runtime-summary.test.ts`
 
 Current truth:
@@ -285,7 +285,7 @@ Validated against:
 - `src/shared/transcript-rendering.ts`
 - `src/config/schema.ts`
 - `src/config/template.ts`
-- `test/agent-service.test.ts`
+- `test/agent-service/agent-service.test.ts`
 
 Current truth:
 
@@ -326,7 +326,7 @@ Validated against:
 - `src/control/runtime-supervisor.ts`
 - `src/control/runtime-health-store.ts`
 - `src/main.ts`
-- `test/runtime-supervisor.test.ts`
+- `test/runtime-supervisor/runtime-supervisor.test.ts`
 
 Current truth:
 

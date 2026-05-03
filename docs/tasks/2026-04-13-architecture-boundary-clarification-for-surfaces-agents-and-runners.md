@@ -133,7 +133,7 @@ Make it explicit which persisted fields are:
 
 - [Architecture Overview](../architecture/architecture-overview.md)
 - [Surface Architecture](../architecture/surface-architecture.md)
-- [Runtime Architecture](../architecture/architecture.md)
+- [Runtime Architecture](../architecture/runtime-architecture.md)
 - [Model Taxonomy And Boundaries](../architecture/model-taxonomy-and-boundaries.md)
 - [Agents Feature](../features/agents/README.md)
 - [Auth Feature](../features/auth/README.md)

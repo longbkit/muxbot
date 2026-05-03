@@ -8,7 +8,7 @@ related:
   - docs/tasks/features/stability/2026-04-15-runtime-crash-containment-and-service-self-healing.md
   - docs/tasks/2026-04-15-session-runner-boundary-simplification-and-validation.md
   - docs/research/agents/2026-04-15-session-runner-boundary-validation.md
-  - docs/architecture/architecture.md
+  - docs/architecture/runtime-architecture.md
   - docs/architecture/architecture-overview.md
   - docs/user-guide/runtime-operations.md
   - src/control/runtime-monitor.ts

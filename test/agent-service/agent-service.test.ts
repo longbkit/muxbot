@@ -1,0 +1,9 @@
+import "./agent-service-session-identity.suite.ts";
+import "./agent-service-reuse-and-resume.suite.ts";
+import "./agent-service-trust-and-startup-blockers.suite.ts";
+import "./agent-service-capture-and-startup-retries.suite.ts";
+import "./agent-service-loops-and-queue.suite.ts";
+import "./agent-service-calendar-and-follow-up.suite.ts";
+import "./agent-service-cleanup-and-detached-runs.suite.ts";
+import "./agent-service-runtime-reconciliation.suite.ts";
+import "./agent-service-mid-run-recovery.suite.ts";

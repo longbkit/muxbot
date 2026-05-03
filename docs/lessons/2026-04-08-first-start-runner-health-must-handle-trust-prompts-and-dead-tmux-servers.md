@@ -4,11 +4,11 @@ date: 2026-04-08
 area: runners, runtime, tmux, codex
 summary: First-start reliability depends on treating trust prompts and dead tmux servers as runner-managed lifecycle concerns, with explicit recovery instead of one-shot timing assumptions.
 related:
-  - docs/architecture/architecture.md
+  - docs/architecture/runtime-architecture.md
   - docs/features/runners/README.md
   - src/agents/agent-service.ts
   - src/runners/tmux/client.ts
-  - test/agent-service.test.ts
+  - test/agent-service/agent-service.test.ts
   - test/tmux-client.integration.test.ts
 ---
 

@@ -841,9 +841,21 @@ export class RunnerService {
     const oldSessionId = (await this.sessionMapping.get(resolved.sessionKey))?.sessionId;
     const command = this.resolveNewSessionCommand(resolved);
     await this.acceptWorkspaceTrustPromptIfPresent(resolved);
-    await this.submitNewSessionCommand(resolved, command);
+    let submitUnconfirmedError: TmuxSubmitUnconfirmedError | null = null;
+    try {
+      await this.submitNewSessionCommand(resolved, command);
+    } catch (error) {
+      if (error instanceof TmuxSubmitUnconfirmedError) {
+        submitUnconfirmedError = error;
+      } else {
+        throw error;
+      }
+    }
     const sessionId = await this.captureNewSessionIdentityAfterTrigger(resolved, oldSessionId);
     if (!sessionId) {
+      if (submitUnconfirmedError) {
+        throw submitUnconfirmedError;
+      }
       this.throwNewSessionCaptureFailure(command, oldSessionId);
     }
     try {

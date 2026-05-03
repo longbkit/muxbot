@@ -90,7 +90,7 @@ That still leaves one hard UX problem:
 Automated validation completed with:
 
 - `bun x tsc --noEmit`
-- `bun test test/interaction-processing.test.ts test/message-cli.test.ts`
+- `bun test test/interaction-processing/interaction-processing.test.ts test/message-cli/message-cli.test.ts`
 - `bun test`
 
 Focused local end-to-end validation in code-level interaction tests now covers:

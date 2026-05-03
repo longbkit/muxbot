@@ -73,7 +73,7 @@ The goal is to convert the existing architecture and workflow intent into a skil
 
 - [Architecture Overview](../../../architecture/architecture-overview.md)
 - [Surface Architecture](../../../architecture/surface-architecture.md)
-- [Runtime Architecture](../../../architecture/architecture.md)
+- [Runtime Architecture](../../../architecture/runtime-architecture.md)
 - [Model Taxonomy And Boundaries](../../../architecture/model-taxonomy-and-boundaries.md)
 - [Task Docs](../../README.md)
 - [clisbot Backlog](../../backlog.md)

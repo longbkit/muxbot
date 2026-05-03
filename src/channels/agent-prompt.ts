@@ -90,10 +90,10 @@ export const TELEGRAM_REPLY_COMMAND_BASE = `{{command}} message send \\
 `;
 
 export const SLACK_REPLY_STYLE_HINT =
-  "Put readable hierarchical Markdown in the --message body.\nKeep each paragraph, list, or code block under 2500 chars.";
+  "Put readable hierarchical Markdown in the --message body.\nFor clickable links, use canonical URLs and do not wrap them in backticks.\nKeep each paragraph, list, or code block under 2500 chars.";
 
 export const TELEGRAM_REPLY_STYLE_HINT =
-  "Put readable hierarchical Markdown in the --message body.\nKeep the Markdown body under 3000 chars.";
+  "Put readable hierarchical Markdown in the --message body.\nFor clickable links, use canonical URLs and do not wrap them in backticks.\nKeep the Markdown body under 3000 chars.";
 
 export const ACCOUNT_CLAUSE = "  --account {{account_id}} \\\n";
 export const EMPTY_ACCOUNT_CLAUSE = "";

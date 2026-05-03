@@ -307,7 +307,7 @@ Minimum required automated coverage:
 Validated with:
 
 - `bun x tsc --noEmit`
-- `bun test test/agent-prompt.test.ts test/interaction-processing.test.ts test/agent-service.test.ts`
+- `bun test test/agent-prompt.test.ts test/interaction-processing/interaction-processing.test.ts test/agent-service/agent-service.test.ts`
 
 This slice now covers:
 

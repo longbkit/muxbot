@@ -198,7 +198,7 @@ Per-bot fields should include:
 - `test/zalo-bot-session-routing.test.ts`
 - `test/zalo-bot-service.test.ts`
 - `test/zalo-bot-message-actions.test.ts`
-- `test/message-cli.test.ts`
+- `test/message-cli/message-cli.test.ts`
 - `test/runtime-summary.test.ts`
 - `docs/user-guide/zalo-bot-setup.md`
 - `docs/tests/features/channels/zalo-bot-channel-mvp.md`

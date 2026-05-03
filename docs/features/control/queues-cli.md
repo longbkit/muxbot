@@ -83,4 +83,4 @@ Slack examples:
 - `test/queues-cli.test.ts`
 - `test/session-state.test.ts`
 - `test/job-queue.test.ts`
-- `test/interaction-processing.test.ts`
+- `test/interaction-processing/interaction-processing.test.ts`

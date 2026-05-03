@@ -154,6 +154,9 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain(
       "Put readable hierarchical Markdown in the --message body.",
     );
+    expect(prompt).toContain(
+      "For clickable links, use canonical URLs and do not wrap them in backticks.",
+    );
     expect(prompt).toContain("Keep the Markdown body under 3000 chars.");
     expect(prompt).toContain("- sender: Alice Smith [telegram:123]");
     expect(prompt).toContain("- surface: Telegram group \"Release Ops\", topic \"Launch\" [telegram:topic:-1001:4]");
@@ -210,6 +213,7 @@ describe("agent prompt envelope", () => {
     expect(prompt).not.toContain("Write normal Markdown only in the --message body");
     expect(prompt).not.toContain("- send at most 3 progress updates");
     expect(prompt).not.toContain("- send exactly 1 final user-facing response");
+    expect(prompt).not.toContain("For clickable links, use canonical URLs and do not wrap them in backticks.");
   });
 
   test("uses the same progress-capable reply instructions for Gemini when streaming is enabled", () => {

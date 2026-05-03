@@ -4,13 +4,13 @@ date: 2026-04-13
 area: runners, configuration, gemini
 summary: When a CLI adds or changes a first-start trust flow, clisbot must update both the runner-owned automation path and the persisted agent config that may still override old defaults.
 related:
-  - docs/architecture/architecture.md
+  - docs/architecture/runtime-architecture.md
   - docs/features/runners/gemini-cli.md
   - src/config/agent-tool-presets.ts
   - src/agents/runner-service.ts
   - src/runners/tmux/session-handshake.ts
-  - test/agent-service.test.ts
-  - test/tmux-runner-latency.test.ts
+  - test/agent-service/agent-service.test.ts
+  - test/tmux-runner-latency/tmux-runner-latency.test.ts
 ---
 
 ## Context
