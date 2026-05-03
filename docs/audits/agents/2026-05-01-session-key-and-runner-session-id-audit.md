@@ -11,7 +11,7 @@ Read this file as:
 - not as a claim that every detailed failure path below still reflects current
   shipped behavior line-for-line
 
-Current release-ready truth after `0.1.45-beta.11`:
+Current release-ready truth after `0.1.45-beta.12`:
 
 - `SessionMapping` is now the session-owned continuity seam
 - ambiguous resume-startup and `/new` capture failures preserve the stored

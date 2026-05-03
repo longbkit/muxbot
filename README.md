@@ -1,3 +1,24 @@
+<p align="center">
+  <img src="docs/brand/x-profile-banner-2026-04-29/images/clisbot-x-banner-v5-frontier-tagline-1500x500.png" alt="clisbot banner" width="100%" />
+</p>
+
+<p align="center">
+  <a href="./README.md">English</a> |
+  <a href="./docs/langs/root/README.vi.md">Tiếng Việt</a> |
+  <a href="./docs/langs/root/README.zh-CN.md">简体中文</a> |
+  <a href="./docs/langs/root/README.ko.md">한국어</a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/clisbot"><img src="https://img.shields.io/npm/v/clisbot?label=npm&color=cb3837" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/clisbot"><img src="https://img.shields.io/npm/dm/clisbot?label=downloads&color=22c55e" alt="npm downloads per month" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-d4a017" alt="MIT license" /></a>
+  <img src="https://img.shields.io/badge/CLI-Codex%20%7C%20Claude%20%7C%20Gemini-111827" alt="supported cli tools" />
+  <img src="https://img.shields.io/badge/Channels-Slack%20%7C%20Telegram-0a66c2" alt="supported channels" />
+  <img src="https://img.shields.io/badge/Runtime-tmux%20backed-16a34a" alt="tmux backed runtime" />
+  <img src="https://img.shields.io/badge/Workflow-AI--native-f59e0b" alt="AI-native workflow" />
+</p>
+
 # clisbot - Turn your favorite coding CLI into an agentic personal assistant, workplace assistant, coding partner - on the go
 Want to use OpenClaw but are struggling because:
 
@@ -502,6 +523,10 @@ Detailed slash-command guide:
 
 ## Docs
 
+- [Localized Docs Hub](docs/langs/README.md)
+- [Vietnamese Repo README](docs/langs/root/README.vi.md)
+- [Simplified Chinese Repo README](docs/langs/root/README.zh-CN.md)
+- [Korean Repo README](docs/langs/root/README.ko.md)
 - [Overview](docs/overview/README.md)
 - [Architecture](docs/architecture/README.md)
 - [Development Guide](docs/development/README.md)

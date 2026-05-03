@@ -103,7 +103,7 @@ active release-track task.
 - no current release blocker remains after the continuity cleanup, trust-prompt
   fix, and restart truthfulness fix
 - the remaining gap is an operator-truth polish idea, not a proven broken
-  contract in the shipped `0.1.45-beta.11` path
+  contract in the shipped `0.1.45-beta.12` path
 - explicit session rebinding remains the clearer later continuity feature to
   track when new evidence appears
 
