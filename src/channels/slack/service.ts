@@ -437,6 +437,13 @@ export class SlackSocketService {
           userId: senderId,
         })
       ) {
+        const explicitlyAddressed =
+          params.wasMentioned || hasBotMention(event.text ?? "", this.botUserId);
+        if (params.route.requireMention && !explicitlyAddressed) {
+          debugSlackEvent("drop-shared-not-addressed", { eventId, senderId });
+          await this.processedEventsStore.markCompleted(eventId);
+          return;
+        }
         try {
           await postSlackText(this.app.client, {
             channel: channelId,

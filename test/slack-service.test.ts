@@ -70,7 +70,7 @@ describe("SlackSocketService shared audience enforcement", () => {
     expect(completed).toEqual(["evt-1"]);
   });
 
-  test("replies with an explicit deny message before dropping unauthorized shared senders", async () => {
+  test("silently drops unauthorized shared senders before the mention gate", async () => {
     const completed: string[] = [];
     const apiCalls: Array<Record<string, unknown>> = [];
 
@@ -111,6 +111,7 @@ describe("SlackSocketService shared audience enforcement", () => {
         route: {
           agentId: "default",
           policy: "allowlist",
+          requireMention: true,
           allowBots: false,
           allowUsers: ["U_ALLOWED"],
           blockUsers: [],
@@ -120,6 +121,60 @@ describe("SlackSocketService shared audience enforcement", () => {
     );
 
     expect(completed).toEqual(["evt-2"]);
+    expect(apiCalls).toHaveLength(0);
+  });
+
+  test("replies with an explicit deny message when unauthorized shared senders mention the bot", async () => {
+    const completed: string[] = [];
+    const apiCalls: Array<Record<string, unknown>> = [];
+
+    await (SlackSocketService.prototype as any).handleInboundMessage.call(
+      {
+        shouldDropMismatchedSlackEvent: () => false,
+        processedEventsStore: {
+          getStatus: async () => null,
+          markCompleted: async (eventId: string) => {
+            completed.push(eventId);
+          },
+        },
+        loadedConfig: createLoadedConfig(),
+        markMessageSeen: () => false,
+        botUserId: "U_SELF",
+        botId: "default",
+        app: {
+          client: {
+            chat: {
+              postMessage: async (payload: Record<string, unknown>) => {
+                apiCalls.push(payload);
+                return { ts: "123.456", message: { ts: "123.456" } };
+              },
+            },
+          },
+        },
+        resolveThreadTs: async () => "111.333",
+      },
+      {
+        body: { event_id: "evt-2b" },
+        event: {
+          channel: "C123",
+          user: "U_DENIED",
+          ts: "111.333",
+          text: "<@U_SELF> hello",
+        },
+        conversationKind: "channel",
+        route: {
+          agentId: "default",
+          policy: "allowlist",
+          requireMention: true,
+          allowBots: false,
+          allowUsers: ["U_ALLOWED"],
+          blockUsers: [],
+        },
+        wasMentioned: true,
+      },
+    );
+
+    expect(completed).toEqual(["evt-2b"]);
     expect(apiCalls).toHaveLength(1);
     expect(String(apiCalls[0]?.text ?? "")).toContain("You are not allowed to use this bot in this group.");
   });
