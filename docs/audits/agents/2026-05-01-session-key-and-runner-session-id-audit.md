@@ -1,5 +1,29 @@
 # Session Key And Runner Session Id Audit
 
+## Status
+
+Historical audit with a shipped follow-up.
+
+Read this file as:
+
+- a large evidence snapshot captured before the 2026-05-02 continuity cleanup
+- plus a short current-status layer near the top
+- not as a claim that every detailed failure path below still reflects current
+  shipped behavior line-for-line
+
+Current release-ready truth after `0.1.45-beta.11`:
+
+- `SessionMapping` is now the session-owned continuity seam
+- ambiguous resume-startup and `/new` capture failures preserve the stored
+  mapping instead of clearing it eagerly
+- delayed workspace trust prompts are now accepted again before the first
+  routed prompt and later steering input
+- `clisbot runner list` no longer captures every live pane just to infer
+  session ids
+- a dedicated memory-first live-session-id registry is not being tracked as a
+  release blocker for `0.1.45`; reopen only if real operator evidence shows
+  persisted-first diagnostics are hiding already-known live truth
+
 ## Quick Reader Guide
 
 If someone knows little about the `clisbot` codebase and only needs the task
@@ -14,7 +38,7 @@ Look here first:
 | Startup capture | `src/agents/runner-service.ts`:`ensureSessionReady()`, `finalizeSessionStartup()`, `retryMissingStoredSessionIdAfterStartup()` | Fresh startup can succeed while capture or persistence still misses or persists the wrong id. |
 | Reuse existing tmux | `src/agents/runner-service.ts`:`syncStoredSessionIdForResolvedTarget()` | Existing stored id can be trusted too early, or cooldown can refresh metadata without fixing identity. |
 | Generic write seam | `src/agents/session-state.ts`:`touchSessionEntry()`, `clearSessionIdEntry()`, `upsertSessionEntry()` | Mapping writes still go through broad generic helpers, so bind vs clear vs refresh is hard to see. |
-| Diagnostics read surfaces | `src/agents/agent-service.ts`:`getSessionDiagnostics()`, `src/control/runner-cli.ts` | `/whoami`, `/status`, and `runner list` only show stored truth, not live pane truth. |
+| Diagnostics read surfaces | `src/agents/agent-service.ts`:`getSessionDiagnostics()`, `src/control/runner-cli.ts` | Current shipped behavior now shows `sessionId` plus persistence annotation without probing every live pane, but it still does not maintain a separate always-live memory registry outside active-run context. |
 | Cleanup / sunset | `src/agents/runner-service.ts`:`runSessionCleanup()` | Cleanup freshness uses broad metadata recency and can race startup or capture flows. |
 
 Non-primary suspects:
@@ -139,12 +163,13 @@ Out of scope:
 
 ## Task-Ready Conclusion
 
-This audit is ready to feed a real implementation task.
+This audit already fed the main implementation task.
 
-The task should not try to change the public mental model again.
+The main continuity cleanup is shipped. Remaining ideas should not try to
+change the public mental model again.
 
-It should instead improve the code so the implementation matches that stable
-mental model more directly:
+It instead improved the code so the implementation matches that stable mental
+model more directly:
 
 - keep continuity and mapping session-layer owned
 - keep backend-specific pass-through or capture or resume mechanics runner-owned
@@ -154,6 +179,8 @@ mental model more directly:
   ordinary chat flow
 - keep semantic cleanup first; do not let file-move cleanup distract from the
   real owner boundary work
+- treat the unreduced detailed sections below as audit history unless a section
+  is explicitly refreshed
 
 This doc was missing one important thing in the first pass:
 

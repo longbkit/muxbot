@@ -25,6 +25,11 @@ If you only remember four lines, remember these:
 
 Done
 
+Historical task record with shipped follow-up. The main continuity cleanup is
+done for `0.1.45`; read the deeper design sections below as the task's working
+target, not as a claim that every aspirational sub-idea is still an active
+release-track requirement.
+
 ## Why This Task Exists
 
 This task existed because the docs had converged before the code had. That
@@ -39,7 +44,8 @@ gap is now closed enough for the main session-id continuity path:
   `sessionId` plus persistence annotation
 
 The remaining follow-up outside this task is explicit session rebinding as a
-future control surface.
+future control surface. The earlier idea of a dedicated memory-first
+live-session-id registry is not being carried as a `0.1.45` release blocker.
 
 ## Implemented
 
@@ -133,18 +139,20 @@ way:
 - `/whoami`
 - `/status`
 
-Rule:
+Current shipped diagnostic rule:
 
-- if runtime memory already knows the current live `sessionId`, show that value
-  first
-- also show persistence state beside it:
-  - persisted
-  - not persisted yet
-- if runtime memory and `sessions.json` disagree, do not let older persisted
-  data hide the fresher runtime value
+- `/whoami`, `/status`, `clisbot runner list`, and `clisbot runner watch` show
+  `sessionId` plus persistence state when clisbot knows it
+- `persisted` means the same value is already saved in continuity state
+- `not persisted yet` means clisbot knows the current value but durable state
+  has not caught up yet
+- if no `sessionId` is shown, clisbot has not saved or confirmed one yet
+- chat and control reads no longer probe every live pane just to infer a newer
+  id during ordinary diagnostics
 
-This means the follow-up is not only a write-boundary cleanup. It also needs
-one clear read-precedence rule for operator and chat diagnostics.
+The stronger runtime-memory-first registry described later in this task was a
+working design target during implementation, but it is not being kept as an
+active release requirement after the shipped continuity cleanup.
 
 ## Smart Persistence Rule
 

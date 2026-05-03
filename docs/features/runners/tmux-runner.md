@@ -209,6 +209,13 @@ The tmux runner should own the backend-specific handling needed to:
 - submit the configured trust action when allowed
 - continue into the real prompt flow cleanly
 
+Current shipped rule:
+
+- trust handling is not only a startup concern
+- if a workspace trust prompt appears late, after the runner looked ready, the
+  tmux runner now re-checks and accepts it again before the first routed prompt
+  or later steering input is sent
+
 ## Failure Modes
 
 The tmux runner should surface clear backend failures such as:
@@ -239,7 +246,9 @@ Current clisbot behavior is narrower than the full ideal:
 - if `create.mode` is `explicit`, `SessionService` keeps the same explicit
   session id and the runner relaunches with it
 - if a stored `sessionId` cannot be brought back for the current `sessionKey`, clisbot preserves the continuity entry and fails truthfully; operators can use `/new` to intentionally trigger a new runner conversation
-- if session-id capture never completes, the session can still run, but restart falls back to a fresh tool conversation
+- if session-id capture never completes and no stored resumable id exists, the
+  session can still run, but a later restart may need to open a fresh tool
+  conversation
 - if the first routed prompt right after status-command capture never lands truthfully, clisbot retries paste in place first, then restarts the runner while preserving the stored session id before surfacing failure
 
 ## Runner Sunsetting

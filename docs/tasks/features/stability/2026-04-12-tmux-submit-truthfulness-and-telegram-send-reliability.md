@@ -17,6 +17,10 @@ Bounded retry rule for this flow:
 
 In Progress
 
+Release-ready for the shipped `0.1.45` fixes in this slice, with broader
+real-surface timing audit still open as follow-up validation rather than a
+public-release blocker.
+
 ## Why
 
 This is both a stability and delay problem.
@@ -65,6 +69,11 @@ The fix must respect the project requirement that stability and speed are both f
   - the runner leaves handshake immediately
   - the pane can still be in a transient post-`/status` state where the first prompt paste does not land
 - the implementation in this batch now targets that post-`/status` first-prompt gap directly
+- later hardening in the same release line also covers:
+  - delayed trust prompts that appear after startup but before the first routed
+    prompt or later steering input
+  - restart stop-timeout false failures where the worker exits moments after the
+    first stop deadline
 - the next validation pass needs to cover cases that may stress the current confirmation heuristic more than the traced Slack Claude slice did:
   - prompts with embedded newlines
   - longer prompt bodies

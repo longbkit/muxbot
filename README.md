@@ -13,6 +13,38 @@ It is not just a tmux bridge with chat glued on top. `clisbot` treats Slack and 
 
 `clisbot` is also meant to grow into a reusable agent runtime layer that can support many CLI tools, many channels, and many workflow shapes on top of the same durable agent session.
 
+## Start Here By Goal
+
+### I Want A Personal Coding Bot In Telegram Or Slack
+
+- start with the [Quick Start](#quick-start)
+- best fit when you want Codex, Claude, or Gemini available from chat without
+  giving up a real workspace
+- current release value: `/queue`, stronger long-run continuity, and better
+  trust or restart recovery
+
+### I Want A Shared Team Bot
+
+- start with [Quick Start](#quick-start), then read [Surface Access Model](#surface-access-model)
+- best fit when you need one bot in a real Slack channel, Telegram group, or
+  Telegram topic with explicit route and sender control
+- current release value: safer shared-surface policy, stricter topic or thread
+  isolation, and direct upgrade from older installs
+
+### I Need Operator Control And Debugging
+
+- start with [Common CLI commands](#common-cli-commands)
+- most useful surfaces: `clisbot status`, `clisbot logs`,
+  `clisbot runner list|watch`, and `clisbot queues`
+- current release value: more truthful `sessionId`, lighter runner inventory,
+  and less confusing restart behavior during updates
+
+### I Just Want To Know What Changed Recently
+
+- start with [Recent Release Highlights](#recent-release-highlights)
+- then read [v0.1.45 Release Notes](docs/releases/v0.1.45.md) or the
+  [v0.1.45 Release Guide](docs/updates/releases/v0.1.45-release-guide.md)
+
 ## Why I Built This
 
 I’m Long Luong (Long), Co-founder & CTO of Vexere, Vietnam’s #1 transportation booking platform, where we also build SaaS and inventory distribution infrastructure for transportation operators. As we scale a 300-person company with a 100-member Engineering, Product, and Design team, I’ve been searching for the most practical way to roll out AI-native workflows across the organization.
@@ -29,6 +61,19 @@ The challenge is not whether AI is useful. It is how to make it work at enterpri
 - Not just a tmux bridge. Slack and Telegram are treated as real channel surfaces with routing, thread or topic continuity, pairing, follow-up control, and attachment-aware interaction instead of plain text passthrough so you can work from your laptop or on the go without giving up a real coding workspace.
 - Team-first by design, with `AGENTS`, `USER`, and `MEMORY` context bootstrapping shaped for shared team reality instead of only personal solo-assistant flows.
 - Useful for coding, operations, teamwork, and general assistant work, with fast chat controls such as `!<command>` and `/bash <command>` for terminal-like control, `/loop` to bring loop-style automation beyond Claude, `/queue` to add follow-up prompts in the same session without interrupting the current run, `/streaming on` to view real-time processing progress for coding tasks, and `/mention`, `/mention channel`, or `/mention all` to tighten follow-up policy at conversation, route, or bot scope.
+
+## Who This Fits Best
+
+- Solo builders who want a real coding assistant in Telegram or Slack, backed
+  by Codex, Claude, or Gemini, without rebuilding their workflow around a new
+  web product.
+- Team leads who want one shared bot with explicit group or topic safety,
+  durable context, and attachment-aware chat workflows.
+- Operators who need tmux-backed runtime truth, restart controls, queue
+  inspection, and debug surfaces instead of opaque "the bot seems stuck"
+  guessing.
+- People who care about getting real work done from chat, not just chatting
+  with a thin terminal proxy.
 
 ## What to expect
 
@@ -154,11 +199,22 @@ What happens next:
 
 ## Recent Release Highlights
 
-- `v0.1.45`: safer personal and team bots in real Slack and Telegram groups, automatic direct updates from older installs, more reliable scheduled loops, clearer sender and surface context, Telegram audio support, and stricter streaming/session isolation.
+- `v0.1.45`: safer personal and team bots in real Slack and Telegram groups, automatic direct updates from older installs, durable queue control, clearer session continuity truth, more reliable scheduled loops, stronger trust/restart behavior, and stricter streaming/session isolation.
 - `v0.1.43`: more durable runtime recovery, clearer routed follow-up controls, more truthful tmux prompt submission checks, better queued-start notifications, and safer Slack thread attachment behavior.
 - `v0.1.39`: the first large release of the current bot-first shape, with native Slack and Telegram rendering, cleaner first-run setup, stronger pairing/auth defaults, better long-running run visibility, and recurring `/loop` automation.
 
-There are many more useful fixes and operator improvements in the full release notes, including config update safety, CLI help, setup docs, runner debugging, route policy behavior, and channel-specific polish.
+What `v0.1.45` most likely means for you:
+
+- personal user: fewer fragile long-run failures, better `/queue`, better media
+  handling on Telegram
+- shared bot owner: clearer route safety and easier direct upgrade from older
+  installs
+- operator: better queue visibility, better session continuity truth, and
+  restart behavior that is less misleading during updates
+
+There are many more useful fixes and operator improvements in the full release
+notes, including config update safety, CLI help, setup docs, runner debugging,
+route policy behavior, and channel-specific polish.
 
 Read the full notes here:
 
@@ -320,13 +376,14 @@ If the quick start does not work, check these in order:
 trust_level = "trusted"
 ```
 
-- If that trust screen is still blocking, inspect the live session name with `clisbot runner list`, then attach directly with `tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>`.
+- If that trust screen appears only after startup, current releases should still accept it again before the first routed prompt or later steering input. If it still blocks after one real prompt attempt, inspect the live session name with `clisbot runner list`, then attach directly with `tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>`.
 - If Gemini startup says it is waiting for manual authorization, authenticate Gemini directly first or provide a headless auth path such as `GEMINI_API_KEY` or Vertex AI credentials; `clisbot` now treats that screen as a startup blocker instead of a healthy ready session.
 - If Codex warns that `bubblewrap` is missing on Linux, install `bubblewrap` in the runtime environment.
 - If the bot does not answer, check `clisbot status` first. Healthy channels should show `connection=active`; if a channel stays `starting`, inspect `clisbot logs`.
 - If a routed message was accepted but no reply arrives, send one test message and immediately run `clisbot runner watch --latest --lines 100` in a terminal. This shows the live tmux runner pane and usually reveals missing CLI auth, trust prompts, stuck startup, or model/provider errors.
 - If Codex works in your normal terminal but the routed runner shows `Missing environment variable: CODEX_CLIPROXYAPI_KEY`, remember that `clisbot` runs Codex from a detached background process and tmux session. Start or restart `clisbot` from a shell where `echo $CODEX_CLIPROXYAPI_KEY` prints a value, or export the key in the environment used by your service manager. Existing tmux runner sessions keep their old environment, so recycle them after fixing env.
 - If runtime startup still fails, run `clisbot logs` and inspect the recent log tail that `clisbot` now prints automatically on startup failure.
+- If `clisbot restart` warns that stop timed out during an update, run `clisbot status` once. Current releases should continue cleanly when status already shows the worker exited; only treat it as a real bug if restart leaves the runtime down.
 - If a normal restart is not enough, use `clisbot stop --hard` to stop the runtime and kill all tmux runner sessions on the configured clisbot socket, then start again from a shell with the correct environment.
 - If you need the full command list, run `clisbot --help`.
 - If you need step-by-step operator docs, start with [docs/user-guide/README.md](docs/user-guide/README.md).

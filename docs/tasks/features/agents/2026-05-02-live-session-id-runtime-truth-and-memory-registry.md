@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned
+Dropped
 
 ## Priority
 
@@ -20,8 +20,20 @@ Restore the original session-id design boundary:
 
 ## Why
 
+This follow-up was proposed while the continuity cleanup was still settling.
+
+Current release decision:
+
+- the shipped `SessionMapping` seam plus `sessionId` persistence annotation are
+  enough for `v0.1.45` release readiness
+- there is no current evidence that a dedicated memory-first live-session-id
+  registry is required to keep ordinary operator or chat flows truthful
+- if a later bug shows that persisted-first diagnostics are hiding an actually
+  known live `sessionId`, reopen this as a concrete runtime-truth task instead
+  of carrying it as a speculative release blocker
+
 The current implementation improved continuity ownership, but it still does not
-fully implement the intended runtime-truth model for `sessionId`.
+fully implement the originally imagined runtime-truth model for `sessionId`.
 
 Current gap:
 
@@ -31,8 +43,8 @@ Current gap:
 - this means `capture succeeded but persist failed` can still look like "no
   live session id yet", even though the runner-side truth is already known
 
-That does not break the run itself, but it weakens operator truthfulness and
-drifts from the intended session model.
+That does not currently break the run itself, and it is not being kept as an
+active release-track task.
 
 ## Desired Contract
 
@@ -85,6 +97,15 @@ drifts from the intended session model.
   - startup seeded from stored continuity
   - live session id newer than stored session id
   - diagnostics showing both live and stored truth when they differ
+
+## Drop Reason
+
+- no current release blocker remains after the continuity cleanup, trust-prompt
+  fix, and restart truthfulness fix
+- the remaining gap is an operator-truth polish idea, not a proven broken
+  contract in the shipped `0.1.45-beta.11` path
+- explicit session rebinding remains the clearer later continuity feature to
+  track when new evidence appears
 
 ## Related
 

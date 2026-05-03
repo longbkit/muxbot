@@ -171,21 +171,14 @@ Current recovery rule:
 
 Current user-facing rule:
 
-- `/whoami`, `/status`, and `clisbot runner list` show the saved session id
-- if that value is missing, clisbot has not saved one yet
-- that does not by itself prove the live runner pane lacks a session id
-
-Follow-up target for continuity cleanup:
-
-- `/whoami`, `/status`, `clisbot runner list`, and `clisbot runner watch`
-  should prefer the current `sessionId` from runtime memory when the live run
-  already knows it
-- those surfaces should still show persistence state next to that value:
-  - persisted
-  - not persisted yet
-- if runtime memory knows a newer `sessionId` than `sessions.json`, clisbot
-  should try to persist it early without turning every repeated read or watch
-  poll into another write
+- `/whoami`, `/status`, and `clisbot runner list` now show `sessionId` plus
+  persistence state when clisbot knows it
+- `persisted` means the same value is already saved in session continuity
+- `not persisted yet` means clisbot knows the current value but durable state
+  has not caught up yet
+- if no `sessionId` is shown, clisbot has not saved or confirmed one yet
+- that still does not by itself prove the live runner pane lacks a native
+  session id
 
 Current queue and recovery ordering rule:
 

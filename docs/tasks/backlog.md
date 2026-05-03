@@ -45,7 +45,7 @@ Subtasks, long notes, and detailed decisions belong in the linked task docs.
 | In Progress | P0 | channels | agent progress reply wrapper and prompt | [2026-04-09-agent-progress-reply-wrapper-and-prompt.md](features/channels/2026-04-09-agent-progress-reply-wrapper-and-prompt.md) | 2026-04-10 | Stable local reply commands now pair with `responseMode`, `additionalMessageMode`, `\q` or `\s`, and queue inspection or clear controls; remaining work is broader live validation. |
 | In Progress | P0 | channels | channel plugin standardization | [2026-04-10-channel-plugin-standardization.md](features/channels/2026-04-10-channel-plugin-standardization.md) | 2026-04-10 | Slack and Telegram now share a first-class `ChannelPlugin` seam for runtime bootstrap, operator message commands, health summaries, and route-policy composition; live Slack validation remains. |
 | In Progress | P0 | channels | loop slash command | [2026-04-12-loop-slash-command.md](features/channels/2026-04-12-loop-slash-command.md) | 2026-04-12 | Add `/loop` with managed interval loops, wall-clock schedules, bounded-times parsing, `LOOP.md` maintenance fallback, restart restore, status or cancel controls, and channel test coverage. |
-| In Progress | P0 | stability | tmux submit truthfulness and Telegram send reliability | [2026-04-12-tmux-submit-truthfulness-and-telegram-send-reliability.md](features/stability/2026-04-12-tmux-submit-truthfulness-and-telegram-send-reliability.md) | 2026-04-20 | Post-`/status` first-prompt hardening is now implemented with settle plus bounded paste retries plus one runner restart that preserves stored session id; remaining work is broader Telegram or Slack timing audit and more real-CLI validation. |
+| In Progress | P0 | stability | tmux submit truthfulness and Telegram send reliability | [2026-04-12-tmux-submit-truthfulness-and-telegram-send-reliability.md](features/stability/2026-04-12-tmux-submit-truthfulness-and-telegram-send-reliability.md) | 2026-05-03 | Post-`/status` first-prompt hardening, delayed trust-prompt acceptance before prompt submission, and bounded restart truthfulness are now shipped; remaining work is broader real-surface timing audit, not a release blocker for `0.1.45`. |
 
 ## Planned
 
@@ -53,7 +53,6 @@ Subtasks, long notes, and detailed decisions belong in the linked task docs.
 | --- | --- | --- | --- | --- | --- | --- |
 | Planned | P0 | stability | session runner state machine review | [2026-04-27-session-runner-state-machine-review.md](features/stability/2026-04-27-session-runner-state-machine-review.md) | 2026-04-27 | Review active-run, runner liveness, recovery exhaustion, final delivery, and stale persisted runtime transitions so status, queue, loop, and steering cannot drift. |
 | Planned | P0 | stability | storage handle standardization and durable flush | [2026-05-01-storage-handle-standardization-and-durable-flush.md](features/stability/2026-05-01-storage-handle-standardization-and-durable-flush.md) | 2026-05-01 | Standardize atomic or queued document persistence plus bounded flush-on-stop across `clisbot.json`, `sessions.json`, processed events, runtime health, activity, surface directory, and runtime credentials. |
-| Planned | P1 | agents | live session id runtime truth and memory registry | [2026-05-02-live-session-id-runtime-truth-and-memory-registry.md](features/agents/2026-05-02-live-session-id-runtime-truth-and-memory-registry.md) | 2026-05-02 | Follow up the continuity cleanup by restoring the original live `sessionId` model: memory-first reads, startup seeding from stored continuity, and truthful diagnostics even when capture succeeds but persistence lags or fails. |
 | Done | P0 | cross-cutting | session continuity boundary and runner-service leak cleanup | [2026-05-02-session-continuity-boundary-and-runner-service-leak-cleanup.md](2026-05-02-session-continuity-boundary-and-runner-service-leak-cleanup.md) | 2026-05-02 | Shipped `SessionMapping`, moved explicit-id minting and continuity writes out of runner-owned code, added `sessionId` persistence annotation to diagnostics, and stopped clearing stored session ids automatically on ambiguous resume or `/new` failures. |
 | Done | P0 | control | scoped loops list | [2026-04-29-scoped-loops-list.md](features/control/2026-04-29-scoped-loops-list.md) | 2026-04-29 | Added scoped `clisbot loops list/status` filters using the existing routed `--channel/--target` shape. |
 | Planned | P0 | control | chat channel runtime recovery controls | [2026-04-26-chat-channel-runtime-recovery-controls.md](features/control/2026-04-26-chat-channel-runtime-recovery-controls.md) | 2026-04-26 | Add authorized chat commands for current-session runner recovery first, then explicit broader restart scopes, so users are not forced back to server shell when a tmux runner is wedged. |
@@ -116,6 +115,12 @@ Subtasks, long notes, and detailed decisions belong in the linked task docs.
 | Status | Priority | Feature | Task | Main Doc | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 
+## Dropped
+
+| Status | Priority | Feature | Task | Main Doc | Updated | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Dropped | P1 | agents | live session id runtime truth and memory registry | [2026-05-02-live-session-id-runtime-truth-and-memory-registry.md](features/agents/2026-05-02-live-session-id-runtime-truth-and-memory-registry.md) | 2026-05-03 | The memory-first live-session-id registry idea is not needed for `0.1.45` release readiness; reopen only if real operator evidence shows persisted-first diagnostics are hiding known live truth. |
+
 ## Done
 
 | Status | Priority | Feature | Task | Main Doc | Updated | Notes |
@@ -154,5 +159,6 @@ Subtasks, long notes, and detailed decisions belong in the linked task docs.
 - If work pauses mid-batch, update the active row note with the real stop state.
 - Keep `Planned` prioritized from most important to least important.
 - Move blocked work to `Blocked` instead of hiding it in notes.
+- Move intentionally abandoned or no-longer-needed work to `Dropped`; do not silently delete it.
 - Move finished work to `Done`; do not delete it.
 - Keep notes to one short sentence.
