@@ -11,7 +11,7 @@ Read this file as:
 - not as a claim that every detailed failure path below still reflects current
   shipped behavior line-for-line
 
-Current release-ready truth after `0.1.45-beta.12`:
+Current release-ready truth after `0.1.50-beta.12`:
 
 - `SessionMapping` is now the session-owned continuity seam
 - ambiguous resume-startup and `/new` capture failures preserve the stored
@@ -21,7 +21,7 @@ Current release-ready truth after `0.1.45-beta.12`:
 - `clisbot runner list` no longer captures every live pane just to infer
   session ids
 - a dedicated memory-first live-session-id registry is not being tracked as a
-  release blocker for `0.1.45`; reopen only if real operator evidence shows
+  release blocker for `0.1.50`; reopen only if real operator evidence shows
   persisted-first diagnostics are hiding already-known live truth
 
 ## Quick Reader Guide

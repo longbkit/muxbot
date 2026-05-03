@@ -163,7 +163,7 @@ Loader hiện sẽ backup config gốc rồi normalize sang shape canonical:
 - `groups["*"]`
 - Slack raw id như `groups["C123"]` và `groups["G123"]`
 
-Backup được viết cạnh config, trong `backups/`, trước khi file hiện tại bị rewrite thành schema `0.1.45`.
+Backup được viết cạnh config, trong `backups/`, trước khi file hiện tại bị rewrite thành schema `0.1.50`.
 
 Upgrade log phải hiện từng bước:
 

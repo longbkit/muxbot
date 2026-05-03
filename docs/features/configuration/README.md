@@ -165,7 +165,7 @@ The loader now backs up the original config and normalizes them into the canonic
 - `groups["*"]`
 - Slack raw ids such as `groups["C123"]` and `groups["G123"]`
 
-That keeps upgrade behavior smooth for existing installs. The backup is written beside the config under `backups/`, for example `~/.clisbot/backups/clisbot.json.0.1.43.<timestamp>`, before the current config is rewritten as `0.1.45`.
+That keeps upgrade behavior smooth for existing installs. The backup is written beside the config under `backups/`, for example `~/.clisbot/backups/clisbot.json.0.1.43.<timestamp>`, before the current config is rewritten as `0.1.50`.
 
 The upgrade logs each stage:
 

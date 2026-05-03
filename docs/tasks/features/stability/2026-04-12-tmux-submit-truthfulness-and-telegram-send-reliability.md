@@ -17,7 +17,7 @@ Bounded retry rule for this flow:
 
 In Progress
 
-Release-ready for the shipped `0.1.45` fixes in this slice, with broader
+Release-ready for the shipped `0.1.50` fixes in this slice, with broader
 real-surface timing audit still open as follow-up validation rather than a
 public-release blocker.
 

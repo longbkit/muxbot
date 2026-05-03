@@ -13,8 +13,8 @@ import {
 } from "./group-routes.ts";
 import { migrateLegacyConfigShape } from "./legacy-config-migration.ts";
 
-export const CURRENT_SCHEMA_VERSION = "0.1.45";
-const CONFIG_UPGRADE_MAX_SCHEMA_VERSION = "0.1.44";
+export const CURRENT_SCHEMA_VERSION = "0.1.50";
+const LEGACY_CONFIG_UPGRADE_MAX_SCHEMA_VERSION = "0.1.44";
 
 type Provider = "slack" | "telegram";
 
@@ -53,6 +53,23 @@ function isAtMostVersion(schemaVersion: string | undefined, maxVersion: string) 
     }
   }
   return true;
+}
+
+function isBeforeVersion(schemaVersion: string | undefined, targetVersion: string) {
+  const current = parseVersionParts(schemaVersion);
+  const target = parseVersionParts(targetVersion);
+  if (!current || !target) {
+    return !schemaVersion;
+  }
+  for (let index = 0; index < current.length; index += 1) {
+    if (current[index] < target[index]) {
+      return true;
+    }
+    if (current[index] > target[index]) {
+      return false;
+    }
+  }
+  return false;
 }
 
 function readTimezone(value: unknown) {
@@ -418,7 +435,11 @@ function updateSchemaVersion(config: Record<string, unknown>) {
 }
 
 export function shouldUpgradeConfigSchema(schemaVersion: string | undefined) {
-  return isAtMostVersion(schemaVersion, CONFIG_UPGRADE_MAX_SCHEMA_VERSION);
+  return isBeforeVersion(schemaVersion, CURRENT_SCHEMA_VERSION);
+}
+
+export function shouldApplyLegacyConfigMigration(schemaVersion: string | undefined) {
+  return isAtMostVersion(schemaVersion, LEGACY_CONFIG_UPGRADE_MAX_SCHEMA_VERSION);
 }
 
 export function normalizeConfigDocumentShape(input: unknown) {
@@ -431,7 +452,7 @@ export function normalizeConfigDocumentShape(input: unknown) {
   const schemaVersion = isRecord(config.meta) && typeof config.meta.schemaVersion === "string"
     ? config.meta.schemaVersion
     : undefined;
-  const legacyExactAdmission = shouldUpgradeConfigSchema(schemaVersion);
+  const legacyExactAdmission = shouldApplyLegacyConfigMigration(schemaVersion);
 
   const bots = cloneRecord(config.bots);
   const slack = cloneRecord(bots.slack);

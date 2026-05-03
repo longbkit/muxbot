@@ -224,7 +224,7 @@ Current default policy:
 - retry every 10 seconds for the first 3 unexpected exits
 - then back off through a smoother stage ladder: 1 minute, 3 minutes, 5 minutes, 10 minutes, 15 minutes, and finally 30 minutes
 - when the configured ladder reaches the final stage, clisbot keeps retrying at that final-stage delay instead of stopping permanently
-- if an older config still uses the legacy `15m x4` then `30m x4` default ladder, the runtime now normalizes that legacy default into the smoother ladder; `0.1.45` update also removes the default backoff block from persisted config so future default tuning can apply
+- if an older config still uses the legacy `15m x4` then `30m x4` default ladder, the runtime now normalizes that legacy default into the smoother ladder; `0.1.50` update also removes the default backoff block from persisted config so future default tuning can apply
 
 Current owner alert rule:
 

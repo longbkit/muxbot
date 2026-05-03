@@ -6,7 +6,7 @@ Planned.
 
 ## Context
 
-The `0.1.45` config migration optimizes for low-friction upgrade: when clisbot first reads a released `0.1.43` config, it backs up the original file and writes the new canonical shape automatically.
+The `0.1.50` config migration optimizes for low-friction upgrade: when clisbot first reads a released `0.1.43` config, it backs up the original file and writes the new canonical shape automatically.
 
 That is the right default for normal users, but downgrade and restore deserve an explicit operator surface instead of relying on manual file copying.
 

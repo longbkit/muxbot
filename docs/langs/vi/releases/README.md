@@ -27,13 +27,13 @@ Nhóm này trả lời:
 ## Các ghi chú hiện có
 
 - [Upcoming](./upcoming.md)
-- [v0.1.45](./v0.1.45.md)
+- [v0.1.50](./v0.1.50.md)
 - [v0.1.43](./v0.1.43.md)
 - [v0.1.41](./v0.1.41.md)
 - [v0.1.39](./v0.1.39.md)
 
 ## Cách đọc nhanh
 
-- Muốn biết “phiên bản mới nhất đáng chú ý gì”: đọc `v0.1.45`
+- Muốn biết “phiên bản mới nhất đáng chú ý gì”: đọc `v0.1.50`
 - Muốn theo dõi các thay đổi sắp public: đọc `upcoming.md`
 - Muốn đọc bản tóm tắt ngắn hơn: sang [tổng quan `updates`](../updates/README.md)

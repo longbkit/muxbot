@@ -40,7 +40,7 @@ clisbot status
 예시:
 
 ```text
-npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.45-beta.10 instead."
+npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.50-beta.10 instead."
 ```
 
 ## 어떤 문서를 읽어야 하나
@@ -48,9 +48,9 @@ npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.45-be
 사용자가 무엇이 바뀌었는지, 무엇을 써 봐야 하는지, 무엇을 조심해야 하는지 묻는다면 다음을 읽습니다.
 
 - [릴리스 노트](../releases/README.md)
-- [v0.1.45 릴리스 노트](../releases/v0.1.45.md)
+- [v0.1.50 릴리스 노트](../releases/v0.1.50.md)
 - [릴리스 가이드 모음](README.md)
-- [v0.1.45 릴리스 가이드](releases/v0.1.45-release-guide.md)
+- [v0.1.50 릴리스 가이드](releases/v0.1.50-release-guide.md)
 - [사용자 가이드](../user-guide/README.md)
 
 버전별 기준 문서는 [릴리스 노트](../releases/README.md), 짧은 변경 요약은 [릴리스 가이드 모음](README.md)을 기준으로 봅니다.
@@ -58,17 +58,17 @@ npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.45-be
 ## 현재 stable 경로
 
 ```text
-Path: any version before 0.1.45 -> 0.1.45
-Target: clisbot@0.1.45
+Path: any version before 0.1.50 -> 0.1.50
+Target: clisbot@0.1.50
 Update path: direct
 Manual action: none
 Risk: low
 Automatic config update: yes
 Breaking change: no
-Command: npm install -g clisbot@0.1.45 && clisbot restart
+Command: npm install -g clisbot@0.1.50 && clisbot restart
 검증: clisbot status
-Release note: ../releases/v0.1.45.md
-Release guide: releases/v0.1.45-release-guide.md
+Release note: ../releases/v0.1.50.md
+Release guide: releases/v0.1.50-release-guide.md
 ```
 
 이 경로에는 공개된 `0.1.43`, 그보다 오래된 legacy install, 내부 `0.1.44` pre-release install이 모두 포함됩니다.

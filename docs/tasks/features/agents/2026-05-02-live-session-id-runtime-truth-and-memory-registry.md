@@ -25,7 +25,7 @@ This follow-up was proposed while the continuity cleanup was still settling.
 Current release decision:
 
 - the shipped `SessionMapping` seam plus `sessionId` persistence annotation are
-  enough for `v0.1.45` release readiness
+  enough for `v0.1.50` release readiness
 - there is no current evidence that a dedicated memory-first live-session-id
   registry is required to keep ordinary operator or chat flows truthful
 - if a later bug shows that persisted-first diagnostics are hiding an actually
@@ -103,7 +103,7 @@ active release-track task.
 - no current release blocker remains after the continuity cleanup, trust-prompt
   fix, and restart truthfulness fix
 - the remaining gap is an operator-truth polish idea, not a proven broken
-  contract in the shipped `0.1.45-beta.12` path
+  contract in the shipped `0.1.50-beta.12` path
 - explicit session rebinding remains the clearer later continuity feature to
   track when new evidence appears
 

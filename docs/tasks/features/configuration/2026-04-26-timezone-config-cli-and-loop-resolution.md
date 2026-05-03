@@ -421,7 +421,7 @@ Example log:
 config migration: backed up existing config to /home/user/.clisbot/config.backup.20260426T141500Z.json
 config migration: migrated app.control.loop.defaultTimezone=Asia/Ho_Chi_Minh to app.timezone
 config migration: removed legacy default-level bot timezone fields after moving timezone default to app.timezone
-config migration: validated upgraded config schemaVersion=0.1.45
+config migration: validated upgraded config schemaVersion=0.1.50
 config migration: applied upgraded config successfully
 config migration: existing persisted loops keep their stored timezone snapshots and will not shift
 ```

@@ -223,7 +223,7 @@ Policy mặc định hiện tại:
 - retry mỗi 10 giây cho 3 lần thoát bất ngờ đầu tiên
 - sau đó back off theo một thang mượt hơn: 1 phút, 3 phút, 5 phút, 10 phút, 15 phút, và cuối cùng là 30 phút
 - khi chạm stage cuối cùng, `clisbot` tiếp tục retry ở khoảng chờ của stage cuối thay vì dừng vĩnh viễn
-- nếu config cũ vẫn còn dùng thang mặc định legacy kiểu `15m x4` rồi `30m x4`, runtime sẽ tự normalize về thang mới; bản update `0.1.45` cũng xóa block backoff mặc định khỏi config đã persist để các chỉnh mặc định trong tương lai còn áp dụng được
+- nếu config cũ vẫn còn dùng thang mặc định legacy kiểu `15m x4` rồi `30m x4`, runtime sẽ tự normalize về thang mới; bản update `0.1.50` cũng xóa block backoff mặc định khỏi config đã persist để các chỉnh mặc định trong tương lai còn áp dụng được
 
 Quy tắc owner alert hiện tại:
 

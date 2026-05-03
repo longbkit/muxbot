@@ -19,6 +19,10 @@
   <img src="https://img.shields.io/badge/Workflow-AI--native-f59e0b" alt="AI-native workflow" />
 </p>
 
+<p align="center">
+  Follow product updates on <a href="https://x.com/clisbot">x.com/clisbot</a>.
+</p>
+
 # clisbot - Turn your favorite coding CLI into an agentic personal assistant, workplace assistant, coding partner - on the go
 Want to use OpenClaw but are struggling because:
 
@@ -65,8 +69,8 @@ It is not just a tmux bridge with chat glued on top. `clisbot` treats Slack and 
 ### I Just Want To Know What Changed Recently
 
 - start with [Recent Release Highlights](#recent-release-highlights)
-- then read [v0.1.45 Release Notes](docs/releases/v0.1.45.md) or the
-  [v0.1.45 Release Guide](docs/updates/releases/v0.1.45-release-guide.md)
+- then read [v0.1.50 Release Notes](docs/releases/v0.1.50.md) or the
+  [v0.1.50 Release Guide](docs/updates/releases/v0.1.50-release-guide.md)
 
 ## Why I Built This
 
@@ -85,7 +89,7 @@ The challenge is not whether AI is useful. It is how to make it work at enterpri
 - Team-first by design, with `AGENTS`, `USER`, and `MEMORY` context bootstrapping shaped for shared team reality instead of only personal solo-assistant flows.
 - Shared-surface permission control is a first-class feature: a bot can be in a team group but still answer only the specific people you allow there, while sensitive control actions stay behind explicit auth roles and permissions.
 - Useful for coding, operations, teamwork, and general assistant work, with fast chat controls such as `!<command>`, `/bash <command>`, `/queue`, `/loop`, `/streaming`, and `/mention`.
-- New in `v0.1.45`: the AI-native control experience is much better. You can increasingly ask the bot in normal chat to update itself and explain what changed, help with onboarding, add or configure bots and agents, or create recurring schedules and loops for you instead of relying only on slash commands.
+- New in `v0.1.50`: the AI-native control experience is much better. You can increasingly ask the bot in normal chat to update itself and explain what changed, help with onboarding, add or configure bots and agents, or create recurring schedules and loops for you instead of relying only on slash commands.
 
 ## Who This Fits Best
 
@@ -181,12 +185,12 @@ Next steps:
 - `clisbot` also has a smart autopairing path to reduce first-run friction. If
   you send the bot a DM within the first 30 minutes, you can usually claim the
   owner role immediately and start using it without a separate pairing round.
-- New from `v0.1.45`: the AI-native operator experience is much stronger. You
+- New from `v0.1.50`: the AI-native operator experience is much stronger. You
   can increasingly ask the bot through chat to explain how to use it, update
   itself and summarize what's new, help onboard you, create or add a new bot or
   agent, or set up loops and schedules for recurring work instead of relying
   only on slash commands.
-- Existing configs from any version before `0.1.45` update directly to `0.1.45` automatically on first run. clisbot writes a backup first under `~/.clisbot/backups/`, then rewrites the config to the current shape.
+- Existing configs from any version before `0.1.50` update directly to `0.1.50` automatically on first run. clisbot writes a backup first under `~/.clisbot/backups/`, then rewrites the config to the current shape.
 - Shared Slack channels, Slack groups, Telegram groups, and Telegram topics are a separate gate: normal users need an explicit route such as `group:<id>` or `topic:<chatId>:<topicId>` before the bot will talk there. Legacy Slack `channel:<id>` input still works for compatibility.
 - After a shared surface is admitted, per-surface sender control comes from the bot's default shared rule `groups["*"]` plus any route-local `allowUsers` or `blockUsers`.
 - With that permission model, a bot can be added to a team group but still be
@@ -233,7 +237,7 @@ What happens next:
 
 ## Recent Release Highlights
 
-- `v0.1.45`: a much more AI-native operator experience, where you can
+- `v0.1.50`: a much more AI-native operator experience, where you can
   increasingly talk to the bot to manage itself; plus safer personal and team
   bots in real Slack and Telegram groups, automatic direct updates from older
   installs, durable queue control, clearer session continuity truth, more
@@ -241,7 +245,7 @@ What happens next:
   streaming/session isolation.
 - `v0.1.43`: more durable runtime recovery, clearer routed follow-up controls, more truthful tmux prompt submission checks, better queued-start notifications, and safer Slack thread attachment behavior.
 
-What `v0.1.45` most likely means for you:
+What `v0.1.50` most likely means for you:
 
 - The headline is AI-native control: ask the bot in chat to queue work,
   schedule recurring briefs, help update itself, explain release changes, or
@@ -264,7 +268,7 @@ Read the full notes here:
 
 - [CHANGELOG.md](CHANGELOG.md)
 - [Release Notes Index](docs/releases/README.md)
-- [v0.1.45 Release Notes](docs/releases/v0.1.45.md)
+- [v0.1.50 Release Notes](docs/releases/v0.1.50.md)
 - [v0.1.43 Release Notes](docs/releases/v0.1.43.md)
 - [v0.1.39 Release Notes](docs/releases/v0.1.39.md)
 
@@ -295,10 +299,10 @@ Repo-local `bun run start|stop|restart|status|logs|init|pairing` is pinned by `.
 
 Update note for existing installs:
 
-- Older installs before `v0.1.45` now update directly on first run with a
+- Older installs before `v0.1.50` now update directly on first run with a
   backup written first, so most people can update and restart without a manual
   migration pass.
-- After you are on `v0.1.45`, future upgrades should feel much more AI-native:
+- After you are on `v0.1.50`, future upgrades should feel much more AI-native:
   in many cases you can simply ask the bot to update `clisbot` to the latest
   version, and it can follow the update guide, perform the upgrade flow, then
   brief you on what changed.

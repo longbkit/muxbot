@@ -38,7 +38,7 @@ If a version was published by mistake:
 Example:
 
 ```text
-npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.45-beta.10 instead."
+npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.50-beta.10 instead."
 ```
 
 ## Release Reading
@@ -46,9 +46,9 @@ npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.45-be
 Read these when the user asks what is new, what to try, or what to watch:
 
 - [Release notes](../releases/README.md)
-- [v0.1.45 release note](../releases/v0.1.45.md)
+- [v0.1.50 release note](../releases/v0.1.50.md)
 - [Release guides](README.md)
-- [v0.1.45 release guide](releases/v0.1.45-release-guide.md)
+- [v0.1.50 release guide](releases/v0.1.50-release-guide.md)
 - [User guide](../user-guide/README.md)
 
 Use [Release notes](../releases/README.md) for the canonical version map.
@@ -58,17 +58,17 @@ For deeper questions that the migration index, update guide, and release docs do
 ## Current Stable Path
 
 ```text
-Path: any version before 0.1.45 -> 0.1.45
-Target: clisbot@0.1.45
+Path: any version before 0.1.50 -> 0.1.50
+Target: clisbot@0.1.50
 Update path: direct
 Manual action: none
 Risk: low
 Automatic config update: yes
 Breaking change: no
-Command: npm install -g clisbot@0.1.45 && clisbot restart
+Command: npm install -g clisbot@0.1.50 && clisbot restart
 Verify: clisbot status
-Release note: ../releases/v0.1.45.md
-Release guide: releases/v0.1.45-release-guide.md
+Release note: ../releases/v0.1.50.md
+Release guide: releases/v0.1.50-release-guide.md
 ```
 
 This includes released `0.1.43` installs, older legacy installs before `0.1.43`, and internal `0.1.44` pre-release installs.

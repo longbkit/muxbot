@@ -2,7 +2,7 @@
 
 # Trạng thái tài liệu tiếng Việt
 
-- Phiên bản nền: `v0.1.45`
+- Phiên bản nền: `v0.1.50`
 - Cập nhật lần cuối: `2026-05-03 UTC`
 - Mục tiêu hiện tại: giữ mirror tree đúng theo source, giữ internal link tiếng Việt nhất quán khi có counterpart, và tiếp tục siết native wording để giảm tối đa English leakage không cần thiết.
 

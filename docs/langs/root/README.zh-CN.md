@@ -17,6 +17,10 @@
   <img src="https://img.shields.io/badge/Workflow-AI--native-f59e0b" alt="AI-native workflow" />
 </p>
 
+<p align="center">
+  产品更新请关注 <a href="https://x.com/clisbot">x.com/clisbot</a>。
+</p>
+
 # clisbot - 把你最喜欢的 coding CLI 变成可随身使用的 agentic 个人助理、团队助理和 coding 搭档
 如果你想用 OpenClaw，但正卡在这些问题上：
 
@@ -55,7 +59,7 @@
 ### 我只想快速知道最近有什么变化
 
 - 从 [最近版本亮点](#recent-release-highlights) 开始
-- 然后读 [v0.1.45 Release Notes](../../../docs/releases/v0.1.45.md) 或 [v0.1.45 Release Guide](../../../docs/updates/releases/v0.1.45-release-guide.md)
+- 然后读 [v0.1.50 Release Notes](../../../docs/releases/v0.1.50.md) 或 [v0.1.50 Release Guide](../../../docs/updates/releases/v0.1.50-release-guide.md)
 
 ## 为什么我做 clisbot
 
@@ -74,7 +78,7 @@
 - 从设计上就 team-first：`AGENTS`、`USER`、`MEMORY` 这套 context bootstrap 是为团队协作现实设计的，而不是只面向单人助理场景。
 - 共享对话场景的权限控制是第一等公民：一个 bot 可以待在团队群里，但只对你明确允许的人作答；而敏感的控制动作仍被清晰的 auth role 和 permission 保护。
 - 它可用于 coding、运维、团队协作以及一般助理工作，并提供 `!<command>`、`/bash <command>`、`/queue`、`/loop`、`/streaming`、`/mention` 等快速聊天控制方式。
-- `v0.1.45` 的一个重要变化是 AI-native 控制体验更好了。你越来越可以直接在普通聊天中让 bot 自己更新并解释变更、帮助 onboarding、添加或配置 bot 和 agent，或为你建立 schedule 和 loop，而不是只依赖 slash command。
+- `v0.1.50` 的一个重要变化是 AI-native 控制体验更好了。你越来越可以直接在普通聊天中让 bot 自己更新并解释变更、帮助 onboarding、添加或配置 bot 和 agent，或为你建立 schedule 和 loop，而不是只依赖 slash command。
 
 ## 最适合谁
 
@@ -167,8 +171,8 @@ clisbot start \
 
 - 出于安全考虑，DM 默认进入 pairing。
 - `clisbot` 也有一套 smart autopairing 路径来减少首次使用摩擦。如果你在前 30 分钟内就给 bot 发 DM，通常可以直接 claim owner 角色并开始使用，而不需要额外经过 pairing 流程。
-- 从 `v0.1.45` 开始，AI-native 运维体验强得多。你越来越可以直接在聊天里让 bot 解释怎么用、自己更新并总结新变化、帮你 onboarding、创建或添加新的 bot / agent，或者搭好 loop 和 schedule 来处理重复工作，而不是只依赖 slash command。
-- 所有早于 `0.1.45` 的旧配置都会在第一次启动时自动直接更新到 `0.1.45`。clisbot 会先把备份写入 `~/.clisbot/backups/`，再把 config 重写成当前 shape。
+- 从 `v0.1.50` 开始，AI-native 运维体验强得多。你越来越可以直接在聊天里让 bot 解释怎么用、自己更新并总结新变化、帮你 onboarding、创建或添加新的 bot / agent，或者搭好 loop 和 schedule 来处理重复工作，而不是只依赖 slash command。
+- 所有早于 `0.1.50` 的旧配置都会在第一次启动时自动直接更新到 `0.1.50`。clisbot 会先把备份写入 `~/.clisbot/backups/`，再把 config 重写成当前 shape。
 - 共享 Slack channel、Slack group、Telegram group 和 Telegram topic 是一层单独的 gate：普通用户必须先有明确 route，比如 `group:<id>` 或 `topic:<chatId>:<topicId>`，bot 才会在那里说话。Legacy Slack `channel:<id>` 输入仍可用于兼容。
 - 当一个共享对话场景被 admit 后，逐场景发送者控制由 bot 默认 shared rule `groups["*"]` 加上 route-local 的 `allowUsers` / `blockUsers` 一起决定。
 - 基于这套 permission model，一个 bot 可以被加入团队群，但仍然只允许回复群里某些特定的人。
@@ -206,10 +210,10 @@ clisbot start \
 
 ## 最近版本亮点
 
-- `v0.1.45`：AI-native 运维体验强了很多，你越来越可以直接对 bot 说话，让它管理自己；同时个人 bot 和团队 bot 在真实 Slack / Telegram group 中更安全，旧安装可以直接升级，durable queue control 更成熟，session continuity 更贴近真实运行状态，scheduled loop 更可靠，trust/restart 更稳，streaming / session isolation 也更严格。
+- `v0.1.50`：AI-native 运维体验强了很多，你越来越可以直接对 bot 说话，让它管理自己；同时个人 bot 和团队 bot 在真实 Slack / Telegram group 中更安全，旧安装可以直接升级，durable queue control 更成熟，session continuity 更贴近真实运行状态，scheduled loop 更可靠，trust/restart 更稳，streaming / session isolation 也更严格。
 - `v0.1.43`：runtime recovery 更持久，routed follow-up control 更清晰，tmux prompt submission check 更接近真实，queued-start notification 更好，Slack thread attachment 行为也更安全。
 
-`v0.1.45` 对你最可能意味着什么：
+`v0.1.50` 对你最可能意味着什么：
 
 - 最大亮点是 AI-native control：你可以在聊天里直接让 bot queue 工作、安排周期性 brief、帮助它自己更新、解释 release 变化，或引导 setup / routing，而不必每件事都落回 shell。
 - 个人用户：长时间运行更少脆弱故障，`/queue` 更好，Telegram 上的媒体处理更稳
@@ -222,7 +226,7 @@ clisbot start \
 
 - [CHANGELOG.md](../../../CHANGELOG.md)
 - [Release Notes Index](../zh-CN/releases/README.md)
-- [v0.1.45 Release Notes](../../../docs/releases/v0.1.45.md)
+- [v0.1.50 Release Notes](../../../docs/releases/v0.1.50.md)
 - [v0.1.43 Release Notes](../../../docs/releases/v0.1.43.md)
 - [v0.1.39 Release Notes](../../../docs/releases/v0.1.39.md)
 
@@ -253,8 +257,8 @@ repo-local 的 `bun run start|stop|restart|status|logs|init|pairing` 通过 `.en
 
 现有安装的更新说明：
 
-- `v0.1.45` 之前的旧安装现在会在第一次运行时自动直接升级，并先写一份备份，所以多数人都可以直接更新并 restart，不需要单独跑一次 manual migration。
-- 当你已经升级到 `v0.1.45` 后，后续升级会越来越 AI-native：很多情况下你只要让 bot 更新 `clisbot` 到最新版本，它就能跟着 update guide 完成升级流程，然后告诉你变化摘要。
+- `v0.1.50` 之前的旧安装现在会在第一次运行时自动直接升级，并先写一份备份，所以多数人都可以直接更新并 restart，不需要单独跑一次 manual migration。
+- 当你已经升级到 `v0.1.50` 后，后续升级会越来越 AI-native：很多情况下你只要让 bot 更新 `clisbot` 到最新版本，它就能跟着 update guide 完成升级流程，然后告诉你变化摘要。
 - 如果你仍想让 agent 在更新前先检查当前配置，可以先让本 repo 中的 Codex 或 Claude 帮你 review。
 - 现在 manual package upgrade 路径也更简单了：
 

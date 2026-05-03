@@ -45,7 +45,7 @@ Subtasks, long notes, and detailed decisions belong in the linked task docs.
 | In Progress | P0 | channels | agent progress reply wrapper and prompt | [2026-04-09-agent-progress-reply-wrapper-and-prompt.md](features/channels/2026-04-09-agent-progress-reply-wrapper-and-prompt.md) | 2026-04-10 | Stable local reply commands now pair with `responseMode`, `additionalMessageMode`, `\q` or `\s`, and queue inspection or clear controls; remaining work is broader live validation. |
 | In Progress | P0 | channels | channel plugin standardization | [2026-04-10-channel-plugin-standardization.md](features/channels/2026-04-10-channel-plugin-standardization.md) | 2026-04-10 | Slack and Telegram now share a first-class `ChannelPlugin` seam for runtime bootstrap, operator message commands, health summaries, and route-policy composition; live Slack validation remains. |
 | In Progress | P0 | channels | loop slash command | [2026-04-12-loop-slash-command.md](features/channels/2026-04-12-loop-slash-command.md) | 2026-04-12 | Add `/loop` with managed interval loops, wall-clock schedules, bounded-times parsing, `LOOP.md` maintenance fallback, restart restore, status or cancel controls, and channel test coverage. |
-| In Progress | P0 | stability | tmux submit truthfulness and Telegram send reliability | [2026-04-12-tmux-submit-truthfulness-and-telegram-send-reliability.md](features/stability/2026-04-12-tmux-submit-truthfulness-and-telegram-send-reliability.md) | 2026-05-03 | Post-`/status` first-prompt hardening, delayed trust-prompt acceptance before prompt submission, and bounded restart truthfulness are now shipped; remaining work is broader real-surface timing audit, not a release blocker for `0.1.45`. |
+| In Progress | P0 | stability | tmux submit truthfulness and Telegram send reliability | [2026-04-12-tmux-submit-truthfulness-and-telegram-send-reliability.md](features/stability/2026-04-12-tmux-submit-truthfulness-and-telegram-send-reliability.md) | 2026-05-03 | Post-`/status` first-prompt hardening, delayed trust-prompt acceptance before prompt submission, and bounded restart truthfulness are now shipped; remaining work is broader real-surface timing audit, not a release blocker for `0.1.50`. |
 
 ## Planned
 
@@ -119,7 +119,7 @@ Subtasks, long notes, and detailed decisions belong in the linked task docs.
 
 | Status | Priority | Feature | Task | Main Doc | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Dropped | P1 | agents | live session id runtime truth and memory registry | [2026-05-02-live-session-id-runtime-truth-and-memory-registry.md](features/agents/2026-05-02-live-session-id-runtime-truth-and-memory-registry.md) | 2026-05-03 | The memory-first live-session-id registry idea is not needed for `0.1.45` release readiness; reopen only if real operator evidence shows persisted-first diagnostics are hiding known live truth. |
+| Dropped | P1 | agents | live session id runtime truth and memory registry | [2026-05-02-live-session-id-runtime-truth-and-memory-registry.md](features/agents/2026-05-02-live-session-id-runtime-truth-and-memory-registry.md) | 2026-05-03 | The memory-first live-session-id registry idea is not needed for `0.1.50` release readiness; reopen only if real operator evidence shows persisted-first diagnostics are hiding known live truth. |
 
 ## Done
 

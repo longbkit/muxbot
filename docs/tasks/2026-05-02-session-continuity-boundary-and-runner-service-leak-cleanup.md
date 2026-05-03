@@ -26,7 +26,7 @@ If you only remember four lines, remember these:
 Done
 
 Historical task record with shipped follow-up. The main continuity cleanup is
-done for `0.1.45`; read the deeper design sections below as the task's working
+done for `0.1.50`; read the deeper design sections below as the task's working
 target, not as a claim that every aspirational sub-idea is still an active
 release-track requirement.
 
@@ -45,7 +45,7 @@ gap is now closed enough for the main session-id continuity path:
 
 The remaining follow-up outside this task is explicit session rebinding as a
 future control surface. The earlier idea of a dedicated memory-first
-live-session-id registry is not being carried as a `0.1.45` release blocker.
+live-session-id registry is not being carried as a `0.1.50` release blocker.
 
 ## Implemented
 
