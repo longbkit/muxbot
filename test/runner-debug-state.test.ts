@@ -49,17 +49,24 @@ describe("listRunnerSessions", () => {
         }, null, 2)}\n`,
       );
 
+      const originalListSessions = TmuxClient.prototype.listSessions;
+      const originalCapturePane = TmuxClient.prototype.capturePane;
       TmuxClient.prototype.listSessions = mock(async () => [resolved.sessionName]);
       const capturePane = mock(async () => {
         throw new Error("capturePane should not be called by runner list");
       });
       TmuxClient.prototype.capturePane = capturePane;
 
-      const sessions = await listRunnerSessions(loaded);
+      try {
+        const sessions = await listRunnerSessions(loaded);
 
-      expect(sessions).toHaveLength(1);
-      expect(sessions[0]?.identity?.sessionId).toBe("stored-session-id");
-      expect(capturePane.mock.calls).toHaveLength(0);
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0]?.identity?.sessionId).toBe("stored-session-id");
+        expect(capturePane.mock.calls).toHaveLength(0);
+      } finally {
+        TmuxClient.prototype.listSessions = originalListSessions;
+        TmuxClient.prototype.capturePane = originalCapturePane;
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
